@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/http_response.dart';
+import 'package:getman/core/network/network_service.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
+import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:uuid/uuid.dart';
-import '../../domain/entities/request_tab_entity.dart';
-import '../../domain/repositories/tabs_repository.dart';
-import '../../domain/usecases/send_request_use_case.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
-import '../../../../core/error/failures.dart';
-import '../../../../core/network/network_service.dart';
-import 'tabs_event.dart';
-import 'tabs_state.dart';
 
 class _RequestManager {
   final Map<String, NetworkCancelHandle> _handles = {};
@@ -49,7 +50,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
   final _RequestManager _requests = _RequestManager();
   Timer? _debounceTimer;
-  final Uuid uuid = const Uuid();
+  static const Uuid _uuid = Uuid();
 
   static const _saveDebounce = Duration(seconds: 10);
 
@@ -104,7 +105,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     try {
       final tabs = await repository.getTabs();
       if (tabs.isEmpty) {
-        final newTabId = uuid.v4();
+        final newTabId = _uuid.v4();
         emit(state.copyWith(
           tabs: [HttpRequestTabEntity(
             tabId: newTabId,
@@ -134,8 +135,8 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }
 
     final newTab = HttpRequestTabEntity(
-      tabId: uuid.v4(),
-      config: event.config ?? HttpRequestConfigEntity(id: uuid.v4()),
+      tabId: _uuid.v4(),
+      config: event.config ?? HttpRequestConfigEntity(id: _uuid.v4()),
       collectionNodeId: event.collectionNodeId,
       collectionName: event.collectionName,
     );
@@ -164,6 +165,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   void _onSetActiveIndex(SetActiveIndex event, Emitter<TabsState> emit) {
+    // Reject out-of-range indices (e.g. from a stale sheet/menu context) so
+    // widgets can index `tabs[activeIndex]` without re-checking bounds.
+    if (event.index < 0 || event.index >= state.tabs.length) return;
     emit(state.copyWith(activeIndex: event.index));
   }
 
@@ -231,7 +235,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (index == -1) return;
     final tabToDuplicate = state.tabs[index];
     final duplicatedTab = HttpRequestTabEntity(
-      tabId: uuid.v4(),
+      tabId: _uuid.v4(),
       config: tabToDuplicate.config.copyWith(),
       collectionNodeId: null,
       collectionName: null,
@@ -253,15 +257,14 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   Future<void> _onSendRequest(SendRequest event, Emitter<TabsState> emit) async {
-    final activeIndex = state.activeIndex;
-    if (activeIndex < 0 || activeIndex >= state.tabs.length) return;
+    final tab = state.tabs.byId(event.tabId);
+    if (tab == null || tab.isSending) return;
 
-    final activeTab = state.tabs[activeIndex];
-    final tabId = activeTab.tabId;
-    final config = activeTab.config;
+    final tabId = tab.tabId;
+    final config = tab.config;
     final handle = _requests.start(tabId);
 
-    emit(state.copyWith(tabs: _replaceTabById(state.tabs, activeTab.copyWith(isSending: true))));
+    emit(state.copyWith(tabs: _replaceTabById(state.tabs, tab.copyWith(isSending: true))));
 
     try {
       final response = await sendRequestUseCase(
@@ -272,10 +275,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       _requests.finish(tabId);
       _applyToTab(emit, tabId, (live) => live.copyWith(
         isSending: false,
-        statusCode: response.statusCode,
-        durationMs: response.durationMs,
-        responseBody: response.body,
-        responseHeaders: response.headers,
+        response: response,
       ));
     } on NetworkFailure catch (f) {
       _requests.finish(tabId);
@@ -287,11 +287,19 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
       _applyToTab(emit, tabId, (live) => live.copyWith(
         isSending: false,
-        statusCode: f.statusCode ?? 0,
-        durationMs: 0,
-        responseBody: f.message,
-        responseHeaders: const <String, String>{},
+        response: HttpResponseEntity(
+          statusCode: f.statusCode ?? 0,
+          body: f.message,
+          headers: const {},
+          durationMs: 0,
+        ),
       ));
+    } catch (e) {
+      // Anything unexpected must still release the tab — otherwise it is
+      // stuck on "SENDING" with no way to retry or cancel.
+      _requests.finish(tabId);
+      debugPrint('SendRequest failed unexpectedly: $e');
+      _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
     }
   }
 

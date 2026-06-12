@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
-import '../../../../core/error/failures.dart';
-import '../../../../core/network/http_response.dart';
-import '../../../../core/network/network_service.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
-import '../../../history/domain/usecases/history_usecases.dart';
-import '../../../settings/domain/usecases/settings_usecases.dart';
-import '../repositories/tabs_repository.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/http_response.dart';
+import 'package:getman/core/network/network_service.dart';
+import 'package:getman/features/history/domain/usecases/history_usecases.dart';
+import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
+import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 
 class SendRequestUseCase {
   final TabsRepository tabsRepository;

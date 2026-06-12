@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/languages/json.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
-import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart';
 
 class JsonCodeEditor extends StatelessWidget {
   final CodeLineEditingController controller;

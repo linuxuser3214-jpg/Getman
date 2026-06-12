@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import '../error/failures.dart';
-import 'http_response.dart';
+import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/http_response.dart';
 
 String _jsonEncode(dynamic data) => json.encode(data);
 

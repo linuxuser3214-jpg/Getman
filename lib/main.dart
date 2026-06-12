@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'core/di/injection_container.dart' as di;
-import 'core/theme/app_theme.dart';
-import 'core/theme/theme_registry.dart';
-import 'features/settings/presentation/bloc/settings_bloc.dart';
-import 'features/settings/presentation/bloc/settings_state.dart';
-import 'features/history/presentation/bloc/history_bloc.dart';
-import 'features/history/presentation/bloc/history_event.dart';
-import 'features/collections/presentation/bloc/collections_bloc.dart';
-import 'features/collections/presentation/bloc/collections_event.dart';
-import 'features/tabs/presentation/bloc/tabs_bloc.dart';
-import 'features/tabs/presentation/bloc/tabs_event.dart';
-import 'features/environments/presentation/bloc/environments_bloc.dart';
-import 'features/environments/presentation/bloc/environments_event.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/di/injection_container.dart' as di;
+import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
-import 'features/settings/domain/entities/settings_entity.dart';
-import 'features/home/domain/usecases/tab_dirty_checker.dart';
-import 'core/navigation/app_router.dart';
+import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
+import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
+import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,12 +37,19 @@ class MyApp extends StatelessWidget {
       child: MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => di.sl<SettingsBloc>()),
-        BlocProvider(create: (_) => di.sl<HistoryBloc>()..add(const LoadHistory())),
+        // HistoryBloc loads itself by subscribing to watchHistory().
+        BlocProvider(create: (_) => di.sl<HistoryBloc>()),
         BlocProvider(create: (_) => di.sl<CollectionsBloc>()..add(const LoadCollections())),
         BlocProvider(create: (_) => di.sl<TabsBloc>()..add(const LoadTabs())),
         BlocProvider(create: (_) => di.sl<EnvironmentsBloc>()..add(const LoadEnvironments())),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
+        // Rebuilding here re-runs the theme builder and rebuilds the entire
+        // MaterialApp — gate it to the three settings that actually feed it.
+        buildWhen: (prev, next) =>
+            prev.settings.themeId != next.settings.themeId ||
+            prev.settings.isDarkMode != next.settings.isDarkMode ||
+            prev.settings.isCompactMode != next.settings.isCompactMode,
         builder: (context, state) {
           final settings = state.settings;
           final themeBuilder = resolveTheme(settings.themeId);

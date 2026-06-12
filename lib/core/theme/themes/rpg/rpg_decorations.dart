@@ -1,9 +1,7 @@
 import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-
-import '../../app_theme.dart';
-import 'rpg_palette.dart';
+import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
 
 BoxDecoration rpgPanelBox(
   BuildContext context, {
@@ -92,36 +90,6 @@ BoxDecoration rpgTabShape(
 
 Widget rpgScaffoldBackground(BuildContext context, {required Widget child}) {
   return _RpgAnimatedBackground(child: child);
-}
-
-Widget rpgDoubleRule(BuildContext context) {
-  final color = Theme.of(context).dividerColor;
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        height: 1,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [
-            color.withValues(alpha: 0),
-            color,
-            color.withValues(alpha: 0),
-          ]),
-        ),
-      ),
-      const SizedBox(height: 2),
-      Container(
-        height: 2,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [
-            RpgPalette.gold.withValues(alpha: 0),
-            RpgPalette.gold,
-            RpgPalette.gold.withValues(alpha: 0),
-          ]),
-        ),
-      ),
-    ],
-  );
 }
 
 /// Slowly drifting starfield + radial vignette behind the app.

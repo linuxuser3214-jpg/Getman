@@ -1,14 +1,11 @@
+import 'package:getman/core/error/exceptions.dart';
+import 'package:getman/core/storage/hive_boxes.dart';
+import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../../../../core/error/exceptions.dart';
-import '../../../../core/storage/hive_boxes.dart';
-import '../../../../core/storage/hive_helpers.dart';
-import '../models/request_config_model.dart';
 
 abstract class HistoryLocalDataSource {
   Future<List<HttpRequestConfig>> getHistory();
-  Future<void> saveHistory(List<HttpRequestConfig> history);
   Future<void> addToHistory(HttpRequestConfig config, int limit);
-  Future<void> clearHistory();
   Stream<void> watch();
 }
 
@@ -21,15 +18,6 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
       return _box().values.toList();
     } catch (e) {
       throw PersistenceException('Failed to read history', cause: e);
-    }
-  }
-
-  @override
-  Future<void> saveHistory(List<HttpRequestConfig> history) async {
-    try {
-      await replaceAllInBox(_box(), history);
-    } catch (e) {
-      throw PersistenceException('Failed to save history', cause: e);
     }
   }
 
@@ -51,15 +39,6 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
       }
     } catch (e) {
       throw PersistenceException('Failed to add to history', cause: e);
-    }
-  }
-
-  @override
-  Future<void> clearHistory() async {
-    try {
-      await _box().clear();
-    } catch (e) {
-      throw PersistenceException('Failed to clear history', cause: e);
     }
   }
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../app_theme.dart';
+import 'package:getman/core/theme/app_theme.dart';
 
 BoxDecoration editorialPanelBox(
   BuildContext context, {
@@ -61,18 +61,6 @@ Widget editorialScaffoldBackground(BuildContext context, {required Widget child}
           ),
         ),
       ),
-    ],
-  );
-}
-
-Widget editorialDoubleRule(BuildContext context) {
-  final ink = Theme.of(context).dividerColor;
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(height: 1, color: ink),
-      const SizedBox(height: 2),
-      Container(height: 3, color: ink),
     ],
   );
 }

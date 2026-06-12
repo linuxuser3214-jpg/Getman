@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'theme_ids.dart';
-import 'themes/brutalist/brutalist_theme.dart';
-import 'themes/editorial/editorial_theme.dart';
-import 'themes/rpg/rpg_theme.dart';
+import 'package:getman/core/theme/theme_ids.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/theme/themes/editorial/editorial_theme.dart';
+import 'package:getman/core/theme/themes/rpg/rpg_theme.dart';
 
 typedef AppThemeBuilder = ThemeData Function(Brightness brightness, {bool isCompact});
 

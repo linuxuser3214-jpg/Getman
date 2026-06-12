@@ -1,8 +1,8 @@
+import 'package:getman/core/error/exceptions.dart';
+import 'package:getman/core/storage/hive_boxes.dart';
+import 'package:getman/core/storage/hive_helpers.dart';
+import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../../../../core/error/exceptions.dart';
-import '../../../../core/storage/hive_boxes.dart';
-import '../../../../core/storage/hive_helpers.dart';
-import '../models/request_tab_model.dart';
 
 abstract class TabsLocalDataSource {
   Future<List<HttpRequestTabModel>> getTabs();
