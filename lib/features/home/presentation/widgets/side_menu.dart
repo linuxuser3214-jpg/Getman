@@ -27,7 +27,9 @@ class SideMenu extends StatelessWidget {
             const _SideMenuHeader(),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: theme.dividerColor, width: layout.borderThick),
+                border: Border(
+                  bottom: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                ),
               ),
               child: TabBar(
                 dividerColor: Colors.transparent,

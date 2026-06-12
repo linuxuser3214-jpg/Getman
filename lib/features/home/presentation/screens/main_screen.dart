@@ -201,9 +201,18 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildSplitShell(BuildContext context, ThemeData theme, TabsState tabsState, int activeIndex, List<HttpRequestTabEntity> tabs, double currentSideMenuWidth) {
+    final layout = context.appLayout;
     return Row(
       children: [
-        SizedBox(width: currentSideMenuWidth, child: const SideMenu()),
+        Container(
+          width: currentSideMenuWidth,
+          decoration: BoxDecoration(
+            border: Border(
+              right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+            ),
+          ),
+          child: const SideMenu(),
+        ),
         Splitter(
           isVertical: false,
           onUpdate: (delta) {
