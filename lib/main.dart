@@ -8,6 +8,7 @@ import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
@@ -56,6 +57,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<CollectionsBloc>()..add(const LoadCollections())),
         BlocProvider(create: (_) => di.sl<TabsBloc>()..add(const LoadTabs())),
         BlocProvider(create: (_) => di.sl<EnvironmentsBloc>()..add(const LoadEnvironments())),
+        BlocProvider(create: (_) => di.sl<RulesBloc>()),
       ],
       child: NetworkSettingsListener(
         child: WorkspaceSyncListener(

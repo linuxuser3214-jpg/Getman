@@ -1,0 +1,24 @@
+import 'package:equatable/equatable.dart';
+import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
+
+abstract class RulesEvent extends Equatable {
+  const RulesEvent();
+  @override
+  List<Object?> get props => [];
+}
+
+/// Load the rules for a request config (the active request editor's config id).
+class LoadRules extends RulesEvent {
+  final String configId;
+  const LoadRules(this.configId);
+  @override
+  List<Object?> get props => [configId];
+}
+
+/// Persist + reflect edited rules.
+class SaveRules extends RulesEvent {
+  final RequestRulesEntity rules;
+  const SaveRules(this.rules);
+  @override
+  List<Object?> get props => [rules];
+}
