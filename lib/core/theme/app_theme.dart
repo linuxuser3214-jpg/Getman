@@ -327,6 +327,21 @@ class AppPalette extends ThemeExtension<AppPalette> {
     return statusAccentWarning;
   }
 
+  /// Black or white — whichever yields the higher WCAG contrast on [background].
+  /// (Flutter's estimateBrightnessForColor is threshold-based and picks the
+  /// wrong one for some mid-tone colors; this direct comparison is optimal and
+  /// guarantees >= ~4.58:1 for any background.) For text/icons on method- and
+  /// status-colored chips instead of hardcoding white. (a11y)
+  Color onColor(Color background) {
+    final lum = background.computeLuminance();
+    final contrastWithWhite = 1.05 / (lum + 0.05);
+    final contrastWithBlack = (lum + 0.05) / 0.05;
+    return contrastWithWhite >= contrastWithBlack ? Colors.white : Colors.black;
+  }
+
+  Color methodOn(String method) => onColor(methodColor(method));
+  Color statusOn(int code) => onColor(statusColor(code));
+
   @override
   AppPalette copyWith({
     Map<String, Color>? methodColors,

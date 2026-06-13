@@ -161,8 +161,8 @@ class _Pill extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          // Deliberate contrast on a variable-colored status pill (CLAUDE.md §4.8).
-          color: Colors.white,
+          // Luminance-based contrast against the variable pill color (a11y).
+          color: context.appPalette.onColor(color),
           fontWeight: context.appTypography.displayWeight,
           fontSize: layout.fontSizeNormal,
         ),

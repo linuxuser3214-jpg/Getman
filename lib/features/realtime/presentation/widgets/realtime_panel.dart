@@ -119,6 +119,7 @@ class _StatusBanner extends StatelessWidget {
     final layout = context.appLayout;
     final palette = context.appPalette;
     final color = connected ? palette.statusSuccess : palette.statusError;
+    final on = palette.onColor(color);
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: layout.isCompact ? 4 : 8),
       decoration: BoxDecoration(
@@ -129,12 +130,12 @@ class _StatusBanner extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(connected ? Icons.link : Icons.link_off, color: Colors.white, size: layout.smallIconSize),
+          Icon(connected ? Icons.link : Icons.link_off, color: on, size: layout.smallIconSize),
           const SizedBox(width: 6),
           Text(
             connected ? 'CONNECTED' : 'DISCONNECTED',
             style: TextStyle(
-              color: Colors.white,
+              color: on,
               fontWeight: context.appTypography.displayWeight,
               fontSize: layout.fontSizeNormal,
             ),
