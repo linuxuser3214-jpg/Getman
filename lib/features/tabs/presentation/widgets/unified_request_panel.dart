@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/utils/byte_format.dart';
+import 'package:getman/features/chaining/presentation/widgets/rules_tab_view.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -34,13 +35,13 @@ class UnifiedRequestPanel extends StatefulWidget {
 }
 
 class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTickerProviderStateMixin {
-  static const int _responseTabIndex = 4;
+  static const int _responseTabIndex = 5;
   late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -69,7 +70,7 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTi
           _StatusRibbon(tabId: widget.tabId),
           BrandedTabBar(
             controller: _tabController,
-            labels: const ['PARAMS', 'AUTH', 'HEADERS', 'BODY', 'RESPONSE'],
+            labels: const ['PARAMS', 'AUTH', 'HEADERS', 'BODY', 'RULES', 'RESPONSE'],
             isScrollable: true,
           ),
           Expanded(
@@ -82,6 +83,7 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTi
                   AuthTabView(tabId: widget.tabId),
                   HeadersTabView(tabId: widget.tabId),
                   BodyTabView(tabId: widget.tabId, controller: widget.bodyController),
+                  RulesTabView(key: ValueKey('rules_${widget.tabId}'), tabId: widget.tabId),
                   ResponseSection(
                     tabId: widget.tabId,
                     responseController: widget.responseController,
