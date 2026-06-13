@@ -1,7 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
+import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/tabs/data/request_serializer.dart';
 
 void main() {
@@ -110,6 +115,112 @@ void main() {
       ));
       expect(headers['x-api-key'], 'manual');
       expect(headers.containsKey('X-Api-Key'), isFalse);
+    });
+  });
+
+  group('RequestSerializer.buildBody', () {
+    late Map<String, String> headers;
+
+    setUp(() {
+      headers = {'Content-Type': 'application/json'};
+    });
+
+    dynamic build(HttpRequestConfigEntity config, {Map<String, String> env = const {}}) {
+      return RequestSerializer.buildBody(config: config, headers: headers, envVars: env);
+    }
+
+    HttpRequestConfigEntity cfg({
+      required BodyType bodyType,
+      String body = '',
+      List<MultipartFieldEntity> formFields = const [],
+      String? bodyFilePath,
+    }) =>
+        HttpRequestConfigEntity(
+          id: 'c',
+          bodyType: bodyType,
+          body: body,
+          formFields: formFields,
+          bodyFilePath: bodyFilePath,
+        );
+
+    test('none returns null', () {
+      expect(build(cfg(bodyType: BodyType.none)), isNull);
+    });
+
+    test('raw resolves env vars and is returned verbatim', () {
+      final data = build(
+        cfg(bodyType: BodyType.raw, body: '{"k":"{{v}}"}'),
+        env: {'v': 'x'},
+      );
+      expect(data, '{"k":"x"}');
+      // raw leaves the Content-Type the user set.
+      expect(headers['Content-Type'], 'application/json');
+    });
+
+    test('raw with empty body returns null', () {
+      expect(build(cfg(bodyType: BodyType.raw)), isNull);
+    });
+
+    test('urlencoded builds a map and forces the content type', () {
+      final data = build(
+        cfg(bodyType: BodyType.urlencoded, formFields: const [
+          MultipartFieldEntity(name: 'a', value: '1'),
+          MultipartFieldEntity(name: 'b', value: '{{x}}'),
+          MultipartFieldEntity(name: '', value: 'skip'),
+        ]),
+        env: {'x': '2'},
+      );
+      expect(data, {'a': '1', 'b': '2'});
+      expect(headers['Content-Type'], 'application/x-www-form-urlencoded');
+    });
+
+    test('multipart builds FormData with text fields and strips content type', () {
+      final data = build(cfg(bodyType: BodyType.multipart, formFields: const [
+        MultipartFieldEntity(name: 'field', value: 'v'),
+      ])) as FormData;
+      expect(data.fields, hasLength(1));
+      expect(data.fields.first.key, 'field');
+      expect(data.fields.first.value, 'v');
+      // Content-Type removed so Dio sets multipart/form-data + boundary.
+      expect(headers.containsKey('Content-Type'), isFalse);
+    });
+
+    test('multipart reads a file row into FormData.files', () {
+      final file = File('${Directory.systemTemp.path}/getman_test_upload.txt')
+        ..writeAsStringSync('hello');
+      addTearDown(() => file.existsSync() ? file.deleteSync() : null);
+
+      final data = build(cfg(bodyType: BodyType.multipart, formFields: [
+        MultipartFieldEntity(name: 'doc', isFile: true, filePath: file.path),
+      ])) as FormData;
+
+      expect(data.files, hasLength(1));
+      expect(data.files.first.key, 'doc');
+      expect(data.files.first.value.filename, 'getman_test_upload.txt');
+    });
+
+    test('binary reads file bytes and sets octet-stream over the JSON default', () {
+      final file = File('${Directory.systemTemp.path}/getman_test_binary.bin')
+        ..writeAsBytesSync([1, 2, 3]);
+      addTearDown(() => file.existsSync() ? file.deleteSync() : null);
+
+      final data = build(cfg(bodyType: BodyType.binary, bodyFilePath: file.path));
+      expect(data, [1, 2, 3]);
+      expect(headers['Content-Type'], 'application/octet-stream');
+    });
+
+    test('binary keeps a user-chosen content type', () {
+      headers['Content-Type'] = 'image/png';
+      final file = File('${Directory.systemTemp.path}/getman_test_img.bin')
+        ..writeAsBytesSync([9]);
+      addTearDown(() => file.existsSync() ? file.deleteSync() : null);
+
+      build(cfg(bodyType: BodyType.binary, bodyFilePath: file.path));
+      expect(headers['Content-Type'], 'image/png');
+    });
+
+    test('binary with no file path returns null', () {
+      expect(build(cfg(bodyType: BodyType.binary)), isNull);
     });
   });
 }

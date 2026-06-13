@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
+import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 
@@ -13,6 +15,16 @@ class HttpRequestConfigEntity extends Equatable {
   final Map<String, String> headers;
   final String body;
   final Map<String, String> auth;
+
+  /// How [body] / [formFields] / [bodyFilePath] are serialized at send time.
+  final BodyType bodyType;
+
+  /// Rows for `urlencoded` / `multipart` bodies. Empty for other body types.
+  final List<MultipartFieldEntity> formFields;
+
+  /// Filesystem path for a `binary` body (desktop/mobile only).
+  final String? bodyFilePath;
+
   final String? responseBody;
   final Map<String, String>? responseHeaders;
   final int? statusCode;
@@ -28,6 +40,9 @@ class HttpRequestConfigEntity extends Equatable {
     },
     this.body = '',
     this.auth = const {},
+    this.bodyType = BodyType.raw,
+    this.formFields = const [],
+    this.bodyFilePath,
     this.responseBody,
     this.responseHeaders,
     this.statusCode,
@@ -52,6 +67,9 @@ class HttpRequestConfigEntity extends Equatable {
     List<QueryParamEntity>? params,
     String? body,
     Map<String, String>? auth,
+    BodyType? bodyType,
+    List<MultipartFieldEntity>? formFields,
+    Object? bodyFilePath = _unset,
     Object? responseBody = _unset,
     Object? responseHeaders = _unset,
     Object? statusCode = _unset,
@@ -68,6 +86,9 @@ class HttpRequestConfigEntity extends Equatable {
       headers: headers ?? Map.from(this.headers),
       body: body ?? this.body,
       auth: auth ?? Map.from(this.auth),
+      bodyType: bodyType ?? this.bodyType,
+      formFields: formFields ?? this.formFields,
+      bodyFilePath: identical(bodyFilePath, _unset) ? this.bodyFilePath : bodyFilePath as String?,
       responseBody: identical(responseBody, _unset) ? this.responseBody : responseBody as String?,
       responseHeaders: identical(responseHeaders, _unset)
           ? this.responseHeaders
@@ -85,6 +106,9 @@ class HttpRequestConfigEntity extends Equatable {
     headers,
     body,
     auth,
+    bodyType,
+    formFields,
+    bodyFilePath,
     responseBody,
     responseHeaders,
     statusCode,

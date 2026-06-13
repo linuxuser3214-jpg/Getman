@@ -96,15 +96,17 @@ class TabsRepositoryImpl implements TabsRepository {
       envVars: envVars,
     );
 
-    final resolvedBody = config.body.isNotEmpty
-        ? EnvironmentResolver.resolve(config.body, envVars)
-        : null;
+    final data = RequestSerializer.buildBody(
+      config: config,
+      headers: headers,
+      envVars: envVars,
+    );
 
     return networkService.request(
       url: resolvedBase,
       method: config.method,
       queryParameters: queryMap,
-      data: resolvedBody,
+      data: data,
       headers: headers,
       cancelHandle: cancelHandle,
     );
