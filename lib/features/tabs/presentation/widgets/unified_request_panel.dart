@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
+import 'package:getman/core/utils/byte_format.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -129,6 +130,7 @@ class _StatusRibbon extends StatelessWidget {
               else if (response != null) ...[
                 _Pill(label: response.statusCode.toString(), color: context.appPalette.statusAccent(response.statusCode)),
                 _Pill(label: '${response.durationMs} ms', color: theme.colorScheme.secondary),
+                _Pill(label: formatBytes(responseSizeBytes(response)), color: theme.colorScheme.secondary),
               ],
             ],
           ),
