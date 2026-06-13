@@ -537,10 +537,27 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
   AppDecoration lerp(ThemeExtension<AppDecoration>? other, double t) => this;
 }
 
+/// Per-theme user-facing copy (strings), so empty states read in each theme's
+/// voice without hardcoding text in widgets.
+class AppCopy extends ThemeExtension<AppCopy> {
+  final String emptyResponse;
+
+  const AppCopy({required this.emptyResponse});
+
+  @override
+  AppCopy copyWith({String? emptyResponse}) =>
+      AppCopy(emptyResponse: emptyResponse ?? this.emptyResponse);
+
+  // Strings don't interpolate — snap to the target.
+  @override
+  AppCopy lerp(ThemeExtension<AppCopy>? other, double t) => other is AppCopy ? other : this;
+}
+
 extension AppThemeAccess on BuildContext {
   AppLayout get appLayout => Theme.of(this).extension<AppLayout>()!;
   AppPalette get appPalette => Theme.of(this).extension<AppPalette>()!;
   AppShape get appShape => Theme.of(this).extension<AppShape>()!;
   AppTypography get appTypography => Theme.of(this).extension<AppTypography>()!;
   AppDecoration get appDecoration => Theme.of(this).extension<AppDecoration>()!;
+  AppCopy get appCopy => Theme.of(this).extension<AppCopy>()!;
 }

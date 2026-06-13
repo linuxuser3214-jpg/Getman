@@ -90,7 +90,7 @@ class ResponseSection extends StatelessWidget {
              children: [
                ExcludeSemantics(child: Icon(Icons.bolt, size: layout.isCompact ? 48 : 64, color: theme.colorScheme.secondary)),
                SizedBox(height: layout.sectionSpacing),
-               Text('HIT SEND TO GET A RESPONSE', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface)),
+               Text(context.appCopy.emptyResponse, textAlign: TextAlign.center, style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface)),
              ],
            ));
         }
