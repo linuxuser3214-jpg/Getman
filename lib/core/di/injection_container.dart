@@ -147,6 +147,7 @@ Future<SettingsEntity> init() async {
   sl.registerLazySingleton(() => TabsBloc(
     repository: sl(),
     sendRequestUseCase: sl(),
+    getRequestRulesUseCase: sl(),
   ));
 
   sl.registerLazySingleton(() => SendRequestUseCase(
