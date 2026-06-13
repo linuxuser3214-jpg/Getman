@@ -26,13 +26,20 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       sideMenuWidth: fields[6] == null ? 300.0 : fields[6] as double,
       themeId: fields[7] == null ? 'brutalist' : fields[7] as String,
       activeEnvironmentId: fields[8] as String?,
+      connectTimeoutMs: fields[9] == null ? 30000 : fields[9] as int,
+      sendTimeoutMs: fields[10] == null ? 30000 : fields[10] as int,
+      receiveTimeoutMs: fields[11] == null ? 60000 : fields[11] as int,
+      followRedirects: fields[12] == null ? true : fields[12] as bool,
+      verifySsl: fields[13] == null ? true : fields[13] as bool,
+      proxyUrl: fields[14] as String?,
+      workspacePath: fields[15] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -50,7 +57,21 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(7)
       ..write(obj.themeId)
       ..writeByte(8)
-      ..write(obj.activeEnvironmentId);
+      ..write(obj.activeEnvironmentId)
+      ..writeByte(9)
+      ..write(obj.connectTimeoutMs)
+      ..writeByte(10)
+      ..write(obj.sendTimeoutMs)
+      ..writeByte(11)
+      ..write(obj.receiveTimeoutMs)
+      ..writeByte(12)
+      ..write(obj.followRedirects)
+      ..writeByte(13)
+      ..write(obj.verifySsl)
+      ..writeByte(14)
+      ..write(obj.proxyUrl)
+      ..writeByte(15)
+      ..write(obj.workspacePath);
   }
 
   @override

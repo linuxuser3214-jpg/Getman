@@ -14,6 +14,18 @@ class SettingsEntity extends Equatable {
   final String themeId;
   final String? activeEnvironmentId;
 
+  // Network configuration (applied to the Dio client at send time).
+  final int connectTimeoutMs;
+  final int sendTimeoutMs;
+  final int receiveTimeoutMs;
+  final bool followRedirects;
+  final bool verifySsl;
+  final String? proxyUrl;
+
+  /// Optional on-disk workspace folder for git-friendly collections (desktop
+  /// only; `null` means Hive-only, today's behavior).
+  final String? workspacePath;
+
   const SettingsEntity({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
@@ -24,6 +36,13 @@ class SettingsEntity extends Equatable {
     this.sideMenuWidth = 300.0,
     this.themeId = kBrutalistThemeId,
     this.activeEnvironmentId,
+    this.connectTimeoutMs = 30000,
+    this.sendTimeoutMs = 30000,
+    this.receiveTimeoutMs = 60000,
+    this.followRedirects = true,
+    this.verifySsl = true,
+    this.proxyUrl,
+    this.workspacePath,
   });
 
   SettingsEntity copyWith({
@@ -36,6 +55,13 @@ class SettingsEntity extends Equatable {
     double? sideMenuWidth,
     String? themeId,
     Object? activeEnvironmentId = _unchanged,
+    int? connectTimeoutMs,
+    int? sendTimeoutMs,
+    int? receiveTimeoutMs,
+    bool? followRedirects,
+    bool? verifySsl,
+    Object? proxyUrl = _unchanged,
+    Object? workspacePath = _unchanged,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -49,6 +75,14 @@ class SettingsEntity extends Equatable {
       activeEnvironmentId: identical(activeEnvironmentId, _unchanged)
           ? this.activeEnvironmentId
           : activeEnvironmentId as String?,
+      connectTimeoutMs: connectTimeoutMs ?? this.connectTimeoutMs,
+      sendTimeoutMs: sendTimeoutMs ?? this.sendTimeoutMs,
+      receiveTimeoutMs: receiveTimeoutMs ?? this.receiveTimeoutMs,
+      followRedirects: followRedirects ?? this.followRedirects,
+      verifySsl: verifySsl ?? this.verifySsl,
+      proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
+      workspacePath:
+          identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
     );
   }
 
@@ -63,5 +97,12 @@ class SettingsEntity extends Equatable {
     sideMenuWidth,
     themeId,
     activeEnvironmentId,
+    connectTimeoutMs,
+    sendTimeoutMs,
+    receiveTimeoutMs,
+    followRedirects,
+    verifySsl,
+    proxyUrl,
+    workspacePath,
   ];
 }
