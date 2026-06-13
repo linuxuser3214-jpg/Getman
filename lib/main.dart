@@ -8,8 +8,10 @@ import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/widgets/workspace_sync_listener.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
@@ -43,6 +45,7 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<TabDirtyChecker>.value(value: di.sl<TabDirtyChecker>()),
         RepositoryProvider<NetworkService>.value(value: di.sl<NetworkService>()),
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
+        RepositoryProvider<WorkspaceSyncService>.value(value: di.sl<WorkspaceSyncService>()),
       ],
       child: MultiBlocProvider(
       providers: [
@@ -54,6 +57,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<EnvironmentsBloc>()..add(const LoadEnvironments())),
       ],
       child: NetworkSettingsListener(
+        child: WorkspaceSyncListener(
         child: BlocBuilder<SettingsBloc, SettingsState>(
         // Rebuilding here re-runs the theme builder and rebuilds the entire
         // MaterialApp — gate it to the three settings that actually feed it.
@@ -106,6 +110,7 @@ class MyApp extends StatelessWidget {
             ),
           );
         },
+      ),
       ),
       ),
       ),

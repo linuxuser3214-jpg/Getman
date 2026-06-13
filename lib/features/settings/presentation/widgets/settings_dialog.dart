@@ -6,6 +6,7 @@ import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
+import 'package:getman/features/collections/presentation/widgets/workspace_settings_tile.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -219,6 +220,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     child: const Text('CLEAR'),
                   ),
                 ),
+                const Divider(),
+                _sectionHeader(context, 'COLLECTIONS'),
+                const WorkspaceSettingsTile(),
               ],
               ),
             ),

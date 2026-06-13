@@ -34,6 +34,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<UpdateFollowRedirects>((e, emit) => _apply(emit, (s) => s.copyWith(followRedirects: e.value)));
     on<UpdateVerifySsl>((e, emit) => _apply(emit, (s) => s.copyWith(verifySsl: e.value)));
     on<UpdateProxyUrl>((e, emit) => _apply(emit, (s) => s.copyWith(proxyUrl: e.url)));
+    on<UpdateWorkspacePath>((e, emit) => _apply(emit, (s) => s.copyWith(workspacePath: e.path)));
   }
 
   // 0 disables the timeout (Dio treats Duration.zero as no limit); never negative.

@@ -6,8 +6,10 @@ import 'package:getman/core/network/in_memory_cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/collections/data/datasources/collections_local_data_source.dart';
+import 'package:getman/features/collections/data/datasources/workspace_data_source_factory.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
 import 'package:getman/features/collections/data/repositories/collections_repository_impl.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -102,6 +104,8 @@ Future<SettingsEntity> init() async {
   sl.registerLazySingleton<CollectionsRepository>(() => CollectionsRepositoryImpl(sl()));
 
   sl.registerLazySingleton<CollectionsLocalDataSource>(() => CollectionsLocalDataSourceImpl());
+
+  sl.registerLazySingleton(() => WorkspaceSyncService(createWorkspaceDataSource()));
 
   // Features - Environments
   sl.registerLazySingleton(() => EnvironmentsBloc(

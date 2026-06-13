@@ -111,3 +111,10 @@ class UpdateProxyUrl extends SettingsEvent {
   @override
   List<Object?> get props => [url];
 }
+
+class UpdateWorkspacePath extends SettingsEvent {
+  final String? path;
+  const UpdateWorkspacePath(this.path);
+  @override
+  List<Object?> get props => [path];
+}
