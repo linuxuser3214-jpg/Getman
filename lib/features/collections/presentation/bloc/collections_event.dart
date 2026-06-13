@@ -73,3 +73,11 @@ class ImportCollections extends CollectionsEvent {
   @override
   List<Object?> get props => [rootNodes];
 }
+
+/// Replaces the entire collection tree (used when opening a workspace folder).
+class ReplaceCollections extends CollectionsEvent {
+  final List<CollectionNodeEntity> rootNodes;
+  const ReplaceCollections(this.rootNodes);
+  @override
+  List<Object?> get props => [rootNodes];
+}

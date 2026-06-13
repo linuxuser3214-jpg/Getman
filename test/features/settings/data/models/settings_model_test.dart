@@ -64,4 +64,61 @@ void main() {
       expect(preserved.activeEnvironmentId, 'x');
     });
   });
+
+  group('SettingsModel network + workspace fields', () {
+    test('defaults match the network baseline', () {
+      const e = SettingsEntity();
+      expect(e.connectTimeoutMs, 30000);
+      expect(e.sendTimeoutMs, 30000);
+      expect(e.receiveTimeoutMs, 60000);
+      expect(e.followRedirects, isTrue);
+      expect(e.verifySsl, isTrue);
+      expect(e.proxyUrl, isNull);
+      expect(e.workspacePath, isNull);
+    });
+
+    test('json roundtrip preserves the new fields', () {
+      final model = SettingsModel(
+        connectTimeoutMs: 1000,
+        sendTimeoutMs: 2000,
+        receiveTimeoutMs: 3000,
+        followRedirects: false,
+        verifySsl: false,
+        proxyUrl: 'localhost:8888',
+        workspacePath: '/tmp/ws',
+      );
+      final back = SettingsModel.fromJson(model.toJson());
+      expect(back.connectTimeoutMs, 1000);
+      expect(back.sendTimeoutMs, 2000);
+      expect(back.receiveTimeoutMs, 3000);
+      expect(back.followRedirects, isFalse);
+      expect(back.verifySsl, isFalse);
+      expect(back.proxyUrl, 'localhost:8888');
+      expect(back.workspacePath, '/tmp/ws');
+    });
+
+    test('entity roundtrip preserves the new fields', () {
+      const entity = SettingsEntity(
+        connectTimeoutMs: 5,
+        verifySsl: false,
+        proxyUrl: 'p:1',
+        workspacePath: '/ws',
+      );
+      final back = SettingsModel.fromEntity(entity).toEntity();
+      expect(back.connectTimeoutMs, 5);
+      expect(back.verifySsl, isFalse);
+      expect(back.proxyUrl, 'p:1');
+      expect(back.workspacePath, '/ws');
+    });
+
+    test('copyWith clears proxyUrl / workspacePath via the sentinel', () {
+      const entity = SettingsEntity(proxyUrl: 'p:1', workspacePath: '/ws');
+      expect(entity.copyWith(proxyUrl: null).proxyUrl, isNull);
+      expect(entity.copyWith(workspacePath: null).workspacePath, isNull);
+      // Omitting keeps them.
+      final kept = entity.copyWith(verifySsl: false);
+      expect(kept.proxyUrl, 'p:1');
+      expect(kept.workspacePath, '/ws');
+    });
+  });
 }

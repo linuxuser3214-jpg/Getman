@@ -26,6 +26,7 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     on<ToggleFavorite>(_onToggleFavorite);
     on<MoveNode>(_onMoveNode);
     on<ImportCollections>(_onImportCollections);
+    on<ReplaceCollections>(_onReplaceCollections);
   }
 
   /// Append [newNode] to [parentId]'s children, or to the root when [parentId]
@@ -117,5 +118,9 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
   Future<void> _onImportCollections(ImportCollections event, Emitter<CollectionsState> emit) {
     if (event.rootNodes.isEmpty) return Future.value();
     return _commit(emit, [...state.collections, ...event.rootNodes]);
+  }
+
+  Future<void> _onReplaceCollections(ReplaceCollections event, Emitter<CollectionsState> emit) {
+    return _commit(emit, event.rootNodes);
   }
 }
