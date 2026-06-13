@@ -7,6 +7,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/assertion_result.dart';
+import 'package:getman/core/domain/entities/extraction_result.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/network/http_response.dart';
@@ -339,5 +341,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SIZE: '), findsOneWidget);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 8: TESTS tab renders assertion results, a summary, and captures
+  // -------------------------------------------------------------------------
+  testWidgets('TESTS tab shows assertion results + summary + captures', (tester) async {
+    const tabId = 'tab8';
+    const tab = HttpRequestTabEntity(
+      tabId: tabId,
+      config: HttpRequestConfigEntity(id: tabId),
+      response: HttpResponseEntity(statusCode: 200, body: '{}', headers: {}, durationMs: 5),
+      assertionResults: [
+        AssertionResult(label: 'status = 200', passed: true, actual: '200'),
+        AssertionResult(label: 'status = 201', passed: false, actual: '200'),
+      ],
+      extractionResults: [
+        ExtractionResult(variable: 'tok', value: 'abc', matched: true),
+      ],
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+
+    await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
+
+    await tester.tap(find.text('TESTS'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 / 2 PASSED'), findsOneWidget);
+    expect(find.textContaining('PASS · status = 200'), findsOneWidget);
+    expect(find.textContaining('FAIL · status = 201'), findsOneWidget);
+    expect(find.textContaining('{{tok}} = abc'), findsOneWidget);
   });
 }
