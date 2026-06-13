@@ -80,7 +80,7 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTi
                   ParamsTabView(tabId: widget.tabId),
                   AuthTabView(tabId: widget.tabId),
                   HeadersTabView(tabId: widget.tabId),
-                  BodyTabView(controller: widget.bodyController),
+                  BodyTabView(tabId: widget.tabId, controller: widget.bodyController),
                   ResponseSection(
                     tabId: widget.tabId,
                     responseController: widget.responseController,

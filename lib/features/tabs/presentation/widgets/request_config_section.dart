@@ -31,7 +31,7 @@ class RequestConfigSection extends StatelessWidget {
                   ParamsTabView(tabId: tabId),
                   AuthTabView(tabId: tabId),
                   HeadersTabView(tabId: tabId),
-                  BodyTabView(controller: bodyController),
+                  BodyTabView(tabId: tabId, controller: bodyController),
                 ],
               ),
             ),
