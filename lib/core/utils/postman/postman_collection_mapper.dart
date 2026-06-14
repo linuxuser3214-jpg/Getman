@@ -181,10 +181,21 @@ class PostmanCollectionMapper {
       if (raw is String) return raw;
       final host = url['host'];
       final path = url['path'];
-      final hostStr = host is List ? host.join('.') : '';
-      final pathStr = path is List ? path.join('/') : '';
+      final hostStr = host is List ? host.join('.') : (host is String ? host : '');
+      final pathStr = path is List ? path.join('/') : (path is String ? path : '');
       if (hostStr.isEmpty && pathStr.isEmpty) return '';
-      return '$hostStr${pathStr.isNotEmpty ? '/$pathStr' : ''}';
+      final pathPart = pathStr.isNotEmpty ? '/$pathStr' : '';
+      if (hostStr.isEmpty) return pathPart;
+      // Postman keeps protocol/port separate from host; rebuild a sendable URL
+      // (default https) instead of dropping the scheme and producing a
+      // schemeless, unsendable string.
+      final protocol = url['protocol'];
+      final scheme = (protocol is String && protocol.isNotEmpty) ? protocol : 'https';
+      final portRaw = url['port'];
+      final port = (portRaw == null || (portRaw is String && portRaw.isEmpty))
+          ? ''
+          : ':$portRaw';
+      return '$scheme://$hostStr$port$pathPart';
     }
     return '';
   }

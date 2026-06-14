@@ -165,6 +165,49 @@ void main() {
       expect(node.children.first.config!.method, 'POST');
     });
 
+    test('reconstructs a structured url (no raw) with protocol, host, port and path', () {
+      const source = '''
+{
+  "info": {"name": "S", "schema": "v2.1.0"},
+  "item": [
+    {
+      "name": "R",
+      "request": {
+        "method": "GET",
+        "url": {
+          "protocol": "https",
+          "host": ["api", "example", "com"],
+          "port": "8443",
+          "path": ["v1", "users"]
+        }
+      }
+    }
+  ]
+}
+''';
+      final config = PostmanCollectionMapper.fromJson(source).children.first.config!;
+      expect(config.url, 'https://api.example.com:8443/v1/users');
+    });
+
+    test('defaults to https when a structured url omits the protocol', () {
+      const source = '''
+{
+  "info": {"name": "S", "schema": "v2.1.0"},
+  "item": [
+    {
+      "name": "R",
+      "request": {
+        "method": "GET",
+        "url": {"host": ["api", "example", "com"], "path": ["x"]}
+      }
+    }
+  ]
+}
+''';
+      final config = PostmanCollectionMapper.fromJson(source).children.first.config!;
+      expect(config.url, 'https://api.example.com/x');
+    });
+
     test('skips disabled headers and query entries', () {
       const source = '''
 {
