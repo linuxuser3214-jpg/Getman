@@ -1,3 +1,4 @@
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:hive/hive.dart';
@@ -30,12 +31,22 @@ class SavedExampleModel extends HiveObject {
     required this.config,
   }) : id = id ?? const Uuid().v4();
 
-  factory SavedExampleModel.fromEntity(SavedExampleEntity entity) => SavedExampleModel(
-        id: entity.id,
-        name: entity.name,
-        capturedAtMs: entity.capturedAt.millisecondsSinceEpoch,
-        config: HttpRequestConfig.fromEntity(entity.config),
-      );
+  factory SavedExampleModel.fromEntity(SavedExampleEntity entity) {
+    // Cap an over-limit captured response body on disk (mirrors the tab/history
+    // paths) so a huge example can't bloat the collections box or stall the UI
+    // isolate when L12's per-root diff re-serializes its root.
+    final config = entity.config;
+    final body = config.responseBody;
+    final capped = body != null && body.length > kMaxPersistedResponseBodyChars
+        ? config.copyWith(responseBody: kResponseBodyTooLargePlaceholder)
+        : config;
+    return SavedExampleModel(
+      id: entity.id,
+      name: entity.name,
+      capturedAtMs: entity.capturedAt.millisecondsSinceEpoch,
+      config: HttpRequestConfig.fromEntity(capped),
+    );
+  }
 
   SavedExampleEntity toEntity() => SavedExampleEntity(
         id: id,

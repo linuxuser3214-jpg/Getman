@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
@@ -68,6 +69,47 @@ void main() {
       const entity = CollectionNodeEntity(id: 'a', name: 'A');
       final back = CollectionNode.fromEntity(entity).toEntity();
       expect(back.examples, isEmpty);
+    });
+
+    test('an over-limit example response body is capped on disk', () {
+      final hugeBody = 'x' * (kMaxPersistedResponseBodyChars + 1);
+      final entity = CollectionNodeEntity(
+        id: 'req',
+        name: 'Big',
+        isFolder: false,
+        examples: [
+          SavedExampleEntity(
+            id: 'e1',
+            name: 'huge',
+            capturedAt: DateTime.utc(2026, 6, 14),
+            config: HttpRequestConfigEntity(id: 'req', statusCode: 200, responseBody: hugeBody),
+          ),
+        ],
+      );
+
+      final back = CollectionNode.fromEntity(entity).toEntity();
+      final cfg = back.examples.single.config;
+      expect(cfg.responseBody, kResponseBodyTooLargePlaceholder);
+      // Status/other fields survive; only the oversized body is dropped.
+      expect(cfg.statusCode, 200);
+    });
+
+    test('a within-limit example body is kept verbatim', () {
+      final entity = CollectionNodeEntity(
+        id: 'req',
+        name: 'Small',
+        isFolder: false,
+        examples: [
+          SavedExampleEntity(
+            id: 'e1',
+            name: 'ok',
+            capturedAt: DateTime.utc(2026, 6, 14),
+            config: const HttpRequestConfigEntity(id: 'req', responseBody: '{"ok":true}'),
+          ),
+        ],
+      );
+      final back = CollectionNode.fromEntity(entity).toEntity();
+      expect(back.examples.single.config.responseBody, '{"ok":true}');
     });
   });
 
