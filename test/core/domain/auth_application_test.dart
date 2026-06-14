@@ -59,6 +59,15 @@ void main() {
           headers: {'Authorization': 'x'});
       expect(app.headers, isEmpty);
     });
+
+    test('skips the header when both username and password resolve empty (L1)', () {
+      expect(apply(const AuthConfig(type: AuthType.basic)).headers, isEmpty);
+    });
+
+    test('still sets the header when only the username is present', () {
+      final app = apply(const AuthConfig(type: AuthType.basic, username: 'u'));
+      expect(app.headers.containsKey('Authorization'), isTrue);
+    });
   });
 
   group('apiKey', () {

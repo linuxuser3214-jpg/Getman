@@ -52,6 +52,9 @@ AuthApplication resolveAuthApplication({
       }
       final user = resolve(auth.username);
       final pass = resolve(auth.password);
+      // Don't emit `Basic <base64(':')>` for blank credentials (matches the
+      // bearer/api-key empty guards). A username-only basic auth is still valid.
+      if (user.isEmpty && pass.isEmpty) return AuthApplication.none;
       final encoded = base64.encode(utf8.encode('$user:$pass'));
       return AuthApplication(headers: {'Authorization': 'Basic $encoded'});
     case AuthType.apiKey:
