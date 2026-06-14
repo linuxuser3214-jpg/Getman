@@ -135,6 +135,30 @@ void main() {
       expect(find.byIcon(Icons.visibility_off), findsOneWidget);
     });
 
+    testWidgets('re-marking a previously-revealed variable secret re-obscures it', (tester) async {
+      await pump(tester, const _SecretHarness(
+        initialVars: {'TOKEN': 'abc123'},
+        initialSecrets: {'TOKEN'},
+      ));
+
+      bool anyObscured() =>
+          tester.widgetList<TextField>(find.byType(TextField)).any((f) => f.obscureText);
+
+      // Reveal the secret value.
+      await tester.tap(find.byIcon(Icons.visibility));
+      await tester.pump();
+      expect(anyObscured(), isFalse);
+
+      // Unmark secret (lock -> open), then mark it secret again.
+      await tester.tap(find.byIcon(Icons.lock_outline));
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.lock_open_outlined).first);
+      await tester.pump();
+
+      // The re-marked secret must start obscured, not inherit the stale reveal.
+      expect(anyObscured(), isTrue);
+    });
+
     testWidgets('tapping the lock reports the new secret set', (tester) async {
       Set<String>? reported;
       await pump(tester, _SecretHarness(

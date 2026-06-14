@@ -124,7 +124,10 @@ class _KeyValueListEditorState<T extends Object> extends State<KeyValueListEdito
       itemCount: _keyControllers.length,
       itemBuilder: (context, index) {
         final secrets = widget.secretKeys;
-        final keyText = _keyControllers[index].text;
+        // Compare trimmed — secretKeys is stored trimmed (matches _toggleSecret
+        // and the env editor's trimming encode), so an untrimmed compare would
+        // mis-flag a key with surrounding whitespace.
+        final keyText = _keyControllers[index].text.trim();
         return _KeyValueRow(
           key: ValueKey(_keyControllers[index]),
           keyController: _keyControllers[index],
@@ -187,6 +190,14 @@ class _KeyValueRow extends StatefulWidget {
 class _KeyValueRowState extends State<_KeyValueRow> {
   bool _isHovered = false;
   bool _revealed = false;
+
+  @override
+  void didUpdateWidget(_KeyValueRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reset reveal whenever secret status flips so a row re-marked secret
+    // always starts obscured instead of inheriting a stale "revealed".
+    if (oldWidget.isSecret != widget.isSecret) _revealed = false;
+  }
 
   @override
   Widget build(BuildContext context) {
