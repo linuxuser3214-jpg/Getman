@@ -244,8 +244,15 @@ class _RawBodyEditor extends StatelessWidget {
                   color: theme.colorScheme.secondary, size: layout.isCompact ? 20 : 24),
               tooltip: 'Beautify JSON',
               onPressed: () async {
-                final prettified = await JsonUtils.prettify(controller.text);
-                controller.text = prettified;
+                final messenger = ScaffoldMessenger.of(context);
+                final original = controller.text;
+                final prettified = await JsonUtils.prettify(original);
+                if (prettified != original) {
+                  controller.text = prettified;
+                  showAppSnackBarVia(messenger, 'JSON formatted');
+                } else {
+                  showAppSnackBarVia(messenger, 'Already formatted or not valid JSON');
+                }
               },
             ),
           ),

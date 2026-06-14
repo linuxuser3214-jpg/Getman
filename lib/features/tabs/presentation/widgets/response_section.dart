@@ -394,7 +394,18 @@ class _ResponseHeadersView extends StatelessWidget {
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
         final headers = tab?.response?.headers;
-        if (headers == null) return const SizedBox();
+        if (headers == null || headers.isEmpty) {
+          return Center(
+            child: Text(
+              'NO RESPONSE HEADERS',
+              style: TextStyle(
+                fontSize: layout.fontSizeNormal,
+                fontWeight: context.appTypography.displayWeight,
+                color: theme.dividerColor.withValues(alpha: 0.6),
+              ),
+            ),
+          );
+        }
 
         final entries = headers.entries.toList();
 
