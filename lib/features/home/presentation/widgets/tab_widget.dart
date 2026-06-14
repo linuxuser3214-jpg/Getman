@@ -93,7 +93,7 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
 
         final dirtyChecker = context.read<TabDirtyChecker>();
         return BlocSelector<CollectionsBloc, CollectionsState, bool>(
-          selector: (collState) => dirtyChecker(tab: tab, collections: collState.collections),
+          selector: (collState) => dirtyChecker(tab: tab, savedConfigs: collState.configById),
           builder: (context, isDirty) {
             final title = tab.displayTitle;
             final displayTitle = (title.length > layout.tabTitleMaxLength

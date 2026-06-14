@@ -26,7 +26,7 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     required this.getCollectionsUseCase,
     required this.saveCollectionsUseCase,
     this.saveDebounce = const Duration(seconds: 2),
-  }) : super(const CollectionsState()) {
+  }) : super(CollectionsState()) {
     on<LoadCollections>(_onLoadCollections);
     on<AddFolder>(_onAddFolder);
     on<SaveRequestToCollection>(_onSaveRequestToCollection);

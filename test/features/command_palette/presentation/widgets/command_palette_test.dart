@@ -45,7 +45,7 @@ void main() {
     environments = MockEnvironmentsBloc();
     settings = MockSettingsBloc();
 
-    when(() => collections.state).thenReturn(const CollectionsState(collections: [
+    when(() => collections.state).thenReturn(CollectionsState(collections: const [
       CollectionNodeEntity(
         id: 'f1',
         name: 'Auth',
