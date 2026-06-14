@@ -95,6 +95,23 @@ class _SheetBody extends StatelessWidget {
               );
             },
           ),
+          _Action(
+            icon: Icons.description_outlined,
+            label: 'EDIT DESCRIPTION',
+            onTap: () {
+              final bloc = context.read<CollectionsBloc>();
+              Navigator.of(context).pop();
+              NamePromptDialog.show(
+                context,
+                title: 'DESCRIPTION',
+                initialText: node.description ?? '',
+                hintText: 'Notes for this ${node.isFolder ? 'folder' : 'request'}',
+                allowEmpty: true,
+                multiline: true,
+                onConfirm: (text) => bloc.add(UpdateNodeDescription(node.id, text.trim())),
+              );
+            },
+          ),
           if (node.isFolder)
             _Action(
               icon: Icons.create_new_folder,

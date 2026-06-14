@@ -419,6 +419,9 @@ class _NodeContextMenu extends StatelessWidget {
           case 'rename':
             _showRenameDialog(context);
             break;
+          case 'describe':
+            _showDescriptionDialog(context);
+            break;
           case 'delete':
             ConfirmDialog.show(
               context,
@@ -451,6 +454,7 @@ class _NodeContextMenu extends StatelessWidget {
         if (node.isFolder && node.config == null)
            PopupMenuItem(value: 'favorite', child: Text(node.isFavorite ? 'UNFAVORITE' : 'FAVORITE', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
         PopupMenuItem(value: 'rename', child: Text('RENAME', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
+        PopupMenuItem(value: 'describe', child: Text('EDIT DESCRIPTION', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
         if (node.isFolder)
            PopupMenuItem(value: 'add_subfolder', child: Text('ADD SUBFOLDER', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
         PopupMenuItem(value: 'export', child: Text('EXPORT TO POSTMAN', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
@@ -469,6 +473,23 @@ class _NodeContextMenu extends StatelessWidget {
       onConfirm: (name) {
         bloc.add(RenameNode(node.id, name));
         showAppSnackBarVia(messenger, 'Renamed to "$name"');
+      },
+    );
+  }
+
+  void _showDescriptionDialog(BuildContext context) {
+    final bloc = context.read<CollectionsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
+    NamePromptDialog.show(
+      context,
+      title: 'DESCRIPTION',
+      initialText: node.description ?? '',
+      hintText: 'Notes for this ${node.isFolder ? 'folder' : 'request'}',
+      allowEmpty: true,
+      multiline: true,
+      onConfirm: (text) {
+        bloc.add(UpdateNodeDescription(node.id, text.trim()));
+        showAppSnackBarVia(messenger, 'Description updated');
       },
     );
   }

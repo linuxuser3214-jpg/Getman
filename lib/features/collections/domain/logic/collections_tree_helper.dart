@@ -49,6 +49,13 @@ class CollectionsTreeHelper {
   ) =>
       _updateNodeById(nodes, id, (node) => node.copyWith(config: config));
 
+  static List<CollectionNodeEntity> describeInTree(
+    List<CollectionNodeEntity> nodes,
+    String id,
+    String description,
+  ) =>
+      _updateNodeById(nodes, id, (node) => node.copyWith(description: description));
+
   static CollectionNodeEntity? findNode(List<CollectionNodeEntity> nodes, String id) {
     for (final node in nodes) {
       if (node.id == id) return node;

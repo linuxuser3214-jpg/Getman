@@ -52,6 +52,15 @@ class RenameNode extends CollectionsEvent {
   List<Object?> get props => [id, newName];
 }
 
+/// Sets the free-text description on a node. An empty string clears it.
+class UpdateNodeDescription extends CollectionsEvent {
+  final String id;
+  final String description;
+  const UpdateNodeDescription(this.id, this.description);
+  @override
+  List<Object?> get props => [id, description];
+}
+
 class ToggleFavorite extends CollectionsEvent {
   final String id;
   const ToggleFavorite(this.id);

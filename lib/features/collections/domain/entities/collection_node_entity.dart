@@ -9,6 +9,9 @@ class CollectionNodeEntity extends Equatable {
   final HttpRequestConfigEntity? config;
   final bool isFavorite;
 
+  /// Free-text notes for a folder or request. Null/empty means "no description".
+  final String? description;
+
   const CollectionNodeEntity({
     required this.id,
     required this.name,
@@ -16,6 +19,7 @@ class CollectionNodeEntity extends Equatable {
     this.children = const [],
     this.config,
     this.isFavorite = false,
+    this.description,
   });
 
   CollectionNodeEntity copyWith({
@@ -24,6 +28,7 @@ class CollectionNodeEntity extends Equatable {
     List<CollectionNodeEntity>? children,
     HttpRequestConfigEntity? config,
     bool? isFavorite,
+    String? description,
   }) {
     return CollectionNodeEntity(
       id: id,
@@ -32,6 +37,7 @@ class CollectionNodeEntity extends Equatable {
       children: children ?? this.children,
       config: config ?? this.config,
       isFavorite: isFavorite ?? this.isFavorite,
+      description: description ?? this.description,
     );
   }
 
@@ -43,5 +49,6 @@ class CollectionNodeEntity extends Equatable {
     children,
     config,
     isFavorite,
+    description,
   ];
 }

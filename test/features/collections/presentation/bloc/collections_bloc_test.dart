@@ -53,6 +53,20 @@ void main() {
       expect(bloc.state.collections.where((n) => n.name == 'Auth' && n.isFolder), hasLength(1));
     });
 
+    test('UpdateNodeDescription sets and then clears a node description', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('R', 'R')]);
+
+      bloc.add(const UpdateNodeDescription('R', 'auth endpoint'));
+      await bloc.stream.first;
+      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')?.description, 'auth endpoint');
+
+      bloc.add(const UpdateNodeDescription('R', ''));
+      await bloc.stream.first;
+      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')?.description, '');
+    });
+
     test('DeleteNode removes the node from the tree', () async {
       final bloc = build();
       addTearDown(bloc.close);
