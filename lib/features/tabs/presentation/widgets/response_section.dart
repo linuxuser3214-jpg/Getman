@@ -185,8 +185,11 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
     }
 
     // Normal path — prettify (or pass through verbatim in raw mode), then load
-    // into the editor.
-    final text = _raw ? (rawBody ?? '') : await JsonUtils.prettify(rawBody);
+    // into the editor. The over-1-MB sentinel is known non-JSON, so render it
+    // as plain text rather than spawning an isolate to fail-parse it.
+    final text = (_raw || rawBody == kResponseBodyTooLargePlaceholder)
+        ? (rawBody ?? '')
+        : await JsonUtils.prettify(rawBody);
     // Only apply if no newer sync was started and we're still mounted.
     if (!mounted || syncId != _pendingSyncId) return;
     widget.responseController.text = text;

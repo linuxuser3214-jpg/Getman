@@ -52,5 +52,14 @@ void main() {
       final result = await JsonUtils.prettify(invalid);
       expect(result, invalid);
     });
+
+    test('non-JSON body starting with [ is returned verbatim (e.g. the over-1-MB placeholder)',
+        () async {
+      // Regression: this string defeats the {/[ short-circuit, reaches the
+      // parser, and used to spam the console with a FormatException log.
+      const placeholder = '[response body over 1 MB was not persisted — re-send the request]';
+      final result = await JsonUtils.prettify(placeholder);
+      expect(result, placeholder);
+    });
   });
 }

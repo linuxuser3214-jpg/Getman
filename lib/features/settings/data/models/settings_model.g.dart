@@ -33,13 +33,14 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       verifySsl: fields[13] == null ? true : fields[13] as bool,
       proxyUrl: fields[14] as String?,
       workspacePath: fields[15] as String?,
+      workspaceBookmark: fields[16] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(16)
+      ..writeByte(17)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -71,7 +72,9 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(14)
       ..write(obj.proxyUrl)
       ..writeByte(15)
-      ..write(obj.workspacePath);
+      ..write(obj.workspacePath)
+      ..writeByte(16)
+      ..write(obj.workspaceBookmark);
   }
 
   @override

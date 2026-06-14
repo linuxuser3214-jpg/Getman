@@ -56,6 +56,9 @@ class SettingsModel extends HiveObject {
   @HiveField(15)
   String? workspacePath;
 
+  @HiveField(16)
+  String? workspaceBookmark;
+
   SettingsModel({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
@@ -73,6 +76,7 @@ class SettingsModel extends HiveObject {
     this.verifySsl = true,
     this.proxyUrl,
     this.workspacePath,
+    this.workspaceBookmark,
   });
 
   SettingsModel copyWith({
@@ -92,6 +96,7 @@ class SettingsModel extends HiveObject {
     bool? verifySsl,
     Object? proxyUrl = _unchanged,
     Object? workspacePath = _unchanged,
+    Object? workspaceBookmark = _unchanged,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -113,6 +118,9 @@ class SettingsModel extends HiveObject {
       proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
       workspacePath:
           identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
+      workspaceBookmark: identical(workspaceBookmark, _unchanged)
+          ? this.workspaceBookmark
+          : workspaceBookmark as String?,
     );
   }
 
@@ -133,6 +141,7 @@ class SettingsModel extends HiveObject {
     'verifySsl': verifySsl,
     'proxyUrl': proxyUrl,
     'workspacePath': workspacePath,
+    'workspaceBookmark': workspaceBookmark,
   };
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -152,6 +161,7 @@ class SettingsModel extends HiveObject {
     verifySsl: json['verifySsl'] ?? true,
     proxyUrl: json['proxyUrl'] as String?,
     workspacePath: json['workspacePath'] as String?,
+    workspaceBookmark: json['workspaceBookmark'] as String?,
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
@@ -171,6 +181,7 @@ class SettingsModel extends HiveObject {
     verifySsl: entity.verifySsl,
     proxyUrl: entity.proxyUrl,
     workspacePath: entity.workspacePath,
+    workspaceBookmark: entity.workspaceBookmark,
   );
 
   SettingsEntity toEntity() => SettingsEntity(
@@ -190,5 +201,6 @@ class SettingsModel extends HiveObject {
     verifySsl: verifySsl,
     proxyUrl: proxyUrl,
     workspacePath: workspacePath,
+    workspaceBookmark: workspaceBookmark,
   );
 }

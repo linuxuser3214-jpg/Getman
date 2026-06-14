@@ -15,6 +15,11 @@ class WorkspaceSyncService {
   final Duration debounce;
   Timer? _timer;
 
+  /// Roots whose last write failed. Used to log a mirror failure only once per
+  /// root per session instead of on every debounced mutation (e.g. a sandbox
+  /// grant that has not been re-acquired would otherwise spam the console).
+  final Set<String> _quietedRoots = {};
+
   WorkspaceSyncService(this.dataSource, {this.debounce = const Duration(seconds: 1)});
 
   Future<List<CollectionNodeEntity>> read(String root) => dataSource.read(root);
@@ -28,9 +33,14 @@ class WorkspaceSyncService {
   Future<void> _mirror(String root, List<CollectionNodeEntity> forest) async {
     try {
       await dataSource.write(root, forest);
+      _quietedRoots.remove(root); // recovered — allow logging again
     } catch (e) {
       // Best-effort: a failed mirror must never break the in-app session.
-      debugPrint('Workspace mirror failed: $e');
+      // Log the first failure for a root, then stay quiet until it recovers.
+      if (_quietedRoots.add(root)) {
+        debugPrint('Workspace mirror failed for "$root" '
+            '(further failures silenced this session): $e');
+      }
     }
   }
 

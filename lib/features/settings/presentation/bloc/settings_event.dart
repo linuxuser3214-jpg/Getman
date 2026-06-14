@@ -114,7 +114,13 @@ class UpdateProxyUrl extends SettingsEvent {
 
 class UpdateWorkspacePath extends SettingsEvent {
   final String? path;
-  const UpdateWorkspacePath(this.path);
+
+  /// macOS security-scoped bookmark (base64) for [path], captured at pick time.
+  /// Always set alongside [path]: a non-null path with its bookmark on connect,
+  /// both `null` on disconnect.
+  final String? bookmark;
+
+  const UpdateWorkspacePath(this.path, {this.bookmark});
   @override
-  List<Object?> get props => [path];
+  List<Object?> get props => [path, bookmark];
 }

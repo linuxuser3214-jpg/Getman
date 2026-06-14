@@ -27,6 +27,12 @@ class SettingsEntity extends Equatable {
   /// only; `null` means Hive-only, today's behavior).
   final String? workspacePath;
 
+  /// macOS App Sandbox security-scoped bookmark (base64) for [workspacePath].
+  /// The folder grant from the open-panel does not survive relaunch, so this
+  /// bookmark is what re-authorizes writes on the next launch. `null` on other
+  /// platforms / when no workspace is connected.
+  final String? workspaceBookmark;
+
   const SettingsEntity({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
@@ -44,6 +50,7 @@ class SettingsEntity extends Equatable {
     this.verifySsl = true,
     this.proxyUrl,
     this.workspacePath,
+    this.workspaceBookmark,
   });
 
   SettingsEntity copyWith({
@@ -63,6 +70,7 @@ class SettingsEntity extends Equatable {
     bool? verifySsl,
     Object? proxyUrl = _unchanged,
     Object? workspacePath = _unchanged,
+    Object? workspaceBookmark = _unchanged,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -84,6 +92,9 @@ class SettingsEntity extends Equatable {
       proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
       workspacePath:
           identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
+      workspaceBookmark: identical(workspaceBookmark, _unchanged)
+          ? this.workspaceBookmark
+          : workspaceBookmark as String?,
     );
   }
 
@@ -115,5 +126,6 @@ class SettingsEntity extends Equatable {
     verifySsl,
     proxyUrl,
     workspacePath,
+    workspaceBookmark,
   ];
 }

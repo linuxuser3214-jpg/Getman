@@ -37,16 +37,10 @@ class NetworkService {
     ));
     configureHttpAdapter(dio, verifySsl: config.verifySsl, proxyUrl: config.proxyUrl);
     if (cookieInterceptor != null) dio.interceptors.add(cookieInterceptor);
-    if (kDebugMode) {
-      dio.interceptors.add(LogInterceptor(
-        requestBody: false,
-        responseBody: false,
-        requestHeader: false,
-        responseHeader: false,
-        request: true,
-        error: true,
-      ));
-    }
+    // No dio LogInterceptor: it dumps a verbose *** Request *** / *** Response ***
+    // block to the console on every send (and its onResponse prints regardless
+    // of the `request` flag). The app already records every request in History
+    // and surfaces responses + typed NetworkFailures in its own UI.
     return dio;
   }
 

@@ -34,7 +34,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<UpdateFollowRedirects>((e, emit) => _apply(emit, (s) => s.copyWith(followRedirects: e.value)));
     on<UpdateVerifySsl>((e, emit) => _apply(emit, (s) => s.copyWith(verifySsl: e.value)));
     on<UpdateProxyUrl>((e, emit) => _apply(emit, (s) => s.copyWith(proxyUrl: e.url)));
-    on<UpdateWorkspacePath>((e, emit) => _apply(emit, (s) => s.copyWith(workspacePath: e.path)));
+    // The bookmark is always set in lockstep with the path (both null on
+    // disconnect), so pass it explicitly rather than via the copyWith sentinel.
+    on<UpdateWorkspacePath>((e, emit) =>
+        _apply(emit, (s) => s.copyWith(workspacePath: e.path, workspaceBookmark: e.bookmark)));
   }
 
   // 0 disables the timeout (Dio treats Duration.zero as no limit); never negative.

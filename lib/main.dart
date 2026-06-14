@@ -8,6 +8,7 @@ import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/core/utils/workspace/workspace_bookmark.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -20,6 +21,7 @@ import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/network_settings_listener.dart';
@@ -34,7 +36,39 @@ void main() async {
   // instead of silently downloading over HTTP (jank + offline breakage).
   GoogleFonts.config.allowRuntimeFetching = false;
   final initialSettings = await di.init();
-  runApp(MyApp(initialSettings: initialSettings));
+  final settings = await _resumeWorkspaceAccess(initialSettings);
+  runApp(MyApp(initialSettings: settings));
+}
+
+/// Re-acquires macOS security-scoped access to the workspace folder from the
+/// persisted bookmark before the first mirror write — the open-panel grant does
+/// not survive relaunch under the App Sandbox. If macOS reports the bookmark as
+/// stale, the refreshed bookmark is persisted so it keeps resolving. No-op on
+/// other platforms / when no bookmark is stored; returns the settings to boot
+/// with (refreshed when the bookmark changed, otherwise unchanged).
+Future<SettingsEntity> _resumeWorkspaceAccess(SettingsEntity settings) async {
+  final bookmark = settings.workspaceBookmark;
+  if (bookmark == null || !WorkspaceBookmarks.supported) return settings;
+  final access = await WorkspaceBookmarks.resolveAndAccess(bookmark);
+  // Null → access could not be re-acquired; the mirror quietly fails until the
+  // user reconnects the folder (the settings tile surfaces a reconnect hint).
+  if (access == null) return settings;
+  // Reconcile to the path/bookmark the OS actually authorized. A security-scoped
+  // bookmark tracks the folder, not the path string, so the resolved path can
+  // differ from the stored one if the folder was moved/renamed between launches.
+  // Mirror writes target settings.workspacePath, so it must follow the resolved
+  // path or writes hit a location we no longer have a grant for. Compare on the
+  // path, not the `stale` flag — a move often resolves with stale=false, and
+  // stale can be set with the path unchanged (app re-sign / OS upgrade).
+  if (access.path != settings.workspacePath || access.bookmark != bookmark) {
+    final refreshed = settings.copyWith(
+      workspacePath: access.path,
+      workspaceBookmark: access.bookmark,
+    );
+    await di.sl<SaveSettingsUseCase>()(refreshed);
+    return refreshed;
+  }
+  return settings;
 }
 
 class MyApp extends StatelessWidget {
