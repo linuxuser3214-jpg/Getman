@@ -102,15 +102,16 @@ Mandatory rules:
 | 0 | `SettingsModel` | `settings` | Single key `'current'`; loaded synchronously in `main()` |
 | 1 | `HttpRequestConfig` | `history` | Shared between history and collection nodes |
 | 2 | `HttpRequestTabModel` | `tabs` | Tab state including response cache |
-| 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`); `String? description` at `HiveField(6)` (next free: 7) |
+| 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`); `String? description` at `HiveField(6)`; `List<SavedExampleModel> examples` at `HiveField(7)` (next free: 8) |
 | 4 | `EnvironmentModel` | `environments` | Flat list; `variables` is `Map<String, String>` at `HiveField(2)`; `List<String> secretKeys` at `HiveField(3)` (next free: 4) |
 | 5 | `MultipartFieldModel` | (embedded) | Multipart/form-data field; nested inside `HttpRequestConfig` |
 | 6 | `StoredCookieModel` | `cookies` | Cookie jar; keyed by `domain\|path\|name` (one put/delete per cookie) |
 | 7 | `ExtractionRuleModel` | (embedded) | One extraction rule; nested inside `RequestRulesModel` |
 | 8 | `AssertionModel` | (embedded) | One assertion; nested inside `RequestRulesModel` |
 | 9 | `RequestRulesModel` | `requestRules` | Per-request-config rules (assertions + extractions), keyed by configId |
+| 10 | `SavedExampleModel` | (embedded) | A saved request+response example; nested in `CollectionNode.examples`. `name` + epoch-millis `capturedAt` + a reused `HttpRequestConfig` (carries the response columns) |
 
-**Never renumber an existing `typeId`.** Add new models with a fresh ID (next free: 10).
+**Never renumber an existing `typeId`.** Add new models with a fresh ID (next free: 11).
 
 As of the pluggable-themes refactor, `SettingsModel` also carries a `String themeId` at `HiveField(7)` (default `'brutalist'`). This drives which theme builder is active.
 
@@ -156,6 +157,7 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 - Sort order: favorites first, then folders, then leaves, each group alphabetical.
 - Drag-and-drop: implemented with `Draggable<String>` (carrying `node.id`) and `DragTarget<String>`. Drop on root goes via the outer `DragTarget` at the list level.
 - Nodes carry an optional free-text `description` (folders and requests). Edited via "EDIT DESCRIPTION" in both the phone `NodeActionSheet` and the desktop popup menu → `UpdateNodeDescription` → `CollectionsTreeHelper.describeInTree`. An empty string clears it.
+- **Saved examples (M10):** a leaf node carries a `List<SavedExampleEntity> examples` (separate from `children`). Captured from the response panel's "Save as example" button (`SaveExampleToNode`); each is a `{id, name, capturedAt, config}` where `config` carries the response snapshot. In the tree they render as inline expandable sub-rows (the `TreeView` content is a `_TreeItem` union — node vs example); tapping one opens it via `AddTab(response: …)` as an **unlinked** tab (so re-sending never overwrites the saved request). Rename/delete via the per-example menu (`RenameExample`/`DeleteExample`). Examples are local-only — excluded from Postman export and the git workspace mirror.
 
 ### 4.4 History feature
 - History is **read-only from the UI**: writes happen only inside `SendRequestUseCase`. `HistoryBloc` has a single (internal) `HistoryUpdated` event and subscribes to `watchHistory()` on construction; the data source uses `Hive.Box.watch()` and emits on every box change. Don't add UI-dispatched history events without wiring real UI to them.
