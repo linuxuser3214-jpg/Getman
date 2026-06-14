@@ -86,7 +86,11 @@ class RequestSerializer {
             if (path == null || path.isEmpty) continue;
             form.files.add(MapEntry(
               name,
-              MultipartFile.fromBytes(await _readBytes(path), filename: _basename(path)),
+              MultipartFile.fromBytes(
+                await _readBytes(path),
+                filename: _basename(path),
+                contentType: _parseMediaType(f.contentType),
+              ),
             ));
           } else {
             form.fields.add(MapEntry(name, r(f.value)));
@@ -116,4 +120,16 @@ class RequestSerializer {
   }
 
   static String _basename(String path) => PathUtils.basename(path);
+
+  /// Parses a per-row content type into a [DioMediaType], or null when unset or
+  /// malformed (so a bad value falls back to Dio's default rather than throwing
+  /// mid-send).
+  static DioMediaType? _parseMediaType(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    try {
+      return DioMediaType.parse(value.trim());
+    } catch (_) {
+      return null;
+    }
+  }
 }

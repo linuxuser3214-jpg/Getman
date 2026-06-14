@@ -251,6 +251,9 @@ class _RowState {
   bool isFile;
   String? filePath;
   String? fileName;
+  // No UI input yet; preserved here so a content type set via import / the
+  // workspace mirror survives an edit instead of being dropped on re-emit.
+  String? contentType;
 
   _RowState({
     required this.nameController,
@@ -258,6 +261,7 @@ class _RowState {
     this.isFile = false,
     this.filePath,
     this.fileName,
+    this.contentType,
   }) : id = _counter++;
 
   factory _RowState.from(MultipartFieldEntity f) => _RowState(
@@ -266,6 +270,7 @@ class _RowState {
         isFile: f.isFile,
         filePath: f.filePath,
         fileName: f.filePath == null ? null : PathUtils.basename(f.filePath!),
+        contentType: f.contentType,
       );
 
   factory _RowState.empty() => _RowState(
@@ -280,6 +285,7 @@ class _RowState {
         value: isFile ? '' : valueController.text,
         isFile: isFile,
         filePath: isFile ? filePath : null,
+        contentType: isFile ? contentType : null,
       );
 
   void dispose() {

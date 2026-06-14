@@ -200,6 +200,25 @@ void main() {
       expect(data.files.first.value.filename, 'getman_test_upload.txt');
     });
 
+    test('multipart applies an explicit file row content type (L2)', () async {
+      // Extension is .bin (would otherwise infer octet-stream) so this asserts
+      // the explicit contentType wins, not filename inference.
+      final file = File('${Directory.systemTemp.path}/getman_test_typed.bin')
+        ..writeAsBytesSync([1, 2, 3]);
+      addTearDown(() => file.existsSync() ? file.deleteSync() : null);
+
+      final data = await build(cfg(bodyType: BodyType.multipart, formFields: [
+        MultipartFieldEntity(
+          name: 'img',
+          isFile: true,
+          filePath: file.path,
+          contentType: 'image/png',
+        ),
+      ])) as FormData;
+
+      expect(data.files.first.value.contentType?.mimeType, 'image/png');
+    });
+
     test('binary reads file bytes and sets octet-stream over the JSON default', () async {
       final file = File('${Directory.systemTemp.path}/getman_test_binary.bin')
         ..writeAsBytesSync([1, 2, 3]);
