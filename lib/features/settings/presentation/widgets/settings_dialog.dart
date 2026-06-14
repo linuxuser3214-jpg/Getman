@@ -8,6 +8,7 @@ import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/workspace_settings_tile.dart';
+import 'package:getman/features/cookies/presentation/widgets/cookie_manager_dialog.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -229,22 +230,31 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   leading: Icon(Icons.cookie_outlined, size: layout.iconSize),
                   title: Text('COOKIES',
                       style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
-                  trailing: TextButton(
-                    onPressed: () {
-                      ConfirmDialog.show(
-                        context,
-                        title: 'Clear cookies?',
-                        message: 'Removes every stored cookie from the jar. This cannot be undone.',
-                        confirmLabel: 'CLEAR',
-                        onConfirm: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          final store = context.read<CookieStore>();
-                          await store.clear();
-                          showAppSnackBarVia(messenger, 'Cookie jar cleared');
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: () => CookieManagerDialog.show(context),
+                        child: const Text('MANAGE'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          ConfirmDialog.show(
+                            context,
+                            title: 'Clear cookies?',
+                            message: 'Removes every stored cookie from the jar. This cannot be undone.',
+                            confirmLabel: 'CLEAR',
+                            onConfirm: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              final store = context.read<CookieStore>();
+                              await store.clear();
+                              showAppSnackBarVia(messenger, 'Cookie jar cleared');
+                            },
+                          );
                         },
-                      );
-                    },
-                    child: const Text('CLEAR'),
+                        child: const Text('CLEAR'),
+                      ),
+                    ],
                   ),
                 ),
                 const Divider(),
