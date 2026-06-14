@@ -3,6 +3,7 @@ import 'package:getman/core/domain/auth_application.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/core/utils/header_utils.dart';
 import 'package:getman/core/utils/io/file_reader.dart';
@@ -85,7 +86,7 @@ class RequestSerializer {
             if (path == null || path.isEmpty) continue;
             form.files.add(MapEntry(
               name,
-              MultipartFile.fromBytes(await readFileBytes(path), filename: _basename(path)),
+              MultipartFile.fromBytes(await _readBytes(path), filename: _basename(path)),
             ));
           } else {
             form.fields.add(MapEntry(name, r(f.value)));
@@ -98,7 +99,19 @@ class RequestSerializer {
         if (!HeaderUtils.hasCustomContentType(headers)) {
           HeaderUtils.setHeader(headers, 'Content-Type', 'application/octet-stream');
         }
-        return await readFileBytes(path);
+        return await _readBytes(path);
+    }
+  }
+
+  /// Reads the file at [path], translating any read failure (missing/deleted
+  /// file, unsupported on web) into a pure [FileBodyException] carrying the
+  /// path. The repository maps that to a NetworkFailure so a missing upload
+  /// surfaces as a visible error response instead of an uncaught throw.
+  static Future<List<int>> _readBytes(String path) async {
+    try {
+      return await readFileBytes(path);
+    } catch (e) {
+      throw FileBodyException(path, cause: e);
     }
   }
 

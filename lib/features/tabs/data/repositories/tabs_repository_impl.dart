@@ -1,6 +1,8 @@
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
+import 'package:getman/core/error/exceptions.dart';
+import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/error/guard.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_service.dart';
@@ -89,11 +91,23 @@ class TabsRepositoryImpl implements TabsRepository {
       envVars: envVars,
     );
 
-    final data = await RequestSerializer.buildBody(
-      config: config,
-      headers: headers,
-      envVars: envVars,
-    );
+    final dynamic data;
+    try {
+      data = await RequestSerializer.buildBody(
+        config: config,
+        headers: headers,
+        envVars: envVars,
+      );
+    } on FileBodyException catch (e) {
+      // A missing/unreadable file body is a real, user-visible error — surface
+      // it as a NetworkFailure (statusCode 0) so the response panel + history
+      // show it, rather than letting an uncaught throw silently drop the send.
+      throw NetworkFailure(
+        'Could not read file: ${e.path}',
+        type: NetworkFailureType.unknown,
+        statusCode: 0,
+      );
+    }
 
     return networkService.request(
       url: resolvedBase,
