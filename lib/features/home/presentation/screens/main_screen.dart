@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/navigation/intents.dart';
+import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
@@ -215,6 +216,13 @@ class _MainScreenState extends State<MainScreen> {
                   // three tabs open is a safe no-op.
                   onInvoke: (intent) {
                     context.read<TabsBloc>().add(SetActiveIndex(intent.index));
+                    return null;
+                  },
+                ),
+                FocusUrlIntent: CallbackAction<FocusUrlIntent>(
+                  onInvoke: (_) {
+                    if (activeIndex < 0 || activeIndex >= tabs.length) return null;
+                    context.read<UrlFocusRegistry>().focus(tabs[activeIndex].tabId);
                     return null;
                   },
                 ),

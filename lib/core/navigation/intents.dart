@@ -39,3 +39,8 @@ class JumpToTabIntent extends Intent {
   final int index;
   const JumpToTabIntent(this.index);
 }
+
+/// Focus the active tab's URL field. Bound to Cmd/Ctrl+L.
+class FocusUrlIntent extends Intent {
+  const FocusUrlIntent();
+}

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
+import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -103,6 +104,8 @@ final Map<ShortcutActivator, Intent> appShortcuts = {
   const SingleActivator(LogicalKeyboardKey.keyK, meta: true): const CommandPaletteIntent(),
   const SingleActivator(LogicalKeyboardKey.tab, control: true): const NextTabIntent(),
   const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true): const PrevTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyL, control: true): const FocusUrlIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyL, meta: true): const FocusUrlIntent(),
   for (var i = 0; i < _tabDigitKeys.length; i++) ...{
     SingleActivator(_tabDigitKeys[i], meta: true): JumpToTabIntent(i),
     SingleActivator(_tabDigitKeys[i], control: true): JumpToTabIntent(i),
@@ -118,6 +121,7 @@ class MyApp extends StatelessWidget {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<TabDirtyChecker>.value(value: di.sl<TabDirtyChecker>()),
+        RepositoryProvider<UrlFocusRegistry>.value(value: di.sl<UrlFocusRegistry>()),
         RepositoryProvider<NetworkService>.value(value: di.sl<NetworkService>()),
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
         RepositoryProvider<WorkspaceSyncService>.value(value: di.sl<WorkspaceSyncService>()),

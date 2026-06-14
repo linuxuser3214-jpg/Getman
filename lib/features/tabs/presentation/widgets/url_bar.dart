@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/http_methods.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -43,6 +44,8 @@ class UrlBar extends StatefulWidget {
 
 class _UrlBarState extends State<UrlBar> {
   late final VariableHighlightController _urlController;
+  late final FocusNode _urlFocusNode;
+  UrlFocusRegistry? _focusRegistry;
 
   @override
   void initState() {
@@ -50,6 +53,9 @@ class _UrlBarState extends State<UrlBar> {
     // Token colors come from AppPalette in didChangeDependencies — never
     // hardcode them here (CLAUDE.md §4.10).
     _urlController = VariableHighlightController();
+    // Register this tab's URL field so the Cmd/Ctrl+L shortcut can focus it.
+    _urlFocusNode = FocusNode(debugLabel: 'url_${widget.tabId}');
+    _focusRegistry = context.read<UrlFocusRegistry>()..register(widget.tabId, _urlFocusNode);
   }
 
   @override
@@ -82,6 +88,8 @@ class _UrlBarState extends State<UrlBar> {
 
   @override
   void dispose() {
+    _focusRegistry?.unregister(widget.tabId, _urlFocusNode);
+    _urlFocusNode.dispose();
     _urlController.dispose();
     super.dispose();
   }
@@ -216,6 +224,7 @@ class _UrlBarState extends State<UrlBar> {
                         Expanded(
                           child: TextField(
                             controller: _urlController,
+                            focusNode: _urlFocusNode,
                             style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
                             decoration: const InputDecoration(
                               hintText: 'Enter URL or paste cURL...',
