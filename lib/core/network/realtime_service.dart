@@ -103,7 +103,12 @@ class _SseConnection implements RealtimeConnection {
           }
         },
         onError: (Object e) => _emit(RealtimeFrame.error(e.toString())),
-        onDone: () => _emit(RealtimeFrame.close()),
+        onDone: () {
+          for (final event in _parser.flush()) {
+            _emit(RealtimeFrame.incoming(event));
+          }
+          _emit(RealtimeFrame.close());
+        },
       );
     }).catchError((Object e) {
       if (e is DioException && CancelToken.isCancel(e)) return;
