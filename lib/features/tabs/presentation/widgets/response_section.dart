@@ -9,6 +9,7 @@ import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/utils/byte_format.dart';
 import 'package:getman/core/utils/cookie_parser.dart';
+import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -285,12 +286,35 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
     showAppSnackBarVia(messenger, 'Response copied');
   }
 
+  /// Writes the verbatim response body (the same text Copy uses, incl. the
+  /// large-body cache) to a user-chosen file. JSON default, txt allowed.
+  Future<void> _saveBody(BuildContext context) async {
+    final text = _copyableText();
+    if (text.isEmpty) return;
+    await saveJsonFileWithFeedback(
+      context,
+      jsonString: text,
+      fileName: 'response.json',
+      dialogTitle: 'SAVE RESPONSE',
+      allowedExtensions: const ['json', 'txt'],
+    );
+  }
+
   Widget _copyButton(BuildContext context) {
     return IconButton(
       tooltip: 'Copy response',
       visualDensity: VisualDensity.compact,
       icon: Icon(Icons.copy_all_outlined, size: context.appLayout.iconSize),
       onPressed: () => _copyBody(context),
+    );
+  }
+
+  Widget _saveButton(BuildContext context) {
+    return IconButton(
+      tooltip: 'Save response to file',
+      visualDensity: VisualDensity.compact,
+      icon: Icon(Icons.save_outlined, size: context.appLayout.iconSize),
+      onPressed: () => _saveBody(context),
     );
   }
 
@@ -303,6 +327,7 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
           children: [
             Expanded(child: _PrettyRawToggle(raw: _raw, onChanged: _setRaw)),
             _copyButton(context),
+            _saveButton(context),
           ],
         ),
         Expanded(child: _buildEditorMode()),
@@ -383,6 +408,7 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
                     ),
                 ],
                 _copyButton(context),
+                _saveButton(context),
               ],
             ),
           ),
