@@ -35,8 +35,7 @@ class _CollectionsListState extends State<CollectionsList> {
   @override
   void initState() {
     super.initState();
-    _treeController = TreeController<CollectionNodeEntity>(
-      roots: const [],
+    _treeController = _IdKeyedTreeController(
       childrenProvider: (node) => node.children,
     );
     _rebuildTree();
@@ -210,6 +209,31 @@ class _CollectionsListState extends State<CollectionsList> {
         ),
       ),
     );
+  }
+}
+
+/// A [TreeController] that tracks expansion by [CollectionNodeEntity.id] rather
+/// than node identity/equality. Collection mutations rebuild non-equal entities
+/// (copyWith rewrites the whole ancestor chain), so the default equality-keyed
+/// expansion set would no longer match and folders collapsed on every
+/// rename/add/favorite/config-edit (H2). Keying by the stable id survives the
+/// rebuild. Overriding these two methods is the package's prescribed extension
+/// point; neither calls notifyListeners (cascading ops invoke them many times).
+class _IdKeyedTreeController extends TreeController<CollectionNodeEntity> {
+  _IdKeyedTreeController({required super.childrenProvider}) : super(roots: const []);
+
+  final Set<String> _expandedIds = <String>{};
+
+  @override
+  bool getExpansionState(CollectionNodeEntity node) => _expandedIds.contains(node.id);
+
+  @override
+  void setExpansionState(CollectionNodeEntity node, bool expanded) {
+    if (expanded) {
+      _expandedIds.add(node.id);
+    } else {
+      _expandedIds.remove(node.id);
+    }
   }
 }
 
