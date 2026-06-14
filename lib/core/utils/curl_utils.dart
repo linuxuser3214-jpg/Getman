@@ -1,8 +1,21 @@
+import 'dart:convert';
+
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/code_gen_service.dart';
 
 class CurlUtils {
-  /// Parses a curl command into an [HttpRequestConfigEntity]
+  /// Common value-taking flags we don't model. Their argument is consumed and
+  /// discarded so it isn't mistaken for the URL (e.g. `-e <referer> <url>`).
+  static const _skipValueFlags = {
+    '-A', '--user-agent', '-e', '--referer', '-o', '--output', '-F', '--form',
+    '-x', '--proxy', '-m', '--max-time', '--connect-timeout', '-T',
+    '--upload-file', '--cert', '--key', '--cacert', '-w', '--write-out',
+  };
+
+  static final RegExp _domainish = RegExp(r'^[\w.-]+\.[\w.-]+');
+  static final RegExp _hostPort = RegExp(r'^[\w.-]+:\d+');
+
+  /// Parses a curl command into an [HttpRequestConfigEntity].
   static HttpRequestConfigEntity? parse(String curl, {required String id}) {
     // Tokenize first; the first token tells us whether this really is a curl
     // invocation. (The previous double-check — startsWith + args[0] — was
@@ -13,16 +26,25 @@ class CurlUtils {
     }
 
     var method = 'GET';
+    var explicitMethod = false;
     var url = '';
     final headers = <String, String>{};
     var body = '';
+    var forceGet = false;
+
+    void addData(String data) {
+      // curl concatenates multiple -d flags with '&'.
+      body = body.isEmpty ? data : '$body&$data';
+      if (method == 'GET' && !explicitMethod) method = 'POST';
+    }
 
     for (var i = 1; i < args.length; i++) {
       final arg = args[i];
-      
+
       if (arg == '-X' || arg == '--request') {
         if (i + 1 < args.length) {
           method = args[++i].toUpperCase();
+          explicitMethod = true;
         }
       } else if (arg == '-H' || arg == '--header') {
         if (i + 1 < args.length) {
@@ -34,18 +56,40 @@ class CurlUtils {
             headers[key] = value;
           }
         }
-      } else if (arg == '-d' || arg == '--data' || arg == '--data-raw' || arg == '--data-binary') {
-        if (i + 1 < args.length) {
-          body = args[++i];
-          if (method == 'GET') method = 'POST';
+      } else if (arg == '-d' ||
+          arg == '--data' ||
+          arg == '--data-raw' ||
+          arg == '--data-binary' ||
+          arg == '--data-ascii') {
+        if (i + 1 < args.length) addData(args[++i]);
+      } else if (arg == '--data-urlencode') {
+        if (i + 1 < args.length) addData(_urlEncodeData(args[++i]));
+      } else if (arg == '-u' || arg == '--user') {
+        if (i + 1 < args.length && !_hasHeader(headers, 'authorization')) {
+          headers['Authorization'] = 'Basic ${base64.encode(utf8.encode(args[++i]))}';
         }
+      } else if (arg == '-b' || arg == '--cookie') {
+        if (i + 1 < args.length && !_hasHeader(headers, 'cookie')) {
+          headers['Cookie'] = args[++i];
+        }
+      } else if (arg == '-G' || arg == '--get') {
+        forceGet = true;
       } else if (arg == '--url') {
-        if (i + 1 < args.length) {
-          url = args[++i];
-        }
-      } else if (arg.startsWith('http')) {
+        if (i + 1 < args.length) url = args[++i];
+      } else if (_skipValueFlags.contains(arg)) {
+        if (i + 1 < args.length) i++; // consume + discard the unmodeled value
+      } else if (!arg.startsWith('-') && url.isEmpty && _looksLikeUrl(arg)) {
         url = arg;
       }
+      // Unknown boolean flags (e.g. --compressed, -s, -L) are ignored.
+    }
+
+    // -G turns accumulated data into the query string and forces GET.
+    if (forceGet && body.isNotEmpty) {
+      final sep = url.contains('?') ? '&' : '?';
+      url = '$url$sep$body';
+      body = '';
+      method = 'GET';
     }
 
     if (url.isEmpty) return null;
@@ -58,6 +102,25 @@ class CurlUtils {
       body: body,
     );
   }
+
+  /// `name=value` -> `name=<encoded value>`; bare token -> fully encoded.
+  static String _urlEncodeData(String data) {
+    final eq = data.indexOf('=');
+    if (eq == -1) return Uri.encodeComponent(data);
+    return '${data.substring(0, eq)}=${Uri.encodeComponent(data.substring(eq + 1))}';
+  }
+
+  static bool _hasHeader(Map<String, String> h, String name) {
+    final l = name.toLowerCase();
+    return h.keys.any((k) => k.toLowerCase() == l);
+  }
+
+  static bool _looksLikeUrl(String s) =>
+      s.startsWith('http://') ||
+      s.startsWith('https://') ||
+      s.startsWith('localhost') ||
+      _domainish.hasMatch(s) ||
+      _hostPort.hasMatch(s);
 
   static List<String> _splitArguments(String command) {
     final args = <String>[];
