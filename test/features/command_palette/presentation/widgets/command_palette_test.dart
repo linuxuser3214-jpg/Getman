@@ -3,6 +3,7 @@
 // them directly and only reads .state / calls .add).
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
@@ -106,6 +107,20 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
     verify(() => tabs.add(any(that: isA<AddTab>()))).called(1);
+  });
+
+  testWidgets('arrow keys move the highlight; Enter runs the highlighted row', (tester) async {
+    await pump(tester);
+    // With an empty query the order is: Login (request), No Environment, Production, themes…
+    // ArrowDown once highlights "No Environment", so Enter must switch the
+    // environment, NOT open the top request as a tab.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+
+    verify(() => settings.add(any(that: isA<UpdateActiveEnvironmentId>()))).called(1);
+    verifyNever(() => tabs.add(any()));
   });
 
   testWidgets('tapping a request opens it as a tab', (tester) async {
