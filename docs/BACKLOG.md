@@ -7,8 +7,30 @@
 
 ## Current state
 - Branch `dev`. App **builds** (`fvm flutter build macos --debug` → `✓ Built …getman.app`).
-- `fvm flutter analyze` → `No issues found!`; `fvm flutter test` → all green (~579).
+- `fvm flutter analyze` → `No issues found!`; `fvm flutter test` → all green (~611).
 - The improvement pass (≈22 commits after `7533cb3`) is committed and clean.
+
+## ✅ Done in the backlog+refactor pass (June 2026)
+Foundational refactors + all bugs + two perf items are shipped on `dev`:
+- **Refactors:** `NetworkCancelHandle`→pure `cancel_handle.dart` (**M2**); `dart:developer`
+  log in `send_request_use_case` — domain now Flutter-free (**M3**); `HeaderUtils` extracted
+  from the serializer+code_gen verbatim dupes; shared `AuthApplication` seam
+  (`auth_application.dart`); `HttpResponseEntity.copyWithBody`; `ConfirmDialog` for the
+  workspace-import prompt; `app_theme.dart` split into `extensions/` (part of **L10**);
+  reusable `HoverHighlight` atom (add_tab_button + history row, part of **R1/M4-family**).
+- **Bugs:** **H1** (Postman multipart+urlencoded round-trip), **H2** (tree expansion keyed by
+  node.id), **M1** (missing multipart file → error response), **L1** (empty basic-auth skip),
+  **L2** (multipart contentType applied).
+- **Perf:** **M4** (O(1) dirty check via `CollectionsState.configById`), tab-switcher `buildWhen`.
+- Partial **M7**: added `TabDirtyChecker` + `configById` tests.
+
+Remaining: the god-file splits (response_section M6, url_bar/main_screen/environments_dialog
+L10, request_editor_tabs, rules_tab_view, collections_list, extract `_RequestManager` from
+tabs_bloc, code_gen), the rest of the rebuild-scope work (settings per-section, tab_widget hover,
+url_bar narrow scope, pill ValueKey, node ValueKey), the remaining M7 tests, the medium features
+below (M5/M10-desc/M11/M12), and the LOW quick wins (L3/L5/L6/L7/L8/L9/L11/L12). The big
+features H3/H4/M8/M9 + M10-examples are explicitly deferred. Plan:
+`~/.claude/plans/i-need-you-to-swirling-anchor.md`.
 
 ## Working agreement (how to resume)
 1. **One concern per commit**, message `type(scope): summary`, end with
@@ -31,13 +53,13 @@ cheap LOW wins to bank momentum, then features/refactors as scoped.
 
 ## 🔴 HIGH
 
-### H1 — Postman export/import drops multipart & urlencoded form bodies
+### ✅ H1 (DONE) — Postman export/import drops multipart & urlencoded form bodies
 - **Files**: `lib/core/utils/postman/postman_collection_mapper.dart` (`_configToRequest` ~112-124 export; `_parseBody` ~238-246 import).
 - **Problem**: Export only emits raw bodies (`if (config.body.isNotEmpty) … mode:'raw'`) and never reads `config.bodyType`/`config.formFields`; for urlencoded/multipart the send path builds the payload purely from `formFields` (so `config.body` is empty) → exported form requests carry **no body**. Import symmetrically returns `''` for any non-`raw` mode.
 - **Fix**: In `_configToRequest`, switch on `config.bodyType`: emit Postman `formdata` mode (array of `{key,value,type:'file'|'text',src}`) for multipart and `urlencoded` mode for urlencoded, from `config.formFields`. Mirror in `_parseBody` to reconstruct `formFields`+`bodyType` on import.
 - **Effort**: M. **Verify**: extend `test/core/utils/postman/postman_collection_mapper_test.dart` with a round-trip (export→import) for a multipart and a urlencoded request.
 
-### H2 — Collections folder tree collapses on ANY mutation
+### ✅ H2 (DONE) — Collections folder tree collapses on ANY mutation
 - **Files**: `lib/features/collections/presentation/widgets/collections_list.dart` (`_rebuildTree` ~57-64, BlocListener ~99-101); `collection_node_entity.dart` (Equatable props ~39-46).
 - **Problem**: `flutter_fancy_tree_view`'s `TreeController.toggledNodes` is keyed by **value-equality**. Mutations build new non-equal `CollectionNodeEntity`s (copyWith rewrites the whole ancestor chain), so after rename/add/favorite/config-edit the expansion state is lost and folders collapse. `expandAll()` only runs during active search.
 - **Fix**: Own expansion state keyed by `node.id` — maintain a `Set<String> expandedIds` in `_CollectionsListState`, re-applied after each `roots` assignment (collapse-then-expand still-present ids), OR override the controller's `getExpansionState`/`setExpansionState` to key by id. This is also the natural seam for the H?/two_dimensional_scrollables migration (M5).
@@ -59,23 +81,23 @@ cheap LOW wins to bank momentum, then features/refactors as scoped.
 
 ## 🟡 MEDIUM
 
-### M1 — Multipart send with a missing/deleted file fails silently
+### ✅ M1 (DONE) — Multipart send with a missing/deleted file fails silently
 - **Files**: `lib/features/tabs/data/request_serializer.dart` (`buildBody` file reads ~104/117), `lib/features/tabs/presentation/bloc/tabs_bloc.dart` (catch-all ~375-381).
 - **Problem**: `readFileBytes` throws `FileSystemException`; it's not a `NetworkFailure`, so `SendRequestUseCase` doesn't catch it and the bloc catch-all only `debugPrint`s + clears `isSending` — no error response, no snackbar, no history.
 - **Fix**: Catch file-read errors and surface a synthetic error `HttpResponseEntity` (statusCode 0, body `File not found: <path>`) so the response panel shows it.
 - **Effort**: M. **Verify**: bloc test with a non-existent multipart file path.
 
-### M2 — `NetworkCancelHandle` domain-purity leak
+### ✅ M2 (DONE) — `NetworkCancelHandle` domain-purity leak
 - **Files**: `lib/features/tabs/domain/repositories/tabs_repository.dart:3`, `…/domain/usecases/send_request_use_case.dart:6` import `core/network/network_service.dart` (which imports dio + flutter).
 - **Fix**: Extract `NetworkCancelHandle` into its own pure-Dart file (`lib/core/network/cancel_handle.dart`, no dio/flutter); `NetworkService` adapts to Dio's `CancelToken` internally; repoint the two domain imports.
 - **Effort**: S. **Verify**: analyze + tests; grep confirms no `core/network/network_service` import under `lib/features/*/domain`.
 
-### M3 — `send_request_use_case.dart` imports `package:flutter/foundation.dart` for `debugPrint`
+### ✅ M3 (DONE) — `send_request_use_case.dart` imports `package:flutter/foundation.dart` for `debugPrint`
 - **Files**: `lib/features/tabs/domain/usecases/send_request_use_case.dart:1,70` (the only Flutter import in the whole domain layer).
 - **Fix**: Replace `debugPrint` with a pure-Dart logging seam (`dart:developer log()`, an injected logger callback, or an abstract `Logger` port in core).
 - **Effort**: S.
 
-### M4 — Tab-strip dirty-check storm (perf)
+### ✅ M4 (DONE) — Tab-strip dirty-check storm (perf)
 - **Files**: `tab_widget.dart` (BlocSelector ~94-96), `tab_dirty_checker.dart` (~13-16), `collections_tree_helper.dart` (`findNode` ~52-59), `collections_state.dart`.
 - **Problem**: For each linked tab, the `BlocSelector<CollectionsBloc>` re-runs on **every** CollectionsState emission and calls `findNode` — an O(nodes) DFS. T tabs × O(N) per collection mutation on the UI isolate (only the rebuild short-circuits, not the scan). Unlinked tabs already short-circuit cheaply (caps real-world impact → medium).
 - **Fix**: Add a precomputed `Map<String, HttpRequestConfigEntity>` (id→config) to `CollectionsState` built once per emission; `TabDirtyChecker` does O(1) lookup. Turns T×O(N) into O(N)+T×O(1).
@@ -124,12 +146,12 @@ cheap LOW wins to bank momentum, then features/refactors as scoped.
 
 ## 🟢 LOW / quick wins
 
-### L1 — Basic auth emits a header with empty credentials  *(quick)*
+### ✅ L1 (DONE) — Basic auth emits a header with empty credentials  *(quick)*
 - **Files**: `lib/features/tabs/data/request_serializer.dart:43-48`.
 - **Problem**: `AuthType.basic` unconditionally sets `Authorization: Basic <base64(':')>` even when user+pass are both empty (bearer/apiKey guard on empty).
 - **Fix**: Skip the header when both resolved user and pass are empty. **Effort**: S. **Verify**: serializer test.
 
-### L2 — `MultipartFieldEntity.contentType` persisted but never applied  *(quick)*
+### ✅ L2 (DONE) — `MultipartFieldEntity.contentType` persisted but never applied  *(quick)*
 - **Files**: `multipart_field_entity.dart`, `request_serializer.dart:102-104`, `form_data_editor.dart`.
 - **Problem**: `contentType` is round-tripped (Hive field 4 + workspace serializer) but never passed to `MultipartFile.fromBytes` and dropped by the form editor's row state.
 - **Fix**: Either thread it through (`DioMediaType` + add to `_RowState`) or remove the field. **Effort**: S.
