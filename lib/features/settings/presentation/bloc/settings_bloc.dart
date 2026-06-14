@@ -52,8 +52,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   // 0 disables the timeout (Dio treats Duration.zero as no limit); never negative.
   static int _clampTimeout(int ms) => ms < 0 ? 0 : ms;
 
-  // 0 means "do not follow redirects"; never negative.
-  static int _clampRedirects(int v) => v < 0 ? 0 : v;
+  // Min 1: dart:io throws "Redirect limit exceeded" on the first 3xx when
+  // maxRedirects is 0 while followRedirects is on (it has no "0 = don't follow"
+  // semantic — disable redirects via the FOLLOW REDIRECTS toggle instead).
+  static int _clampRedirects(int v) => v < 1 ? 1 : v;
 
   Future<void> _apply(
     Emitter<SettingsState> emit,
