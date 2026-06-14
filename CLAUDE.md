@@ -117,7 +117,9 @@ As of the pluggable-themes refactor, `SettingsModel` also carries a `String them
 
 `SettingsModel` also carries `String? activeEnvironmentId` at `HiveField(8)` (nullable, no default — `null` means "No Environment"). This is the id of the environment whose variables get substituted into `{{var}}` placeholders at send time. `SettingsEntity.copyWith` uses a sentinel (`_unchanged` `Object` constant) so the caller can explicitly clear the id back to `null`.
 
-`SettingsModel` carries `bool alwaysPrettifyLargeResponses` at `HiveField(17)` (default `false`). When `true`, `_ResponseBodyView` prettifies + highlights bodies over `kLargeResponseViewerChars` automatically (auto-opts into the editor) instead of the plain-text large viewer — the user accepts the render cost. The `kResponseBodyTooLargePlaceholder` sentinel always stays plain text. (Highest `HiveField` on `SettingsModel`; next free: 18.)
+`SettingsModel` carries `bool alwaysPrettifyLargeResponses` at `HiveField(17)` (default `false`). When `true`, `_ResponseBodyView` prettifies + highlights bodies over `kLargeResponseViewerChars` automatically (auto-opts into the editor) instead of the plain-text large viewer — the user accepts the render cost. The `kResponseBodyTooLargePlaceholder` sentinel always stays plain text.
+
+`SettingsModel` also carries network/redirect/mTLS fields: `int maxRedirects` at `HiveField(18)` (default `5`, applied to `BaseOptions.maxRedirects`), and the client-certificate trio `String? clientCertPath` / `clientKeyPath` / `clientCertPassphrase` at `HiveField(19/20/21)` (nullable; mTLS). Cert config is plain-string data on `NetworkConfig`/`SettingsEntity` (never a `dart:io` `SecurityContext`, which is built only inside `dio_adapter_config_io.dart`, guarded with a try/catch fallback; the web stub ignores it). All reach the live Dio via `NetworkSettingsListener.listenWhen`. (Highest `HiveField` on `SettingsModel`; next free: 22.)
 
 After editing any `@HiveType` field, regenerate:
 ```
