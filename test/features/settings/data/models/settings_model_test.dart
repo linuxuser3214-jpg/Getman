@@ -121,4 +121,30 @@ void main() {
       expect(kept.workspacePath, '/ws');
     });
   });
+
+  group('SettingsModel workspaceBookmark (macOS security-scoped bookmark)', () {
+    test('default is null', () {
+      expect(const SettingsEntity().workspaceBookmark, isNull);
+      expect(SettingsModel().workspaceBookmark, isNull);
+    });
+
+    test('json roundtrip preserves the bookmark', () {
+      final model = SettingsModel(workspacePath: '/ws', workspaceBookmark: 'Ym9va21hcms=');
+      final back = SettingsModel.fromJson(model.toJson());
+      expect(back.workspacePath, '/ws');
+      expect(back.workspaceBookmark, 'Ym9va21hcms=');
+    });
+
+    test('entity roundtrip preserves the bookmark', () {
+      const entity = SettingsEntity(workspacePath: '/ws', workspaceBookmark: 'Ym9va21hcms=');
+      final back = SettingsModel.fromEntity(entity).toEntity();
+      expect(back.workspaceBookmark, 'Ym9va21hcms=');
+    });
+
+    test('copyWith clears the bookmark via the sentinel; omitting keeps it', () {
+      const entity = SettingsEntity(workspacePath: '/ws', workspaceBookmark: 'b');
+      expect(entity.copyWith(workspaceBookmark: null).workspaceBookmark, isNull);
+      expect(entity.copyWith(verifySsl: false).workspaceBookmark, 'b');
+    });
+  });
 }

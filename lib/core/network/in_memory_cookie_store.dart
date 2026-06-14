@@ -25,7 +25,11 @@ class InMemoryCookieStore implements CookieStore {
   @override
   String? cookieHeaderFor(Uri uri) {
     final n = now();
-    final matching = _cookies.where((c) => !c.isExpired(n) && c.matches(uri));
+    final matching = _cookies.where((c) => !c.isExpired(n) && c.matches(uri)).toList()
+      // RFC 6265 §5.4: cookies with longer paths sort before shorter ones, so a
+      // more-specific cookie wins for servers that read the first value of a
+      // duplicated name.
+      ..sort((a, b) => b.path.length.compareTo(a.path.length));
     if (matching.isEmpty) return null;
     return matching.map((c) => '${c.name}=${c.value}').join('; ');
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/hover_highlight.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/utils/debouncer.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
@@ -115,53 +116,44 @@ class _HistoryListState extends State<HistoryList> {
   }
 }
 
-class _HistoryItemWidget extends StatefulWidget {
+class _HistoryItemWidget extends StatelessWidget {
   final HttpRequestConfigEntity config;
   final VoidCallback onTap;
   const _HistoryItemWidget({super.key, required this.config, required this.onTap});
-
-  @override
-  State<_HistoryItemWidget> createState() => _HistoryItemWidgetState();
-}
-
-class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
-  bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: _isHovered ? theme.hoverColor : Colors.transparent,
-          border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1), width: 1)),
+    // The ListTile is built once here and passed as the stable child of
+    // HoverHighlight, so hovering rebuilds only the row's background, not the
+    // tile + MethodBadge + text subtree.
+    return HoverHighlight(
+      decoration: (hovered) => BoxDecoration(
+        color: hovered ? theme.hoverColor : Colors.transparent,
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1), width: 1)),
+      ),
+      child: ListTile(
+        dense: true,
+        onTap: onTap,
+        title: Text(config.url.isEmpty ? '(NO URL)' : config.url,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
         ),
-        child: ListTile(
-          dense: true,
-          onTap: widget.onTap,
-          title: Text(widget.config.url.isEmpty ? '(NO URL)' : widget.config.url,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
-          ),
-          subtitle: Row(
-            children: [
-              MethodBadge(method: widget.config.method, small: true),
-              if (widget.config.statusCode != null) ...[
-                const SizedBox(width: 8),
-                Text(widget.config.statusCode.toString(), style: TextStyle(
-                  color: context.appPalette.statusColor(widget.config.statusCode!),
-                  fontWeight: context.appTypography.displayWeight,
-                  fontSize: layout.fontSizeNormal,
-                )),
-              ],
+        subtitle: Row(
+          children: [
+            MethodBadge(method: config.method, small: true),
+            if (config.statusCode != null) ...[
+              const SizedBox(width: 8),
+              Text(config.statusCode.toString(), style: TextStyle(
+                color: context.appPalette.statusColor(config.statusCode!),
+                fontWeight: context.appTypography.displayWeight,
+                fontSize: layout.fontSizeNormal,
+              )),
             ],
-          ),
+          ],
         ),
       ),
     );

@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/exceptions.dart';
@@ -169,6 +171,37 @@ void main() {
             cancelHandle: any(named: 'cancelHandle'),
           )).captured.single as Map<String, List<String>>;
       expect(query['api_key'], ['v']);
+    });
+  });
+
+  group('sendRequest body assembly failures', () {
+    test('a multipart body with a missing file fails as NetworkFailure, not FileSystemException', () async {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        method: 'POST',
+        url: 'https://api.dev/upload',
+        bodyType: BodyType.multipart,
+        formFields: [
+          MultipartFieldEntity(
+            name: 'file',
+            isFile: true,
+            filePath: '/no/such/getman_missing_file_xyz.bin',
+          ),
+        ],
+      );
+
+      await expectLater(
+        () => repository.sendRequest(config),
+        throwsA(isA<NetworkFailure>().having((f) => f.statusCode, 'statusCode', 0)),
+      );
+      verifyNever(() => networkService.request(
+            url: any(named: 'url'),
+            method: any(named: 'method'),
+            queryParameters: any(named: 'queryParameters'),
+            data: any(named: 'data'),
+            headers: any(named: 'headers'),
+            cancelHandle: any(named: 'cancelHandle'),
+          ));
     });
   });
 

@@ -50,4 +50,15 @@ void main() {
     await bloc.stream.firstWhere((s) => s.settings.proxyUrl == null);
     expect(bloc.state.settings.proxyUrl, isNull);
   });
+
+  test('UpdateWorkspacePath connects with a bookmark, then disconnect clears both', () async {
+    bloc.add(const UpdateWorkspacePath('/ws', bookmark: 'Ym0='));
+    await bloc.stream.firstWhere((s) => s.settings.workspacePath == '/ws');
+    expect(bloc.state.settings.workspaceBookmark, 'Ym0=');
+
+    // Disconnect (no bookmark arg) must clear the bookmark too, not strand it.
+    bloc.add(const UpdateWorkspacePath(null));
+    await bloc.stream.firstWhere((s) => s.settings.workspacePath == null);
+    expect(bloc.state.settings.workspaceBookmark, isNull);
+  });
 }

@@ -7,6 +7,12 @@ const Object _unchanged = Object();
 class SettingsEntity extends Equatable {
   final int historyLimit;
   final bool saveResponseInHistory;
+
+  /// When `true`, response bodies over the large-viewer threshold are
+  /// prettified and syntax-highlighted automatically instead of falling back
+  /// to the plain-text "large response" viewer. The user opts into the extra
+  /// render cost deliberately (default `false`).
+  final bool alwaysPrettifyLargeResponses;
   final bool isDarkMode;
   final bool isCompactMode;
   final bool isVerticalLayout;
@@ -27,9 +33,16 @@ class SettingsEntity extends Equatable {
   /// only; `null` means Hive-only, today's behavior).
   final String? workspacePath;
 
+  /// macOS App Sandbox security-scoped bookmark (base64) for [workspacePath].
+  /// The folder grant from the open-panel does not survive relaunch, so this
+  /// bookmark is what re-authorizes writes on the next launch. `null` on other
+  /// platforms / when no workspace is connected.
+  final String? workspaceBookmark;
+
   const SettingsEntity({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
+    this.alwaysPrettifyLargeResponses = false,
     this.isDarkMode = false,
     this.isCompactMode = false,
     this.isVerticalLayout = false,
@@ -44,11 +57,13 @@ class SettingsEntity extends Equatable {
     this.verifySsl = true,
     this.proxyUrl,
     this.workspacePath,
+    this.workspaceBookmark,
   });
 
   SettingsEntity copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
+    bool? alwaysPrettifyLargeResponses,
     bool? isDarkMode,
     bool? isCompactMode,
     bool? isVerticalLayout,
@@ -63,10 +78,13 @@ class SettingsEntity extends Equatable {
     bool? verifySsl,
     Object? proxyUrl = _unchanged,
     Object? workspacePath = _unchanged,
+    Object? workspaceBookmark = _unchanged,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
       saveResponseInHistory: saveResponseInHistory ?? this.saveResponseInHistory,
+      alwaysPrettifyLargeResponses:
+          alwaysPrettifyLargeResponses ?? this.alwaysPrettifyLargeResponses,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       isCompactMode: isCompactMode ?? this.isCompactMode,
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
@@ -84,6 +102,9 @@ class SettingsEntity extends Equatable {
       proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
       workspacePath:
           identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
+      workspaceBookmark: identical(workspaceBookmark, _unchanged)
+          ? this.workspaceBookmark
+          : workspaceBookmark as String?,
     );
   }
 
@@ -101,6 +122,7 @@ class SettingsEntity extends Equatable {
   List<Object?> get props => [
     historyLimit,
     saveResponseInHistory,
+    alwaysPrettifyLargeResponses,
     isDarkMode,
     isCompactMode,
     isVerticalLayout,
@@ -115,5 +137,6 @@ class SettingsEntity extends Equatable {
     verifySsl,
     proxyUrl,
     workspacePath,
+    workspaceBookmark,
   ];
 }

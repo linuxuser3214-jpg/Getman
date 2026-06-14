@@ -1,6 +1,6 @@
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
-import 'package:getman/core/network/network_service.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 
 abstract class TabsRepository {

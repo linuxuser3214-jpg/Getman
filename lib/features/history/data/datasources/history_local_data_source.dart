@@ -89,9 +89,14 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
       if (box.length > limit) {
         final removeCount = box.length - limit;
         final keysToRemove = <dynamic>[];
-        for (var i = 0; i < removeCount; i++) {
+        // Advance past any null key instead of consuming a removal slot for it,
+        // so exactly `removeCount` real entries are dropped and the box can't be
+        // left above the limit.
+        var i = 0;
+        while (keysToRemove.length < removeCount && i < box.length) {
           final oldKey = box.keyAt(i);
           final oldest = box.getAt(i);
+          i++;
           if (oldKey == null) continue;
           keysToRemove.add(oldKey);
           if (oldest != null) _indexRemoveKey(oldest.hashCode, oldKey);

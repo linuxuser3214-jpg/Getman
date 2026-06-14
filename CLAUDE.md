@@ -2,6 +2,11 @@
 
 Getman is a high-performance, aesthetically pleasing HTTP client built with Flutter, featuring a Neo-Brutalist design. Tabbed request UI, collections tree with drag-and-drop, request history, local-only persistence.
 
+> **Open work:** a prioritized, verified backlog of remaining tasks lives in
+> [`docs/BACKLOG.md`](docs/BACKLOG.md) (file paths + evidence + suggested fix +
+> a working agreement per item). Start there to pick up where the last session
+> left off.
+
 ---
 
 ## 1. Tech Stack
@@ -17,6 +22,9 @@ Getman is a high-performance, aesthetically pleasing HTTP client built with Flut
 - **Tree UI**: `flutter_fancy_tree_view` (**DISCONTINUED on pub.dev**; plan a migration to `two_dimensional_scrollables`).
 - **Reactive helpers**: `collection` (for `MapEquality`, `ListEquality`, `firstWhereOrNull`).
 - **Style**: `google_fonts` (Lexend base, JetBrainsMono in code editors).
+- **Realtime**: `web_socket_channel` (WebSocket; SSE rides on `dio` response streams via `SseParser`).
+- **File I/O**: `file_picker` (import/export, binary & multipart bodies).
+- **Loading UI**: `shimmer` (response-pending skeleton).
 
 ---
 
@@ -42,7 +50,7 @@ lib/
         rpg/                  # third theme ("Arcane Quest")
     ui/widgets/      # Cross-feature atoms: MethodBadge, Splitter, BrandedTabBar,
                      # KeyValueListEditor, VariableHighlightController,
-                     # ResponsiveDialog, NamePromptDialog, showAppSnackBar
+                     # ResponsiveDialog, NamePromptDialog, ConfirmDialog, showAppSnackBar
     utils/           # JsonUtils, CurlUtils, UrlQueryUtils, EnvironmentResolver,
                      # json_file_io (Postman import/export plumbing), postman/ mappers
   features/
@@ -53,7 +61,26 @@ lib/
   main.dart          # Bootstrap, global shortcuts, MultiBlocProvider, MaterialApp.router
 ```
 
-Features today: `tabs`, `collections`, `history`, `settings`, `home`, `environments`.
+Features today: `tabs`, `collections`, `history`, `settings`, `home`, `environments`, `chaining`,
+`cookies`, `realtime`, `command_palette`.
+
+- **chaining** — no-code post-response **assertions** + variable **extraction** (`domain/logic/`:
+  `assertion_engine.dart`, `extraction_engine.dart`, `rules_runner.dart`). Rules are stored per
+  request-config id and run after a send; captured values are written back to the active
+  environment by `ChainingWriteBackListener` (widget-layer coordinator, never bloc→bloc).
+- **cookies** — Hive-backed cookie jar (`CookieStore`/`InMemoryCookieStore` + `CookieInterceptor`
+  on the live Dio). Infra-only by design: no domain/data/presentation split.
+- **realtime** — WebSocket (`web_socket_channel`) + SSE (`SseParser` over a `dio` response
+  stream), driven by `RealtimeBloc` over `RealtimeService`. Bloc-over-service by design: no full
+  domain/data split.
+- **command_palette** — Cmd/Ctrl+K fuzzy jump to a saved request / environment / theme. Reads
+  bloc state at open time; dispatches existing events (no new bloc). Arrow-key navigable.
+
+Also shipped but cross-cutting (not their own feature dirs): **auth** (`auth_config.dart` —
+bearer/basic/api-key, applied in `request_serializer.dart`), **code generation**
+(`code_gen_service.dart` — cURL / JS fetch / Python requests), **body types** (`body_type.dart` —
+none/raw/urlencoded/multipart/binary), and a **git-friendly workspace mirror**
+(`collections/data/services/workspace_sync_service.dart`).
 
 Mandatory rules:
 - **Domain layer has zero imports from `data/` or Flutter UI.** Only pure Dart + `equatable`.
@@ -72,12 +99,19 @@ Mandatory rules:
 | 2 | `HttpRequestTabModel` | `tabs` | Tab state including response cache |
 | 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`) |
 | 4 | `EnvironmentModel` | `environments` | Flat list; `variables` is `Map<String, String>` at `HiveField(2)` |
+| 5 | `MultipartFieldModel` | (embedded) | Multipart/form-data field; nested inside `HttpRequestConfig` |
+| 6 | `StoredCookieModel` | `cookies` | Cookie jar; keyed by `domain\|path\|name` (one put/delete per cookie) |
+| 7 | `ExtractionRuleModel` | (embedded) | One extraction rule; nested inside `RequestRulesModel` |
+| 8 | `AssertionModel` | (embedded) | One assertion; nested inside `RequestRulesModel` |
+| 9 | `RequestRulesModel` | `requestRules` | Per-request-config rules (assertions + extractions), keyed by configId |
 
-**Never renumber an existing `typeId`.** Add new models with a fresh ID.
+**Never renumber an existing `typeId`.** Add new models with a fresh ID (next free: 10).
 
 As of the pluggable-themes refactor, `SettingsModel` also carries a `String themeId` at `HiveField(7)` (default `'brutalist'`). This drives which theme builder is active.
 
 `SettingsModel` also carries `String? activeEnvironmentId` at `HiveField(8)` (nullable, no default — `null` means "No Environment"). This is the id of the environment whose variables get substituted into `{{var}}` placeholders at send time. `SettingsEntity.copyWith` uses a sentinel (`_unchanged` `Object` constant) so the caller can explicitly clear the id back to `null`.
+
+`SettingsModel` carries `bool alwaysPrettifyLargeResponses` at `HiveField(17)` (default `false`). When `true`, `_ResponseBodyView` prettifies + highlights bodies over `kLargeResponseViewerChars` automatically (auto-opts into the editor) instead of the plain-text large viewer — the user accepts the render cost. The `kResponseBodyTooLargePlaceholder` sentinel always stays plain text. (Highest `HiveField` on `SettingsModel`; next free: 18.)
 
 After editing any `@HiveType` field, regenerate:
 ```
@@ -92,7 +126,7 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 
 ### 4.1 Boot sequence (`main.dart` + `injection_container.dart`)
 1. `WidgetsFlutterBinding.ensureInitialized()`.
-2. `di.init()` — opens Hive, registers adapters, opens boxes, reads current settings synchronously, registers all use cases, repositories, data sources, BLoCs, `NetworkService`, `AppRouter`, `TabDirtyChecker`.
+2. `di.init()` — opens Hive, registers adapters, opens **all** boxes in parallel (`Future.wait`), reads current settings synchronously, registers all use cases, repositories, data sources, BLoCs, `NetworkService`, `AppRouter`, `TabDirtyChecker`. The `cookies` + `requestRules` boxes are opened on this cold-start path and the cookie jar is hydrated via `openAndHydrateDeferredBoxes` **before** `NetworkService` is usable — an earlier post-frame `warmUpDeferredBoxes` raced early sends (dropped cookies / skipped rules), so don't re-defer these without a readiness gate.
 3. Returns `SettingsEntity` to pass as `initialSettings` into `SettingsBloc`.
 4. `MultiRepositoryProvider` exposes cross-feature services (currently `TabDirtyChecker`) to the widget tree.
 5. `MultiBlocProvider` creates `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `EnvironmentsBloc`. Collections/Tabs/Environments dispatch their `Load*` event eagerly; `HistoryBloc` has no load event — it starts with `isLoading: true` and populates from its `watchHistory()` subscription (the stream yields the current list on subscribe). The root `BlocBuilder<SettingsBloc>` has a `buildWhen` gated to `themeId`/`isDarkMode`/`isCompactMode` — anything else would rebuild the whole `MaterialApp` per settings keystroke.
@@ -138,7 +172,7 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 - The active `ThemeData` is produced by `resolveTheme(settings.themeId)(brightness, isCompact)` from `lib/core/theme/theme_registry.dart`. Three themes are registered (`brutalist`, `editorial`, `rpg`), each as a `ThemeDescriptor` (id + display name + builder). Every theme builder attaches five `ThemeExtension`s: `AppLayout` (sizes), `AppPalette` (method/status colors + `codeBackground` + variable token colors), `AppShape` (panel/button/input/dialog radii), `AppTypography` (`TextTheme`, `codeFontFamily`, three weights), and `AppDecoration` (closures for `panelBox`, `tabShape`, `wrapInteractive`, `scaffoldBackground`).
 - **Never hardcode sizes, colors, radii, weights, or interaction behavior in widgets.** Pull from the per-theme extensions via `BuildContext` accessors defined in `extension AppThemeAccess on BuildContext` (`lib/core/theme/app_theme.dart`): `context.appLayout`, `context.appPalette`, `context.appShape`, `context.appTypography`, `context.appDecoration`.
 - Adding a new theme: drop a new `<name>_theme.dart` under `lib/core/theme/themes/<name>/`, export `ThemeData <name>Theme(Brightness, {bool isCompact})`, and register a `ThemeDescriptor` in `theme_registry.dart`'s `appThemes` map with a new ID constant in `theme_ids.dart`. No widget edits are required — widgets consume the extensions uniformly.
-- **Shared chrome atoms**: the filled-indicator tab strip is `BrandedTabBar` (`core/ui/widgets/`) — used by the request panel, unified phone panel, response panel, and side menu. Snackbars go through `showAppSnackBar(context, message)` — never construct styled `SnackBar`s inline.
+- **Shared chrome atoms**: the filled-indicator tab strip is `BrandedTabBar` (`core/ui/widgets/`) — used by the request panel, unified phone panel, response panel, and side menu. Snackbars go through `showAppSnackBar(context, message)` — never construct styled `SnackBar`s inline (use `showAppSnackBarVia(messenger, …)` with a captured `ScaffoldMessenger` after an `await`/dialog dismissal). Irreversible actions (delete node/environment, clear cookies) confirm through `ConfirmDialog.show(...)` first.
 - **Colors**: method badges use `context.appPalette.methodColor(method)`; status-code bands use `context.appPalette.statusColor(code)` / `.statusAccent(code)`. Text on branded backgrounds (primary, method colors) → `Theme.of(context).colorScheme.onPrimary`. Error/destructive affordances (delete icons, cancel buttons) → `colorScheme.error` / `colorScheme.onError`. Never use `Colors.black`/`Colors.red`/`Colors.white` literals for themeable surfaces; `Colors.white` is only acceptable as deliberate contrast on a variable-colored status badge.
 - **Typography**: `context.appTypography.displayWeight` (brutalist = `w900`) for headlines/buttons/badges; `.titleWeight` (`w700` / `FontWeight.bold`) for titles and dialog actions; `.bodyWeight` (`w500`) for body text. Widget-specific weights that aren't display/title/body (e.g. `FontWeight.w600` one-off, popup menu item emphasis) may stay as literals. Code editors read `context.appTypography.codeFontFamily` and `context.appPalette.codeBackground`.
 - **Decorations**:
@@ -152,7 +186,8 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 ### 4.10 Environments feature
 - Flat list of `EnvironmentEntity(id, name, variables: Map<String, String>)` — no folders/tree. Stored in the `environments` Hive box as `EnvironmentModel` (typeId 4).
 - The currently-active environment id is **not** owned by `EnvironmentsBloc`; it lives on `SettingsEntity.activeEnvironmentId` (per-user preference, persisted with settings). `null` means "No Environment" — a synthetic always-available option in the selector UI.
-- **Variable syntax:** `{{name}}` — the resolver in `lib/core/utils/environment_resolver.dart` accepts `[A-Za-z0-9_\-\.]+` identifiers with optional whitespace inside the braces (`{{ name }}` is valid). Unknown variable names are **left verbatim**, not blanked — silent empty substitution is worse than a visibly broken URL.
+- **Variable syntax:** `{{name}}` — the resolver in `lib/core/utils/environment_resolver.dart` accepts `\$?[A-Za-z0-9_\-\.]+` identifiers with optional whitespace inside the braces (`{{ name }}` is valid). Unknown variable names are **left verbatim**, not blanked — silent empty substitution is worse than a visibly broken URL.
+- **Dynamic variables:** a leading `$` marks a built-in resolved at send time without an environment — `{{$guid}}`/`{{$randomUUID}}`, `{{$timestamp}}` (unix seconds), `{{$isoTimestamp}}` (UTC ISO-8601), `{{$randomInt}}` (0–1000). Each occurrence resolves independently; an env var of the same name still wins. `EnvironmentResolver.isDynamic(name)` is the source of truth (the URL highlighter colors dynamic vars as resolved).
 - **Substitution scope:** `TabsRepositoryImpl.sendRequest` resolves against URL, query-param values, header values, and body (not header/param *keys*) before dispatching via `networkService.request`. **History records the templated (unresolved) config** — the user should be able to re-send a history entry under a different environment, matching Postman/Insomnia.
 - **Resolution plumbing:** the `SendRequest` event carries `tabId` plus `Map<String, String> envVars`. Dispatchers that need real substitution — the SEND button in `UrlBar`, the `SendRequestIntent` shortcut in `MainScreen` — compute it via `ActiveEnvironmentHelper.variablesFor(environments, activeEnvironmentId)` read from `EnvironmentsBloc` + `SettingsBloc`.
 - **URL highlighting:** `VariableHighlightController` (in `lib/core/ui/widgets/`, a `TextEditingController` subclass) overrides `buildTextSpan` to color each `{{var}}` token. Colors are theme-dependent so the constructor takes none — the owning widget pushes variable + color updates via `updateVariables` / `updateColors` in `didChangeDependencies`; both methods `notifyListeners()` only when the underlying value actually changed (via `MapEquality` / `==`) so we don't thrash rebuilds. Until colors arrive, tokens render unhighlighted.
@@ -192,6 +227,7 @@ Verification bar: **`fvm flutter analyze` produces `No issues found!` AND `fvm f
 - **BLoC tab lookups**: always `state.tabs.firstWhereOrNull((t) => t.tabId == id)`. Never index by position across state emissions — positions can shift. This applies to event *payloads* too: identity-addressed `TabsEvent`s carry `tabId`, not `index` (see §4.2).
 - **`listenWhen` / `buildWhen` are not optional**: `RequestView` rebuilds are expensive; narrow selectors are how we keep the editor responsive.
 - **Text controllers vs editor controllers**: `KeyValueListEditor` uses `TextEditingController`; the body and response panels use `re_editor.CodeLineEditingController`. Don't mix.
+- **JSON syntax highlighting is synchronous, not `codeTheme`**: re_editor's built-in highlighter runs in an `isolate_manager` worker whose coloured results never reach the paint path in this app (everything rendered in the base text colour). `JsonCodeEditor` therefore does **not** set `CodeEditorStyle.codeTheme`; colours come from `jsonHighlightSpanBuilder` (in `json_code_editor.dart`), a per-line `re_highlight` pass wired via the controller's `spanBuilder`. Always build controllers fed to `JsonCodeEditor` with `createJsonCodeController()` (request body + response, both in `request_view.dart`). Per-line is accurate for JSON (tokens never span lines) and viewport-bound (cheap); non-JSON lines fall back to the base colour. **Do not reinstate `codeTheme`** — it silently reverts to single-colour.
 - **`_setControllerPreservingEnd`** (in `url_bar.dart`) is the only safe way to push text into a `TextEditingController` without jumping the cursor during an echo-write.
 - **Key/value editing is one widget**: `KeyValueListEditor` (`core/ui/widgets/`) backs params (ordered list), headers (map), and environment variables (map) via decode/encode/equals codecs. Its `_lastEmitted` echo-suppression keeps focus and half-typed state alive across the BLoC round-trip — never bypass it by writing a bespoke row editor.
 - **Keyboard shortcuts** are declared in `main.dart` (global) and in `RequestView` / `MainScreen` (scoped `Actions`). The `NewTabIntent` Action is at the root; `CloseTabIntent` and `SendRequestIntent` at `MainScreen`; `SaveRequestIntent` and `BeautifyJsonIntent` inside `RequestView`. Put intents where `context.read<TabsBloc>()` is reachable.

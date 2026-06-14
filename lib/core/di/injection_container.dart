@@ -56,10 +56,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 final sl = GetIt.instance;
 
-/// Held so [warmUpDeferredBoxes] can hydrate the same instance that DI handed
-/// to the network interceptor.
-InMemoryCookieStore? _cookieStore;
-
 Future<SettingsEntity> init() async {
   await Hive.initFlutter();
 
@@ -74,11 +70,13 @@ Future<SettingsEntity> init() async {
   Hive.registerAdapter(AssertionModelAdapter());
   Hive.registerAdapter(RequestRulesModelAdapter());
 
-  // Open the boxes that have an eager reader on the first frame in PARALLEL
-  // (settings → theme, environments → initial list, and the eager Load* events
-  // for tabs/collections + HistoryBloc's subscribe-time read). Cookies and
-  // request-rules have no first-frame reader and are deferred to
-  // [warmUpDeferredBoxes] after the first frame.
+  // Open every box in PARALLEL (Future.wait) so cold start is bounded by the
+  // slowest single box, not their sum. The cookies + request-rules boxes are
+  // small and open concurrently with the rest; they used to be deferred to a
+  // post-frame callback, but that raced early sends — a request fired before
+  // the deferred warm-up finished silently dropped persisted cookies and
+  // skipped post-response rules. Opening them on the cold path closes that race
+  // for a negligible (parallel) cost. See [openAndHydrateDeferredBoxes].
   final boxes = await Future.wait<Box<dynamic>>([
     Hive.openBox<SettingsModel>(HiveBoxes.settings),
     Hive.openBox<EnvironmentModel>(HiveBoxes.environments),
@@ -86,6 +84,8 @@ Future<SettingsEntity> init() async {
     Hive.openBox<HttpRequestTabModel>(HiveBoxes.tabs),
     Hive.openBox(HiveBoxes.tabsMeta),
     Hive.openBox<CollectionNode>(HiveBoxes.collections),
+    Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
+    Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules),
   ]);
   final settingsBox = boxes[0] as Box<SettingsModel>;
   final environmentsBox = boxes[1] as Box<EnvironmentModel>;
@@ -191,10 +191,11 @@ Future<SettingsEntity> init() async {
   // Features - Home
   sl.registerLazySingleton(() => const TabDirtyChecker());
 
-  // Core. Cookie store is created empty here — its box is opened and hydrated
-  // off the first-frame path by [warmUpDeferredBoxes].
+  // Core. The cookie box is already open (parallel wait above); hydrate the jar
+  // before the network service can be used so the first send sees stored
+  // cookies.
   final cookieStore = InMemoryCookieStore(persistence: HiveCookiePersistence());
-  _cookieStore = cookieStore;
+  await openAndHydrateDeferredBoxes(cookieStore);
   sl.registerLazySingleton<CookieStore>(() => cookieStore);
   sl.registerLazySingleton(() => NetworkService(
         dio: NetworkService.buildDio(
@@ -207,15 +208,19 @@ Future<SettingsEntity> init() async {
   return initialSettings;
 }
 
-/// Opens the boxes that have no first-frame reader (cookies, request-rules),
-/// migrates the cookie jar to its keyed layout, then hydrates the cookie store.
-/// Call once after the first frame is scheduled (see `main.dart`) so cold start
-/// isn't blocked by these reads. Safe to call when boxes are already open.
-Future<void> warmUpDeferredBoxes() async {
+/// Ensures the cookies + request-rules boxes are open, migrates the cookie jar
+/// to its keyed layout, then hydrates [store]. [init] calls this on the
+/// cold-start path so an early send can never race an unopened box (bugs:
+/// dropped cookies / skipped post-response rules). Idempotent — the `isBoxOpen`
+/// guards make it safe to call when the boxes are already open, and it is also
+/// the single seam exercised by the boot test.
+Future<void> openAndHydrateDeferredBoxes(InMemoryCookieStore store) async {
   await Future.wait<Box<dynamic>>([
-    Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
-    Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules),
+    if (!Hive.isBoxOpen(HiveBoxes.cookies))
+      Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
+    if (!Hive.isBoxOpen(HiveBoxes.requestRules))
+      Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules),
   ]);
   await HiveCookiePersistence.migrateLegacyKeysIfNeeded();
-  _cookieStore?.hydrate();
+  store.hydrate();
 }

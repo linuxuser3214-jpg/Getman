@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
@@ -72,15 +73,27 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
     final layout = context.appLayout;
 
     return BlocBuilder<TabsBloc, TabsState>(
-      buildWhen: (prev, next) =>
-          prev.tabs.byId(widget.tabId) != next.tabs.byId(widget.tabId),
+      // The chrome only shows the title (collectionName / config.url) and the
+      // dirty marker (config vs saved). Rebuild on those, but NOT on response
+      // arrival / isSending / extraction results — otherwise every body
+      // keystroke or a multi-MB response would drag the whole entity (incl. the
+      // response body) through `==` and rebuild the chrome of every open tab.
+      buildWhen: (prev, next) {
+        final p = prev.tabs.byId(widget.tabId);
+        final n = next.tabs.byId(widget.tabId);
+        if (identical(p, n)) return false;
+        if (p == null || n == null) return p != n;
+        return p.config != n.config ||
+            p.collectionName != n.collectionName ||
+            p.collectionNodeId != n.collectionNodeId;
+      },
       builder: (context, state) {
         final tab = state.tabs.byId(widget.tabId);
         if (tab == null) return const SizedBox.shrink();
 
         final dirtyChecker = context.read<TabDirtyChecker>();
         return BlocSelector<CollectionsBloc, CollectionsState, bool>(
-          selector: (collState) => dirtyChecker(tab: tab, collections: collState.collections),
+          selector: (collState) => dirtyChecker(tab: tab, savedConfigs: collState.configById),
           builder: (context, isDirty) {
             final title = tab.displayTitle;
             final displayTitle = (title.length > layout.tabTitleMaxLength
@@ -194,12 +207,16 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
-          onTap: () => tabsBloc.add(DuplicateTab(tab.tabId)),
+          onTap: () {
+            tabsBloc.add(DuplicateTab(tab.tabId));
+            showAppSnackBar(context, 'Tab duplicated');
+          },
           child: _buildMenuItem(context, Icons.copy, 'DUPLICATE'),
         ),
         PopupMenuItem(
           onTap: () {
             Clipboard.setData(ClipboardData(text: tab.config.url));
+            showAppSnackBar(context, 'URL copied');
           },
           child: _buildMenuItem(context, Icons.link, 'COPY URL'),
         ),

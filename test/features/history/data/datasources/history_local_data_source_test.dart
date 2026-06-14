@@ -128,6 +128,19 @@ void main() {
       expect(box.length, 3);
     });
 
+    test('dedup-evict and trim in the same add still honor the limit', () async {
+      // Fill 4 distinct entries.
+      for (var i = 0; i < 4; i++) {
+        await dataSource.addToHistory(makeConfig(url: 'https://d-$i.com'), 10);
+      }
+      // Re-adding d-1 evicts the old d-1 (dedup) AND limit=2 trims, in one call.
+      await dataSource.addToHistory(makeConfig(url: 'https://d-1.com'), 2);
+
+      final history = await dataSource.getHistory();
+      expect(history, hasLength(2));
+      expect(history.last.url, 'https://d-1.com'); // re-inserted as newest
+    });
+
     test('oldest entries are trimmed, newest are kept', () async {
       for (var i = 0; i < 4; i++) {
         await dataSource.addToHistory(makeConfig(url: 'https://old-$i.com'), 10);

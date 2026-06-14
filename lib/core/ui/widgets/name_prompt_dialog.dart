@@ -67,7 +67,7 @@ class _NamePromptDialogState extends State<NamePromptDialog> {
 
   void _submit() {
     final value = _controller.text;
-    if (value.isEmpty) return;
+    if (value.trim().isEmpty) return; // matches the disabled-confirm guard
     Navigator.pop(context);
     widget.onConfirm(value);
   }
@@ -86,7 +86,14 @@ class _NamePromptDialogState extends State<NamePromptDialog> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(widget.cancelLabel)),
-        TextButton(onPressed: _submit, child: Text(widget.confirmLabel)),
+        // Disable confirm while the field is empty so the no-op isn't silent.
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _controller,
+          builder: (context, value, _) => TextButton(
+            onPressed: value.text.trim().isEmpty ? null : _submit,
+            child: Text(widget.confirmLabel),
+          ),
+        ),
       ],
     );
   }

@@ -132,6 +132,32 @@ void main() {
     verify(() => addToHistory.call(any(), any())).called(1);
   });
 
+  test('records failed requests with saveResponseInHistory on (typed empty headers)', () async {
+    // Regression: on the failure path `response` is null, so the recorded
+    // config gets an empty header map. The fallback must be typed
+    // (`Map<String, String>`) or copyWith's cast throws and history is dropped.
+    when(() => repository.sendRequest(
+          any(),
+          envVars: any(named: 'envVars'),
+          cancelHandle: any(named: 'cancelHandle'),
+        )).thenThrow(
+        const NetworkFailure('boom', type: NetworkFailureType.connection, statusCode: 500));
+    when(() => getSettings.call())
+        .thenAnswer((_) async => const SettingsEntity(saveResponseInHistory: true));
+
+    await expectLater(
+      () => useCase(config: config, envVars: envVars),
+      throwsA(isA<NetworkFailure>()),
+    );
+
+    final recorded =
+        verify(() => addToHistory.call(captureAny(), any())).captured.single
+            as HttpRequestConfigEntity;
+    expect(recorded.statusCode, 500);
+    expect(recorded.responseBody, 'boom');
+    expect(recorded.responseHeaders, isEmpty);
+  });
+
   test('does NOT record cancelled requests', () async {
     when(() => repository.sendRequest(
           any(),

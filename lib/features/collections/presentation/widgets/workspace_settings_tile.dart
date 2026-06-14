@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/confirm_dialog.dart';
+import 'package:getman/core/utils/workspace/workspace_bookmark.dart';
 import 'package:getman/core/utils/workspace/workspace_picker.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
@@ -24,9 +28,17 @@ class WorkspaceSettingsTile extends StatelessWidget {
     final theme = Theme.of(context);
 
     return BlocBuilder<SettingsBloc, SettingsState>(
-      buildWhen: (p, n) => p.settings.workspacePath != n.settings.workspacePath,
+      buildWhen: (p, n) =>
+          p.settings.workspacePath != n.settings.workspacePath ||
+          p.settings.workspaceBookmark != n.settings.workspaceBookmark,
       builder: (context, state) {
         final path = state.settings.workspacePath;
+        // macOS: a connected folder with no stored security-scoped bookmark
+        // (e.g. connected before this feature) cannot be written after a
+        // relaunch under the sandbox until it is reconnected once.
+        final needsReconnect = WorkspaceBookmarks.supported &&
+            path != null &&
+            state.settings.workspaceBookmark == null;
         return Padding(
           padding: EdgeInsets.symmetric(
             horizontal: layout.inputPadding,
@@ -60,6 +72,16 @@ class WorkspaceSettingsTile extends StatelessWidget {
                       fontSize: layout.fontSizeSmall,
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.75)),
                 ),
+                if (needsReconnect) ...[
+                  SizedBox(height: layout.tabSpacing),
+                  Text(
+                    'Reconnect this folder to restore write access after restart.',
+                    style: TextStyle(
+                        fontSize: layout.fontSizeSmall,
+                        fontWeight: context.appTypography.titleWeight,
+                        color: theme.colorScheme.error),
+                  ),
+                ],
                 SizedBox(height: layout.tabSpacing),
                 Wrap(
                   spacing: 8,
@@ -96,28 +118,38 @@ class WorkspaceSettingsTile extends StatelessWidget {
     final sync = context.read<WorkspaceSyncService>();
     final collections = context.read<CollectionsBloc>();
     final settings = context.read<SettingsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
 
     List<CollectionNodeEntity> onDisk;
     try {
-      onDisk = await sync.read(picked);
+      onDisk = await sync.read(picked.path);
     } catch (_) {
       onDisk = const [];
     }
     if (!context.mounted) return;
 
+    void connect() {
+      settings.add(UpdateWorkspacePath(picked.path, bookmark: picked.bookmark));
+      showAppSnackBarVia(messenger, 'Workspace connected');
+    }
+
     if (onDisk.isNotEmpty) {
-      final confirmed = await _confirm(
+      unawaited(ConfirmDialog.show(
         context,
-        'This folder has ${onDisk.length} item(s). Import them and REPLACE your current collections?',
-      );
-      if (confirmed != true) return;
-      collections.add(ReplaceCollections(onDisk));
+        title: 'IMPORT WORKSPACE',
+        message:
+            'This folder has ${onDisk.length} item(s). Import them and REPLACE your current collections?',
+        confirmLabel: 'IMPORT',
+        onConfirm: () {
+          collections.add(ReplaceCollections(onDisk));
+          connect();
+        },
+      ));
     } else {
       // Empty folder → export the current collections into it.
-      sync.scheduleMirror(picked, collections.state.collections);
+      sync.scheduleMirror(picked.path, collections.state.collections);
+      connect();
     }
-    settings.add(UpdateWorkspacePath(picked));
-    if (context.mounted) showAppSnackBar(context, 'Workspace connected');
   }
 
   Future<void> _reload(BuildContext context, String path) async {
@@ -132,19 +164,5 @@ class WorkspaceSettingsTile extends StatelessWidget {
     if (!context.mounted) return;
     collections.add(ReplaceCollections(onDisk));
     showAppSnackBar(context, 'Reloaded ${onDisk.length} item(s) from disk');
-  }
-
-  Future<bool?> _confirm(BuildContext context, String message) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('IMPORT WORKSPACE'),
-        content: Text(message),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('IMPORT')),
-        ],
-      ),
-    );
   }
 }

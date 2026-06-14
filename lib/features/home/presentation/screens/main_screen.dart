@@ -104,7 +104,7 @@ class _MainScreenState extends State<MainScreen> {
     if (tab == null) return false;
     return context.read<TabDirtyChecker>()(
       tab: tab,
-      collections: context.read<CollectionsBloc>().state.collections,
+      savedConfigs: context.read<CollectionsBloc>().state.configById,
     );
   }
 

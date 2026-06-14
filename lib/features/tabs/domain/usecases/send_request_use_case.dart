@@ -1,9 +1,10 @@
-import 'package:flutter/foundation.dart';
+import 'dart:developer';
+
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
-import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/utils/perf_trace.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
@@ -58,7 +59,10 @@ class SendRequestUseCase {
       final historyConfig = settings.saveResponseInHistory
           ? config.copyWith(
               responseBody: cappedBody,
-              responseHeaders: response?.headers ?? const {},
+              // Typed empty literal: `copyWith` casts to `Map<String, String>?`,
+              // and a bare `const {}` is `Map<dynamic, dynamic>` — which throws
+              // on the failure path (response == null) and drops the record.
+              responseHeaders: response?.headers ?? const <String, String>{},
               statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
               durationMs: response?.durationMs ?? 0,
             )
@@ -67,7 +71,12 @@ class SendRequestUseCase {
     } catch (e, st) {
       // History is best-effort; never fail the request because of persistence —
       // but surface the failure so silent regressions are spotted.
-      debugPrint('SendRequestUseCase: failed to record history: $e\n$st');
+      log(
+        'SendRequestUseCase: failed to record history',
+        name: 'getman.send',
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 }

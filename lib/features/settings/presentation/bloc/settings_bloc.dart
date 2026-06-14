@@ -24,6 +24,8 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
           historyLimit: e.historyLimit < _historyLimitMin ? _historyLimitMin : e.historyLimit,
         )));
     on<UpdateSaveResponseInHistory>((e, emit) => _apply(emit, (s) => s.copyWith(saveResponseInHistory: e.save)));
+    on<UpdateAlwaysPrettifyLargeResponses>(
+        (e, emit) => _apply(emit, (s) => s.copyWith(alwaysPrettifyLargeResponses: e.value)));
     on<UpdateSplitRatio>((e, emit) => _apply(emit, (s) => s.copyWith(splitRatio: e.ratio)));
     on<UpdateSideMenuWidth>((e, emit) => _apply(emit, (s) => s.copyWith(sideMenuWidth: e.width)));
     on<UpdateThemeId>((e, emit) => _apply(emit, (s) => s.copyWith(themeId: e.themeId)));
@@ -34,7 +36,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<UpdateFollowRedirects>((e, emit) => _apply(emit, (s) => s.copyWith(followRedirects: e.value)));
     on<UpdateVerifySsl>((e, emit) => _apply(emit, (s) => s.copyWith(verifySsl: e.value)));
     on<UpdateProxyUrl>((e, emit) => _apply(emit, (s) => s.copyWith(proxyUrl: e.url)));
-    on<UpdateWorkspacePath>((e, emit) => _apply(emit, (s) => s.copyWith(workspacePath: e.path)));
+    // The bookmark is always set in lockstep with the path (both null on
+    // disconnect), so pass it explicitly rather than via the copyWith sentinel.
+    on<UpdateWorkspacePath>((e, emit) =>
+        _apply(emit, (s) => s.copyWith(workspacePath: e.path, workspaceBookmark: e.bookmark)));
   }
 
   // 0 disables the timeout (Dio treats Duration.zero as no limit); never negative.

@@ -2,21 +2,17 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/dio_adapter_config.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_config.dart';
 
+// Re-exported so existing data-layer / test importers of `network_service.dart`
+// keep resolving `NetworkCancelHandle` without churn; the domain layer imports
+// `cancel_handle.dart` directly to stay dio/flutter-free.
+export 'package:getman/core/network/cancel_handle.dart';
+
 String _jsonEncode(dynamic data) => json.encode(data);
-
-class NetworkCancelHandle {
-  final CancelToken _token;
-  NetworkCancelHandle() : _token = CancelToken();
-
-  bool get isCancelled => _token.isCancelled;
-  void cancel([String reason = 'Cancelled']) {
-    if (!_token.isCancelled) _token.cancel(reason);
-  }
-}
 
 class NetworkService {
   final Dio _dio;
@@ -41,16 +37,10 @@ class NetworkService {
     ));
     configureHttpAdapter(dio, verifySsl: config.verifySsl, proxyUrl: config.proxyUrl);
     if (cookieInterceptor != null) dio.interceptors.add(cookieInterceptor);
-    if (kDebugMode) {
-      dio.interceptors.add(LogInterceptor(
-        requestBody: false,
-        responseBody: false,
-        requestHeader: false,
-        responseHeader: false,
-        request: true,
-        error: true,
-      ));
-    }
+    // No dio LogInterceptor: it dumps a verbose *** Request *** / *** Response ***
+    // block to the console on every send (and its onResponse prints regardless
+    // of the `request` flag). The app already records every request in History
+    // and surfaces responses + typed NetworkFailures in its own UI.
     return dio;
   }
 
@@ -75,13 +65,15 @@ class NetworkService {
     NetworkCancelHandle? cancelHandle,
   }) async {
     final stopwatch = Stopwatch()..start();
+    final cancelToken = CancelToken();
+    cancelHandle?.bindCancel((reason) => cancelToken.cancel(reason));
     try {
       final response = await _dio.request(
         url,
         data: data,
         queryParameters: queryParameters,
         options: Options(method: method, headers: headers),
-        cancelToken: cancelHandle?._token,
+        cancelToken: cancelToken,
       );
       stopwatch.stop();
 

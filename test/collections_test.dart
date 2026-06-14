@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
@@ -39,7 +40,36 @@ void main() {
   );
 
   test('initial state should be CollectionsState with empty list', () {
-    expect(collectionsBloc.state, const CollectionsState());
+    expect(collectionsBloc.state, CollectionsState());
+  });
+
+  test('configById indexes leaf configs by id, recursing into folders (M4)', () {
+    const childLeaf = CollectionNodeEntity(
+      id: 'leaf-a',
+      name: 'A',
+      isFolder: false,
+      config: HttpRequestConfigEntity(id: 'leaf-a', url: 'https://a.dev'),
+    );
+    const folder = CollectionNodeEntity(
+      id: 'folder',
+      name: 'F',
+      isFolder: true,
+      children: [childLeaf],
+    );
+    const rootLeaf = CollectionNodeEntity(
+      id: 'leaf-b',
+      name: 'B',
+      isFolder: false,
+      config: HttpRequestConfigEntity(id: 'leaf-b', url: 'https://b.dev'),
+    );
+
+    final index = CollectionsState(collections: const [folder, rootLeaf]).configById;
+
+    expect(index.keys, containsAll(<String>['leaf-a', 'leaf-b']));
+    expect(index['leaf-a']!.url, 'https://a.dev');
+    expect(index['leaf-b']!.url, 'https://b.dev');
+    // The folder (config == null) is not indexed.
+    expect(index.containsKey('folder'), isFalse);
   });
 
   test('should emit [isLoading: true, collections: [...]] when LoadCollections is added', () async {
@@ -53,8 +83,8 @@ void main() {
     await expectLater(
       collectionsBloc.stream,
       emitsInOrder([
-        const CollectionsState(collections: [], isLoading: true),
-        const CollectionsState(collections: [tNode], isLoading: false),
+        CollectionsState(collections: const [], isLoading: true),
+        CollectionsState(collections: const [tNode], isLoading: false),
       ]),
     );
   });
@@ -71,8 +101,8 @@ void main() {
     await expectLater(
       collectionsBloc.stream,
       emitsInOrder([
-        const CollectionsState(collections: [], isLoading: true),
-        const CollectionsState(collections: [], isLoading: false),
+        CollectionsState(collections: const [], isLoading: true),
+        CollectionsState(collections: const [], isLoading: false),
       ]),
     );
   });

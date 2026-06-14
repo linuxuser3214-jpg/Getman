@@ -1,11 +1,13 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
+import 'package:getman/core/domain/auth_application.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
+import 'package:getman/core/utils/header_utils.dart';
 import 'package:getman/core/utils/io/file_reader.dart';
+import 'package:getman/core/utils/path_utils.dart';
 
 /// Data-layer helper that turns a request's auth + body configuration into the
 /// concrete headers / query / payload handed to [NetworkService]. Lives in the
@@ -30,31 +32,15 @@ class RequestSerializer {
     required Map<String, List<String>> query,
     required Map<String, String> envVars,
   }) {
-    switch (auth.type) {
-      case AuthType.none:
-      case AuthType.inherit:
-        return;
-      case AuthType.bearer:
-        if (_hasHeader(headers, 'authorization')) return;
-        final token = EnvironmentResolver.resolve(auth.token, envVars);
-        if (token.isEmpty) return;
-        headers['Authorization'] = 'Bearer $token';
-      case AuthType.basic:
-        if (_hasHeader(headers, 'authorization')) return;
-        final user = EnvironmentResolver.resolve(auth.username, envVars);
-        final pass = EnvironmentResolver.resolve(auth.password, envVars);
-        final encoded = base64.encode(utf8.encode('$user:$pass'));
-        headers['Authorization'] = 'Basic $encoded';
-      case AuthType.apiKey:
-        final name = EnvironmentResolver.resolve(auth.apiKeyName, envVars);
-        if (name.isEmpty) return;
-        final value = EnvironmentResolver.resolve(auth.apiKeyValue, envVars);
-        if (auth.apiKeyLocation == ApiKeyLocation.header) {
-          if (_hasHeader(headers, name)) return;
-          headers[name] = value;
-        } else {
-          query.putIfAbsent(name, () => <String>[]).add(value);
-        }
+    final app = resolveAuthApplication(
+      auth: auth,
+      currentHeaders: headers,
+      resolve: (value) => EnvironmentResolver.resolve(value, envVars),
+    );
+    headers.addAll(app.headers);
+    final queryParam = app.queryParam;
+    if (queryParam != null) {
+      query.putIfAbsent(queryParam.key, () => <String>[]).add(queryParam.value);
     }
   }
 
@@ -84,13 +70,13 @@ class RequestSerializer {
       case BodyType.raw:
         return config.body.isEmpty ? null : r(config.body);
       case BodyType.urlencoded:
-        _setHeader(headers, 'Content-Type', 'application/x-www-form-urlencoded');
+        HeaderUtils.setHeader(headers, 'Content-Type', 'application/x-www-form-urlencoded');
         return <String, String>{
           for (final f in config.formFields)
             if (!f.isFile && f.name.isNotEmpty) r(f.name): r(f.value),
         };
       case BodyType.multipart:
-        _removeHeader(headers, 'content-type'); // Dio adds it with the boundary.
+        HeaderUtils.removeHeader(headers, 'content-type'); // Dio adds it with the boundary.
         final form = FormData();
         for (final f in config.formFields) {
           if (f.name.isEmpty) continue;
@@ -100,7 +86,11 @@ class RequestSerializer {
             if (path == null || path.isEmpty) continue;
             form.files.add(MapEntry(
               name,
-              MultipartFile.fromBytes(await readFileBytes(path), filename: _basename(path)),
+              MultipartFile.fromBytes(
+                await _readBytes(path),
+                filename: _basename(path),
+                contentType: _parseMediaType(f.contentType),
+              ),
             ));
           } else {
             form.fields.add(MapEntry(name, r(f.value)));
@@ -110,40 +100,36 @@ class RequestSerializer {
       case BodyType.binary:
         final path = config.bodyFilePath;
         if (path == null || path.isEmpty) return null;
-        if (!_hasCustomContentType(headers)) {
-          _setHeader(headers, 'Content-Type', 'application/octet-stream');
+        if (!HeaderUtils.hasCustomContentType(headers)) {
+          HeaderUtils.setHeader(headers, 'Content-Type', 'application/octet-stream');
         }
-        return await readFileBytes(path);
+        return await _readBytes(path);
     }
   }
 
-  static bool _hasHeader(Map<String, String> headers, String name) {
-    final lower = name.toLowerCase();
-    return headers.keys.any((k) => k.toLowerCase() == lower);
-  }
-
-  /// Sets [name] to [value], dropping any case-variant of the key first so we
-  /// never emit both `Content-Type` and `content-type`.
-  static void _setHeader(Map<String, String> headers, String name, String value) {
-    _removeHeader(headers, name);
-    headers[name] = value;
-  }
-
-  static void _removeHeader(Map<String, String> headers, String name) {
-    final lower = name.toLowerCase();
-    headers.removeWhere((k, _) => k.toLowerCase() == lower);
-  }
-
-  /// True when a Content-Type is present that isn't the app's JSON default —
-  /// i.e. the user deliberately chose one, which a binary body should keep.
-  static bool _hasCustomContentType(Map<String, String> headers) {
-    for (final e in headers.entries) {
-      if (e.key.toLowerCase() == 'content-type') {
-        return e.value.trim().toLowerCase() != 'application/json';
-      }
+  /// Reads the file at [path], translating any read failure (missing/deleted
+  /// file, unsupported on web) into a pure [FileBodyException] carrying the
+  /// path. The repository maps that to a NetworkFailure so a missing upload
+  /// surfaces as a visible error response instead of an uncaught throw.
+  static Future<List<int>> _readBytes(String path) async {
+    try {
+      return await readFileBytes(path);
+    } catch (e) {
+      throw FileBodyException(path, cause: e);
     }
-    return false;
   }
 
-  static String _basename(String path) => path.split(RegExp(r'[/\\]')).last;
+  static String _basename(String path) => PathUtils.basename(path);
+
+  /// Parses a per-row content type into a [DioMediaType], or null when unset or
+  /// malformed (so a bad value falls back to Dio's default rather than throwing
+  /// mid-send).
+  static DioMediaType? _parseMediaType(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    try {
+      return DioMediaType.parse(value.trim());
+    } catch (_) {
+      return null;
+    }
+  }
 }

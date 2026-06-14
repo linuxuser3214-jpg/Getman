@@ -56,7 +56,9 @@ class AssertionEngine {
       case AssertionComparator.equals:
         return present && actual == expected;
       case AssertionComparator.notEquals:
-        return actual != expected;
+        // Gate on presence like equals/contains: a missing field must not
+        // "pass" notEquals just because its "(not found)" sentinel differs.
+        return present && actual != expected;
       case AssertionComparator.contains:
         return present && actual.contains(expected);
       case AssertionComparator.lessThan:

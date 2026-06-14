@@ -33,4 +33,22 @@ void main() {
     final p = SseParser();
     expect(p.addChunk('data: a\n\ndata: b\n\n'), ['a', 'b']);
   });
+
+  test('flush emits a final event that never got a trailing blank line', () {
+    final p = SseParser();
+    expect(p.addChunk('data: last\n'), isEmpty); // line complete, no blank line yet
+    expect(p.flush(), ['last']);
+  });
+
+  test('flush folds a trailing data line with no newline at all', () {
+    final p = SseParser();
+    expect(p.addChunk('data: tail'), isEmpty); // no newline -> buffered in carry
+    expect(p.flush(), ['tail']);
+  });
+
+  test('flush returns nothing when there is no buffered data', () {
+    final p = SseParser();
+    expect(p.addChunk('data: done\n\n'), ['done']);
+    expect(p.flush(), isEmpty);
+  });
 }

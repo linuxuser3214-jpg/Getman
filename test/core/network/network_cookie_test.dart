@@ -41,6 +41,14 @@ void main() {
       expect(c.matches(Uri.parse('https://evil.com/v1')), isFalse);
     });
 
+    test('path matching respects the / boundary (no sibling over-match)', () {
+      const c = NetworkCookie(name: 'a', value: '1', domain: 'example.com', path: '/api');
+      expect(c.matches(Uri.parse('https://example.com/api')), isTrue); // exact
+      expect(c.matches(Uri.parse('https://example.com/api/users')), isTrue); // child
+      expect(c.matches(Uri.parse('https://example.com/apixyz')), isFalse); // sibling
+      expect(c.matches(Uri.parse('https://example.com/apiartisan/x')), isFalse);
+    });
+
     test('secure cookies only match https', () {
       const c = NetworkCookie(name: 'a', value: '1', domain: 'example.com', secure: true);
       expect(c.matches(Uri.parse('https://example.com/')), isTrue);

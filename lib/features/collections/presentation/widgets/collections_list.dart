@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/utils/debouncer.dart';
@@ -33,8 +35,7 @@ class _CollectionsListState extends State<CollectionsList> {
   @override
   void initState() {
     super.initState();
-    _treeController = TreeController<CollectionNodeEntity>(
-      roots: const [],
+    _treeController = _IdKeyedTreeController(
       childrenProvider: (node) => node.children,
     );
     _rebuildTree();
@@ -129,32 +130,110 @@ class _CollectionsListState extends State<CollectionsList> {
             ),
           ),
           Expanded(
-            child: context.isPhone
-                ? AnimatedTreeView<CollectionNodeEntity>(
-                    treeController: _treeController,
-                    nodeBuilder: (context, entry) => _CollectionNodeWidget(
-                      entry: entry,
-                      onToggle: () => _treeController.toggleExpansion(entry.node),
-                    ),
-                  )
-                : DragTarget<String>(
-                    onAcceptWithDetails: (details) => context.read<CollectionsBloc>().add(MoveNode(details.data, null)),
-                    builder: (context, candidateData, rejectedData) {
-                      return AnimatedTreeView<CollectionNodeEntity>(
+            child: BlocBuilder<CollectionsBloc, CollectionsState>(
+              // Only switch between loading / empty / tree — not on every tree
+              // mutation (the AnimatedTreeView is driven by _treeController).
+              buildWhen: (p, n) =>
+                  p.isLoading != n.isLoading ||
+                  p.collections.isEmpty != n.collections.isEmpty,
+              builder: (context, state) {
+                if (state.isLoading && state.collections.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (state.collections.isEmpty) {
+                  return _buildEmptyState(context);
+                }
+                return context.isPhone
+                    ? AnimatedTreeView<CollectionNodeEntity>(
                         treeController: _treeController,
-                        nodeBuilder: (context, entry) {
-                          return _CollectionNodeWidget(
-                            entry: entry,
-                            onToggle: () => _treeController.toggleExpansion(entry.node),
+                        nodeBuilder: (context, entry) => _CollectionNodeWidget(
+                          entry: entry,
+                          onToggle: () => _treeController.toggleExpansion(entry.node),
+                        ),
+                      )
+                    : DragTarget<String>(
+                        onAcceptWithDetails: (details) =>
+                            context.read<CollectionsBloc>().add(MoveNode(details.data, null)),
+                        builder: (context, candidateData, rejectedData) {
+                          return AnimatedTreeView<CollectionNodeEntity>(
+                            treeController: _treeController,
+                            nodeBuilder: (context, entry) {
+                              return _CollectionNodeWidget(
+                                entry: entry,
+                                onToggle: () => _treeController.toggleExpansion(entry.node),
+                              );
+                            },
                           );
                         },
                       );
-                    },
-                  ),
+              },
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final layout = context.appLayout;
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(layout.pagePadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.folder_open_outlined,
+                size: layout.iconSize * 2, color: theme.dividerColor),
+            SizedBox(height: layout.sectionSpacing),
+            Text(
+              'NO COLLECTIONS YET',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: layout.fontSizeNormal,
+                fontWeight: context.appTypography.displayWeight,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+            SizedBox(height: layout.tabSpacing),
+            Text(
+              'Save a request or import from Postman to get started.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: layout.fontSizeSmall,
+                fontWeight: context.appTypography.bodyWeight,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A [TreeController] that tracks expansion by [CollectionNodeEntity.id] rather
+/// than node identity/equality. Collection mutations rebuild non-equal entities
+/// (copyWith rewrites the whole ancestor chain), so the default equality-keyed
+/// expansion set would no longer match and folders collapsed on every
+/// rename/add/favorite/config-edit (H2). Keying by the stable id survives the
+/// rebuild. Overriding these two methods is the package's prescribed extension
+/// point; neither calls notifyListeners (cascading ops invoke them many times).
+class _IdKeyedTreeController extends TreeController<CollectionNodeEntity> {
+  _IdKeyedTreeController({required super.childrenProvider}) : super(roots: const []);
+
+  final Set<String> _expandedIds = <String>{};
+
+  @override
+  bool getExpansionState(CollectionNodeEntity node) => _expandedIds.contains(node.id);
+
+  @override
+  void setExpansionState(CollectionNodeEntity node, bool expanded) {
+    if (expanded) {
+      _expandedIds.add(node.id);
+    } else {
+      _expandedIds.remove(node.id);
+    }
   }
 }
 
@@ -338,10 +417,24 @@ class _NodeContextMenu extends StatelessWidget {
             _showRenameDialog(context);
             break;
           case 'delete':
-            context.read<CollectionsBloc>().add(DeleteNode(node.id));
+            ConfirmDialog.show(
+              context,
+              title: node.isFolder ? 'Delete folder?' : 'Delete request?',
+              message: node.isFolder
+                  ? 'Deletes "${node.name}" and everything inside it. This cannot be undone.'
+                  : 'Deletes "${node.name}". This cannot be undone.',
+              onConfirm: () {
+                context.read<CollectionsBloc>().add(DeleteNode(node.id));
+                showAppSnackBar(context, 'Deleted "${node.name}"');
+              },
+            );
             break;
           case 'favorite':
             context.read<CollectionsBloc>().add(ToggleFavorite(node.id));
+            showAppSnackBar(
+              context,
+              node.isFavorite ? 'Removed from favorites' : 'Added to favorites',
+            );
             break;
           case 'add_subfolder':
              _showAddSubfolderDialog(context);
@@ -365,21 +458,29 @@ class _NodeContextMenu extends StatelessWidget {
 
   void _showRenameDialog(BuildContext context) {
     final bloc = context.read<CollectionsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
     NamePromptDialog.show(
       context,
       title: 'RENAME',
       initialText: node.name,
-      onConfirm: (name) => bloc.add(RenameNode(node.id, name)),
+      onConfirm: (name) {
+        bloc.add(RenameNode(node.id, name));
+        showAppSnackBarVia(messenger, 'Renamed to "$name"');
+      },
     );
   }
 
   void _showAddSubfolderDialog(BuildContext context) {
     final bloc = context.read<CollectionsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
     NamePromptDialog.show(
       context,
       title: 'ADD SUBFOLDER',
       confirmLabel: 'ADD',
-      onConfirm: (name) => bloc.add(AddFolder(name, parentId: node.id)),
+      onConfirm: (name) {
+        bloc.add(AddFolder(name, parentId: node.id));
+        showAppSnackBarVia(messenger, 'Folder "$name" created');
+      },
     );
   }
 

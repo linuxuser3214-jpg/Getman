@@ -5,6 +5,7 @@
 // case — the same construction pattern as tabs_bloc_test.dart.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/assertion_result.dart';
@@ -13,6 +14,9 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
@@ -30,7 +34,16 @@ class MockTabsRepository extends Mock implements TabsRepository {}
 
 class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 
+class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
+
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
+
+/// A [SettingsBloc] backed by a no-op save, seeded with [settings].
+SettingsBloc _settingsBloc(SettingsEntity settings) {
+  final saveUseCase = MockSaveSettingsUseCase();
+  when(() => saveUseCase(any())).thenAnswer((_) async {});
+  return SettingsBloc(saveSettingsUseCase: saveUseCase, initialSettings: settings);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -64,13 +77,17 @@ Future<void> _pump(
   required TabsBloc bloc,
   required String tabId,
   required CodeLineEditingController controller,
+  SettingsEntity settings = const SettingsEntity(),
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: brutalistTheme(Brightness.light),
       home: Scaffold(
-        body: BlocProvider.value(
-          value: bloc,
+        body: MultiBlocProvider(
+          providers: [
+            BlocProvider.value(value: bloc),
+            BlocProvider<SettingsBloc>(create: (_) => _settingsBloc(settings)),
+          ],
           child: ResponseSection(
             tabId: tabId,
             responseController: controller,
@@ -118,6 +135,7 @@ void main() {
       tabId: 'fallback',
       config: HttpRequestConfigEntity(id: 'fallback'),
     ));
+    registerFallbackValue(const SettingsEntity());
   });
 
   setUp(() {
@@ -238,6 +256,41 @@ void main() {
   );
 
   // -------------------------------------------------------------------------
+  // Test 3b: alwaysPrettifyLargeResponses auto-shows the editor for big bodies
+  // -------------------------------------------------------------------------
+  testWidgets(
+    'alwaysPrettifyLargeResponses renders the CodeEditor for a large body',
+    (tester) async {
+      const tabId = 'tab3b';
+      // A large but valid JSON body (over the 512 KiB viewer threshold).
+      final body = '[${List.filled(200000, '"x"').join(',')}]';
+      expect(body.length, greaterThan(kLargeResponseViewerChars));
+      final tab = _tabWithBody(tabId, body);
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      final controller = CodeLineEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(
+        tester,
+        bloc: bloc,
+        tabId: tabId,
+        controller: controller,
+        settings: const SettingsEntity(alwaysPrettifyLargeResponses: true),
+      );
+
+      // Editor is shown (auto opt-in), not the plain-text SelectableText.
+      expect(find.byType(CodeEditor), findsOneWidget);
+      expect(find.byType(SelectableText), findsNothing);
+      // The banner still reports the size, now flagged as highlighting enabled.
+      expect(find.textContaining('HIGHLIGHTING ENABLED'), findsOneWidget);
+      // No opt-in button needed anymore.
+      expect(find.text('PRETTIFY ANYWAY'), findsNothing);
+    },
+  );
+
+  // -------------------------------------------------------------------------
   // Test 4: Small response renders the editor directly (no banner)
   // -------------------------------------------------------------------------
   testWidgets(
@@ -287,6 +340,38 @@ void main() {
     expect(find.byType(CodeEditor), findsOneWidget);
   });
 
+  testWidgets('copy button puts the body on the clipboard and shows feedback', (tester) async {
+    const tabId = 'tabCopy';
+    final tab = _tabWithBody(tabId, '{"ok":true}');
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+
+    await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
+
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+
+    await tester.tap(find.byTooltip('Copy response'));
+    await tester.pump(); // run the async copy
+    await tester.pump(); // surface the snackbar
+
+    expect(copied, isNotNull);
+    expect(copied, contains('"ok"'));
+    expect(find.text('Response copied'), findsOneWidget);
+  });
+
   // -------------------------------------------------------------------------
   // Test 6: COOKIES tab lists cookies parsed from the set-cookie header
   // -------------------------------------------------------------------------
@@ -330,8 +415,12 @@ void main() {
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
         home: Scaffold(
-          body: BlocProvider.value(
-            value: bloc,
+          body: MultiBlocProvider(
+            providers: [
+              BlocProvider.value(value: bloc),
+              BlocProvider<SettingsBloc>(
+                  create: (_) => _settingsBloc(const SettingsEntity())),
+            ],
             child: ResponseSection(tabId: tabId, responseController: controller),
           ),
         ),

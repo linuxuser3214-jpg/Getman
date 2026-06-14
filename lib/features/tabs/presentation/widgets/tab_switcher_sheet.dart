@@ -41,6 +41,10 @@ class TabSwitcherSheet extends StatelessWidget {
     final layout = context.appLayout;
 
     return BlocBuilder<TabsBloc, TabsState>(
+      // The sheet only renders the tab list + active highlight; skip rebuilds
+      // for emissions that change neither (e.g. an isLoading-only flip).
+      buildWhen: (prev, next) =>
+          prev.tabs != next.tabs || prev.activeIndex != next.activeIndex,
       builder: (context, state) {
         final tabs = state.tabs;
         final activeIndex = state.activeIndex;

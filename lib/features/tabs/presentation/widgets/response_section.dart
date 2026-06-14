@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/assertion_result.dart';
 import 'package:getman/core/domain/entities/extraction_result.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/utils/byte_format.dart';
 import 'package:getman/core/utils/cookie_parser.dart';
-import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -173,6 +176,23 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
     final syncId = ++_pendingSyncId;
 
     if (rawBody != null && rawBody.length > kLargeResponseViewerChars) {
+      // Opt-in setting: prettify + highlight large bodies automatically (the
+      // user accepts the render cost). The over-1-MB placeholder is a known
+      // non-JSON sentinel, so it always stays in plain-text mode.
+      final autoPrettify =
+          context.read<SettingsBloc>().state.settings.alwaysPrettifyLargeResponses &&
+              rawBody != kResponseBodyTooLargePlaceholder;
+      if (autoPrettify) {
+        final prettified = await JsonUtils.prettify(rawBody);
+        if (!mounted || syncId != _pendingSyncId) return;
+        widget.responseController.text = prettified;
+        setState(() {
+          _largeBody = rawBody;
+          _showFullPreview = false;
+          _highlightingOptedIn = true;
+        });
+        return;
+      }
       // Large path — skip prettify and editor; go to plain-text mode.
       if (!mounted || syncId != _pendingSyncId) return;
       setState(() {
@@ -184,8 +204,11 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
     }
 
     // Normal path — prettify (or pass through verbatim in raw mode), then load
-    // into the editor.
-    final text = _raw ? (rawBody ?? '') : await JsonUtils.prettify(rawBody);
+    // into the editor. The over-1-MB sentinel is known non-JSON, so render it
+    // as plain text rather than spawning an isolate to fail-parse it.
+    final text = (_raw || rawBody == kResponseBodyTooLargePlaceholder)
+        ? (rawBody ?? '')
+        : await JsonUtils.prettify(rawBody);
     // Only apply if no newer sync was started and we're still mounted.
     if (!mounted || syncId != _pendingSyncId) return;
     widget.responseController.text = text;
@@ -218,26 +241,70 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<TabsBloc, TabsState>(
-      listenWhen: (prev, next) {
-        final prevTab = prev.tabs.byId(widget.tabId);
-        final nextTab = next.tabs.byId(widget.tabId);
-        return prevTab?.response?.body != nextTab?.response?.body;
-      },
-      listener: (context, state) {
-        final tab = state.tabs.byId(widget.tabId);
-        _syncBody(tab?.response?.body);
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<TabsBloc, TabsState>(
+          listenWhen: (prev, next) {
+            final prevTab = prev.tabs.byId(widget.tabId);
+            final nextTab = next.tabs.byId(widget.tabId);
+            return prevTab?.response?.body != nextTab?.response?.body;
+          },
+          listener: (context, state) {
+            final tab = state.tabs.byId(widget.tabId);
+            _syncBody(tab?.response?.body);
+          },
+        ),
+        // Re-render the current body when the user flips the prettify-large
+        // setting, so the change is visible without re-sending.
+        BlocListener<SettingsBloc, SettingsState>(
+          listenWhen: (prev, next) =>
+              prev.settings.alwaysPrettifyLargeResponses !=
+              next.settings.alwaysPrettifyLargeResponses,
+          listener: (context, state) {
+            final body =
+                context.read<TabsBloc>().state.tabs.byId(widget.tabId)?.response?.body;
+            _syncBody(body);
+          },
+        ),
+      ],
       child: _largeBody != null ? _buildLargeMode(context) : _buildSmallMode(),
     );
   }
 
-  /// Sub-threshold view: a Pretty/Raw toggle above the editor.
+  /// The text a Copy action should put on the clipboard: the verbatim large
+  /// body when highlighting is off, otherwise whatever the editor shows.
+  String _copyableText() => _largeBody != null && !_highlightingOptedIn
+      ? _largeBody!
+      : widget.responseController.text;
+
+  Future<void> _copyBody(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final text = _copyableText();
+    if (text.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: text));
+    showAppSnackBarVia(messenger, 'Response copied');
+  }
+
+  Widget _copyButton(BuildContext context) {
+    return IconButton(
+      tooltip: 'Copy response',
+      visualDensity: VisualDensity.compact,
+      icon: Icon(Icons.copy_all_outlined, size: context.appLayout.iconSize),
+      onPressed: () => _copyBody(context),
+    );
+  }
+
+  /// Sub-threshold view: a Pretty/Raw toggle (+ copy) above the editor.
   Widget _buildSmallMode() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _PrettyRawToggle(raw: _raw, onChanged: _setRaw),
+        Row(
+          children: [
+            Expanded(child: _PrettyRawToggle(raw: _raw, onChanged: _setRaw)),
+            _copyButton(context),
+          ],
+        ),
         Expanded(child: _buildEditorMode()),
       ],
     );
@@ -315,6 +382,7 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
                       ),
                     ),
                 ],
+                _copyButton(context),
               ],
             ),
           ),
@@ -354,14 +422,28 @@ class _ResponseHeadersView extends StatelessWidget {
 
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
-        final p = prev.tabs.byId(tabId);
-        final n = next.tabs.byId(tabId);
-        return !stringMapEquality.equals(p?.response?.headers, n?.response?.headers);
+        // response is replaced wholesale on each send, so a reference check is
+        // an O(1) gate — no MapEquality over headers on every state emission.
+        return !identical(
+          prev.tabs.byId(tabId)?.response,
+          next.tabs.byId(tabId)?.response,
+        );
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
         final headers = tab?.response?.headers;
-        if (headers == null) return const SizedBox();
+        if (headers == null || headers.isEmpty) {
+          return Center(
+            child: Text(
+              'NO RESPONSE HEADERS',
+              style: TextStyle(
+                fontSize: layout.fontSizeNormal,
+                fontWeight: context.appTypography.displayWeight,
+                color: theme.dividerColor.withValues(alpha: 0.6),
+              ),
+            ),
+          );
+        }
 
         final entries = headers.entries.toList();
 
@@ -447,9 +529,12 @@ class _ResponseCookiesView extends StatelessWidget {
 
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
-        final p = prev.tabs.byId(tabId);
-        final n = next.tabs.byId(tabId);
-        return !stringMapEquality.equals(p?.response?.headers, n?.response?.headers);
+        // response is replaced wholesale on each send, so a reference check is
+        // an O(1) gate — no MapEquality over headers on every state emission.
+        return !identical(
+          prev.tabs.byId(tabId)?.response,
+          next.tabs.byId(tabId)?.response,
+        );
       },
       builder: (context, state) {
         final headers = state.tabs.byId(tabId)?.response?.headers;

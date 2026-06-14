@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
@@ -52,19 +53,46 @@ class _CommandPaletteState extends State<CommandPalette> {
   // Debounced query drives only the results list, so typing doesn't rebuild the
   // whole dialog or re-run FuzzyMatcher over every command on each keystroke.
   final ValueNotifier<String> _queryText = ValueNotifier<String>('');
+  // Index of the keyboard-highlighted row; reset to 0 whenever the query
+  // changes (results reorder).
+  final ValueNotifier<int> _selected = ValueNotifier<int>(0);
   final Debouncer _debouncer = Debouncer();
   late final List<_Command> _all = _buildCommands();
+  // Latest results, cached from the list builder so the key handlers can move
+  // the selection / run a row without recomputing on every event.
+  List<_Command> _currentResults = const [];
 
   @override
   void dispose() {
     _debouncer.dispose();
     _queryText.dispose();
+    _selected.dispose();
     _query.dispose();
     super.dispose();
   }
 
   List<_Command> _resultsFor(String query) =>
       FuzzyMatcher.filter(query, _all, (c) => '${c.label} ${c.subtitle}');
+
+  void _onQueryChanged(String v) {
+    _debouncer.run(() {
+      _queryText.value = v;
+      _selected.value = 0;
+    });
+  }
+
+  void _moveSelection(int delta) {
+    if (_currentResults.isEmpty) return;
+    _selected.value =
+        (_selected.value + delta).clamp(0, _currentResults.length - 1);
+  }
+
+  void _runSelected() {
+    // Recompute against the live text so Enter works before the debounce fires.
+    final results = _resultsFor(_query.text);
+    if (results.isEmpty) return;
+    _invoke(results[_selected.value.clamp(0, results.length - 1)]);
+  }
 
   List<_Command> _buildCommands() {
     final cmds = <_Command>[];
@@ -121,8 +149,39 @@ class _CommandPaletteState extends State<CommandPalette> {
 
   @override
   Widget build(BuildContext context) {
-    final layout = context.appLayout;
+    // These Shortcuts sit between the focused search field and the root
+    // DefaultTextEditingShortcuts, so they win the arrow/Enter keys (nearest
+    // Shortcuts to the focus is resolved first) — arrow keys move the
+    // highlight instead of the text caret.
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.arrowDown): _MoveSelectionIntent(1),
+        SingleActivator(LogicalKeyboardKey.arrowUp): _MoveSelectionIntent(-1),
+        SingleActivator(LogicalKeyboardKey.enter): _RunSelectionIntent(),
+        SingleActivator(LogicalKeyboardKey.numpadEnter): _RunSelectionIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _MoveSelectionIntent: CallbackAction<_MoveSelectionIntent>(
+            onInvoke: (i) {
+              _moveSelection(i.delta);
+              return null;
+            },
+          ),
+          _RunSelectionIntent: CallbackAction<_RunSelectionIntent>(
+            onInvoke: (_) {
+              _runSelected();
+              return null;
+            },
+          ),
+        },
+        child: _buildScaffold(context),
+      ),
+    );
+  }
 
+  Widget _buildScaffold(BuildContext context) {
+    final layout = context.appLayout;
     return ResponsiveDialogScaffold(
       title: const Text('COMMAND PALETTE'),
       content: SizedBox(
@@ -140,13 +199,10 @@ class _CommandPaletteState extends State<CommandPalette> {
                 prefixIcon: Icon(Icons.search),
                 isDense: true,
               ),
-              onChanged: (v) => _debouncer.run(() => _queryText.value = v),
-              onSubmitted: (_) {
-                // Enter is a deliberate action — recompute synchronously against
-                // the current text so it works even before the debounce fires.
-                final results = _resultsFor(_query.text);
-                if (results.isNotEmpty) _invoke(results.first);
-              },
+              onChanged: _onQueryChanged,
+              // Enter via the soft keyboard action; physical Enter is handled by
+              // the Shortcuts above. Both run the highlighted row.
+              onSubmitted: (_) => _runSelected(),
             ),
             SizedBox(height: layout.sectionSpacing),
             ConstrainedBox(
@@ -155,6 +211,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                 valueListenable: _queryText,
                 builder: (context, query, _) {
                   final results = _resultsFor(query);
+                  _currentResults = results;
                   if (results.isEmpty) {
                     return Padding(
                       padding: EdgeInsets.all(layout.pagePadding),
@@ -167,20 +224,31 @@ class _CommandPaletteState extends State<CommandPalette> {
                       ),
                     );
                   }
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: results.length,
-                    itemBuilder: (context, i) {
-                      final c = results[i];
-                      return ListTile(
-                        dense: true,
-                        leading: Icon(c.icon, size: layout.iconSize),
-                        title: Text(c.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontWeight: context.appTypography.titleWeight)),
-                        subtitle: Text(c.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        onTap: () => _invoke(c),
+                  return ValueListenableBuilder<int>(
+                    valueListenable: _selected,
+                    builder: (context, selected, _) {
+                      final highlight =
+                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.14);
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: results.length,
+                        itemBuilder: (context, i) {
+                          final c = results[i];
+                          return ColoredBox(
+                            color: i == selected ? highlight : Colors.transparent,
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(c.icon, size: layout.iconSize),
+                              title: Text(c.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontWeight: context.appTypography.titleWeight)),
+                              subtitle:
+                                  Text(c.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              onTap: () => _invoke(c),
+                            ),
+                          );
+                        },
                       );
                     },
                   );
@@ -205,4 +273,13 @@ class _Command {
     required this.icon,
     required this.run,
   });
+}
+
+class _MoveSelectionIntent extends Intent {
+  final int delta;
+  const _MoveSelectionIntent(this.delta);
+}
+
+class _RunSelectionIntent extends Intent {
+  const _RunSelectionIntent();
 }

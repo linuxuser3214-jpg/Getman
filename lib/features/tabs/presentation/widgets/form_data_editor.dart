@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/utils/path_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -250,6 +251,9 @@ class _RowState {
   bool isFile;
   String? filePath;
   String? fileName;
+  // No UI input yet; preserved here so a content type set via import / the
+  // workspace mirror survives an edit instead of being dropped on re-emit.
+  String? contentType;
 
   _RowState({
     required this.nameController,
@@ -257,6 +261,7 @@ class _RowState {
     this.isFile = false,
     this.filePath,
     this.fileName,
+    this.contentType,
   }) : id = _counter++;
 
   factory _RowState.from(MultipartFieldEntity f) => _RowState(
@@ -264,7 +269,8 @@ class _RowState {
         valueController: TextEditingController(text: f.value),
         isFile: f.isFile,
         filePath: f.filePath,
-        fileName: f.filePath?.split(RegExp(r'[/\\]')).last,
+        fileName: f.filePath == null ? null : PathUtils.basename(f.filePath!),
+        contentType: f.contentType,
       );
 
   factory _RowState.empty() => _RowState(
@@ -279,6 +285,7 @@ class _RowState {
         value: isFile ? '' : valueController.text,
         isFile: isFile,
         filePath: isFile ? filePath : null,
+        contentType: isFile ? contentType : null,
       );
 
   void dispose() {

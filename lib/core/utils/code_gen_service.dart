@@ -1,9 +1,10 @@
 import 'dart:convert';
 
-import 'package:getman/core/domain/entities/auth_config.dart';
+import 'package:getman/core/domain/auth_application.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/utils/header_utils.dart';
 
 /// Target language for generated request code.
 enum CodeGenTarget {
@@ -40,40 +41,31 @@ class CodeGenService {
     final headers = Map<String, String>.of(config.headers);
     var url = config.url;
 
-    final auth = config.authConfig;
-    switch (auth.type) {
-      case AuthType.none:
-      case AuthType.inherit:
-        break;
-      case AuthType.bearer:
-        if (auth.token.isNotEmpty && !_hasKey(headers, 'authorization')) {
-          headers['Authorization'] = 'Bearer ${auth.token}';
-        }
-      case AuthType.basic:
-        if (!_hasKey(headers, 'authorization')) {
-          final encoded = base64.encode(utf8.encode('${auth.username}:${auth.password}'));
-          headers['Authorization'] = 'Basic $encoded';
-        }
-      case AuthType.apiKey:
-        if (auth.apiKeyName.isNotEmpty) {
-          if (auth.apiKeyLocation == ApiKeyLocation.header) {
-            if (!_hasKey(headers, auth.apiKeyName)) headers[auth.apiKeyName] = auth.apiKeyValue;
-          } else {
-            final sep = url.contains('?') ? '&' : '?';
-            url += '$sep${auth.apiKeyName}=${auth.apiKeyValue}';
-          }
-        }
+    // Code-gen emits a template: pass the identity resolver so `{{vars}}` stay
+    // verbatim. Same auth decision as the send path (auth_application.dart).
+    final auth = resolveAuthApplication(
+      auth: config.authConfig,
+      currentHeaders: headers,
+      resolve: (value) => value,
+    );
+    headers.addAll(auth.headers);
+    final apiKeyQuery = auth.queryParam;
+    if (apiKeyQuery != null) {
+      final sep = url.contains('?') ? '&' : '?';
+      final name = Uri.encodeComponent(apiKeyQuery.key);
+      final value = Uri.encodeComponent(apiKeyQuery.value);
+      url += '$sep$name=$value';
     }
 
     // Mirror the send pipeline's content-type handling for structured bodies.
     switch (config.bodyType) {
       case BodyType.urlencoded:
-        _setKey(headers, 'Content-Type', 'application/x-www-form-urlencoded');
+        HeaderUtils.setHeader(headers, 'Content-Type', 'application/x-www-form-urlencoded');
       case BodyType.multipart:
-        _removeKey(headers, 'content-type');
+        HeaderUtils.removeHeader(headers, 'content-type');
       case BodyType.binary:
-        if (!_hasCustomContentType(headers)) {
-          _setKey(headers, 'Content-Type', 'application/octet-stream');
+        if (!HeaderUtils.hasCustomContentType(headers)) {
+          HeaderUtils.setHeader(headers, 'Content-Type', 'application/octet-stream');
         }
       case BodyType.none:
       case BodyType.raw:
@@ -97,20 +89,20 @@ class CodeGenService {
     final b = StringBuffer('curl --request ${e.method} \\\n');
     b.write("  --url '${e.url}'");
     e.headers.forEach((k, v) {
-      b.write(" \\\n  --header '$k: ${_sq(v)}'");
+      b.write(" \\\n  --header '$k: ${_shellSq(v)}'");
     });
     switch (e.bodyType) {
       case BodyType.none:
         break;
       case BodyType.raw:
-        if (e.rawBody.isNotEmpty) b.write(" \\\n  --data '${_sq(e.rawBody)}'");
+        if (e.rawBody.isNotEmpty) b.write(" \\\n  --data '${_shellSq(e.rawBody)}'");
       case BodyType.urlencoded:
-        b.write(" \\\n  --data '${_sq(_urlEncodedString(e.formFields))}'");
+        b.write(" \\\n  --data '${_shellSq(_urlEncodedString(e.formFields))}'");
       case BodyType.multipart:
         for (final f in e.formFields) {
           if (f.name.isEmpty) continue;
           final v = f.isFile ? '@${f.filePath ?? ''}' : f.value;
-          b.write(" \\\n  --form '${_sq('${f.name}=$v')}'");
+          b.write(" \\\n  --form '${_shellSq('${f.name}=$v')}'");
         }
       case BodyType.binary:
         b.write(" \\\n  --data-binary '@${e.binaryPath ?? ''}'");
@@ -224,40 +216,26 @@ class CodeGenService {
     return '{${entries.join(', ')}}';
   }
 
-  /// Escapes single quotes for embedding inside a `'...'` literal (shell/JS/py).
-  static String _sq(String v) => v.replaceAll('\n', '\\n').replaceAll("'", "\\'");
+  /// Escapes a value for embedding inside a `'...'` literal in JS/Python
+  /// (backslash first so it isn't double-processed, then newline, then quote).
+  static String _sq(String v) =>
+      v.replaceAll('\\', '\\\\').replaceAll('\n', '\\n').replaceAll("'", "\\'");
 
-  /// Quotes a JS string with backticks when it spans lines, else single quotes.
-  static String _jsString(String v) =>
-      v.contains('\n') ? '`$v`' : "'${v.replaceAll("'", "\\'")}'";
+  /// POSIX single-quote escaping for shell (curl): a literal `'` becomes the
+  /// `'\''` idiom (close, escaped quote, reopen). Newlines are literal inside
+  /// single quotes, so they're left as-is.
+  static String _shellSq(String v) => v.replaceAll("'", "'\\''");
 
-  /// Python: triple-quote multiline payloads, else single-quote.
-  static String _pyString(String v) =>
-      v.contains('\n') ? "'''$v'''" : "'${v.replaceAll("'", "\\'")}'";
+  /// A JS string literal. Multiline payloads use a JSON-encoded double-quoted
+  /// literal (so embedded backticks / `\${...}` can't form a template literal);
+  /// single-line uses a simple single-quoted literal.
+  static String _jsString(String v) => v.contains('\n') ? jsonEncode(v) : "'${_sq(v)}'";
 
-  static bool _hasKey(Map<String, String> h, String name) {
-    final l = name.toLowerCase();
-    return h.keys.any((k) => k.toLowerCase() == l);
-  }
+  /// A Python string literal. Multiline payloads use a JSON-encoded
+  /// double-quoted literal (valid Python — so an embedded `'''` can't break
+  /// it); single-line uses a simple single-quoted literal.
+  static String _pyString(String v) => v.contains('\n') ? jsonEncode(v) : "'${_sq(v)}'";
 
-  static void _setKey(Map<String, String> h, String name, String value) {
-    _removeKey(h, name);
-    h[name] = value;
-  }
-
-  static void _removeKey(Map<String, String> h, String name) {
-    final l = name.toLowerCase();
-    h.removeWhere((k, _) => k.toLowerCase() == l);
-  }
-
-  static bool _hasCustomContentType(Map<String, String> h) {
-    for (final e in h.entries) {
-      if (e.key.toLowerCase() == 'content-type') {
-        return e.value.trim().toLowerCase() != 'application/json';
-      }
-    }
-    return false;
-  }
 }
 
 class _Effective {
