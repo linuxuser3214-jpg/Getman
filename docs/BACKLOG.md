@@ -30,6 +30,31 @@ runner), **M8** (GraphQL body), **M9** (pre-request scripts), **M10 examples**; 
 **M5** (`two_dimensional_scrollables`); and **L10** (god-file splits: url_bar/main_screen/
 environments_dialog), **L11** (max-redirects / mTLS), **L12** (collections serialization isolate).
 
+## ✅ Done in the migration + features + perf pass (June 2026, session 3)
+Shipped on `dev` (one concern per commit, analyze clean + full suite green between each,
+verified with a real CFE compile per working-agreement #4; the mTLS change also via
+`flutter build web`):
+- **M5** — collections tree migrated off the discontinued `flutter_fancy_tree_view` to
+  `two_dimensional_scrollables` (`TreeView`), preserving H2 (id-keyed expansion via a `Set`
+  reseeded into `TreeViewNode(expanded:)`), drag-and-drop, search, and indentation
+  (`AppLayout.treeRowExtent` + manual `depthPaddingMultiplier`).
+- **M10 examples** — saved request+response examples on leaf nodes (`SavedExampleEntity`,
+  Hive typeId 10 + `CollectionNode` `@HiveField(7)`), captured from the response panel, listed
+  as inline expandable tree rows, opened as unlinked tabs with their response shown
+  (`AddTab(response:)`), rename/delete menus; local-only (excluded from Postman + git mirror).
+- **L11** — configurable `maxRedirects` (`@HiveField 18`) + client-certificate mTLS
+  (PEM cert/key paths + passphrase at `@HiveField 19/20/21`, `SecurityContext` built only in the
+  native adapter with a try/catch fallback; web stub matches the signature).
+- **L12** — collections persist keyed by root id (+ legacy int-key migration); a per-root diff
+  inside `CollectionsRepositoryImpl` rewrites only changed roots. (compute() ruled out —
+  HiveObjects can't cross an isolate.)
+- **L10** — god-file splits: extracted `RealtimeButton`/`UrlOverflowMenu`/
+  `RequestKindMethodSelector` (url_bar), `TabChip`/`EmptyTabsPlaceholder` (main_screen),
+  `EnvironmentListTile`/`EnvironmentEditor` (environments_dialog) into their own public files.
+
+Remaining: the big deferred features **H3** (OAuth2), **H4** (collection runner), **M8**
+(GraphQL body), **M9** (pre-request scripts).
+
 ## ✅ Done in the backlog+refactor pass (June 2026)
 Foundational refactors + all bugs + two perf items are shipped on `dev`:
 - **Refactors:** `NetworkCancelHandle`→pure `cancel_handle.dart` (**M2**); `dart:developer`
@@ -123,7 +148,7 @@ cheap LOW wins to bank momentum, then features/refactors as scoped.
 - **Fix**: Add a precomputed `Map<String, HttpRequestConfigEntity>` (id→config) to `CollectionsState` built once per emission; `TabDirtyChecker` does O(1) lookup. Turns T×O(N) into O(N)+T×O(1).
 - **Effort**: M. **Verify**: existing collections/tab tests stay green; ideally a perf_trace span.
 
-### M5 — `flutter_fancy_tree_view` (discontinued) → `two_dimensional_scrollables`
+### ✅ M5 (DONE) — `flutter_fancy_tree_view` (discontinued) → `two_dimensional_scrollables`
 - **Files**: `pubspec.yaml:20`; sole consumer `collections_list.dart` (`TreeController`/`AnimatedTreeView`/`TreeEntry`/`TreeIndentation`).
 - **Fix**: Do **H2 first** (own expansion state by id), then swap to `TreeView.builder`; drag-and-drop (`Draggable<String>`/`DragTarget<String>`) is lib-independent.
 - **Effort**: L.
@@ -147,7 +172,7 @@ cheap LOW wins to bank momentum, then features/refactors as scoped.
 - **Fix**: Prefer a **no-code** pre-request rules pass (set-header-from-variable, compute-HMAC, set-timestamp) mirroring `RulesRunInput`, run before dispatch — consistent with the existing no-code chaining design (avoid a JS sandbox initially).
 - **Effort**: L.
 
-### ✅ M10 (descriptions DONE; examples deferred) — Request/folder descriptions + saved examples
+### ✅ M10 (DONE — descriptions + examples) — Request/folder descriptions + saved examples
 - **Files**: `collection_node_entity.dart` + `collection_node_model.dart` (typeId 3), `request_config_entity.dart`.
 - **Fix**: Add a nullable `description` (entity + fresh `@HiveField` on `CollectionNode`) and a notes panel. Saved examples are larger (examples list on leaf nodes + capture UI).
 - **Effort**: M (descriptions) / L (examples). Needs `build_runner`.
@@ -205,14 +230,14 @@ cheap LOW wins to bank momentum, then features/refactors as scoped.
 - **Files**: `code_gen_service.dart:9` (`CodeGenTarget` enum), `code_export_dialog.dart`.
 - **Fix**: Add targets incrementally (Node axios, Go net/http, Java OkHttp); the `_Effective` abstraction already normalizes auth+content-type, so each is a pure formatter. **Effort**: M.
 
-### L10 — `url_bar.dart` / `main_screen.dart` / `environments_dialog.dart` god files
+### ✅ L10 (DONE) — `url_bar.dart` / `main_screen.dart` / `environments_dialog.dart` god files
 - **Fix**: Extract standalone sub-widgets (`_RealtimeButton`/`_OverflowMenu` from url_bar; `_TabChip` from main_screen; `_EnvironmentListTile`/`_EnvironmentEditor` from environments_dialog). **Effort**: M.
 
-### L11 — No max-redirects limit / client-certificate (mTLS) support
+### ✅ L11 (DONE) — No max-redirects limit / client-certificate (mTLS) support
 - **Files**: `network_config.dart`, `settings_entity.dart`, `settings_dialog.dart`, `dio_adapter_config_io.dart`.
 - **Fix**: Add `maxRedirects` (int) to `NetworkConfig`+settings+UI and apply to Dio options; for client certs, install a `SecurityContext` from a user-provided cert/key+passphrase in the platform-split adapter config. Niche/enterprise → low priority. **Effort**: M.
 
-### L12 — Collections whole-tree serialization on the UI isolate
+### ✅ L12 (DONE) — Collections whole-tree serialization on the UI isolate
 - **Files**: `collections_repository_impl.dart`, `collection_node_model.dart` (`fromEntity` recursion), `hive_helpers.dart`.
 - **Note**: Mostly mitigated this pass — saves are now debounced/coalesced (2s), so it's one whole-tree write per burst, not per edit. Residual jank only on very large Postman imports.
 - **Fix**: Move `fromEntity`-forest serialization to a background isolate via `compute`, or move collections to keyed/subtree writes (tabs/environments/cookies already are). **Effort**: M.
