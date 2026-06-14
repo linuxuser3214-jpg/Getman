@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/utils/debouncer.dart';
@@ -338,10 +340,24 @@ class _NodeContextMenu extends StatelessWidget {
             _showRenameDialog(context);
             break;
           case 'delete':
-            context.read<CollectionsBloc>().add(DeleteNode(node.id));
+            ConfirmDialog.show(
+              context,
+              title: node.isFolder ? 'Delete folder?' : 'Delete request?',
+              message: node.isFolder
+                  ? 'Deletes "${node.name}" and everything inside it. This cannot be undone.'
+                  : 'Deletes "${node.name}". This cannot be undone.',
+              onConfirm: () {
+                context.read<CollectionsBloc>().add(DeleteNode(node.id));
+                showAppSnackBar(context, 'Deleted "${node.name}"');
+              },
+            );
             break;
           case 'favorite':
             context.read<CollectionsBloc>().add(ToggleFavorite(node.id));
+            showAppSnackBar(
+              context,
+              node.isFavorite ? 'Removed from favorites' : 'Added to favorites',
+            );
             break;
           case 'add_subfolder':
              _showAddSubfolderDialog(context);
@@ -365,21 +381,29 @@ class _NodeContextMenu extends StatelessWidget {
 
   void _showRenameDialog(BuildContext context) {
     final bloc = context.read<CollectionsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
     NamePromptDialog.show(
       context,
       title: 'RENAME',
       initialText: node.name,
-      onConfirm: (name) => bloc.add(RenameNode(node.id, name)),
+      onConfirm: (name) {
+        bloc.add(RenameNode(node.id, name));
+        showAppSnackBarVia(messenger, 'Renamed to "$name"');
+      },
     );
   }
 
   void _showAddSubfolderDialog(BuildContext context) {
     final bloc = context.read<CollectionsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
     NamePromptDialog.show(
       context,
       title: 'ADD SUBFOLDER',
       confirmLabel: 'ADD',
-      onConfirm: (name) => bloc.add(AddFolder(name, parentId: node.id)),
+      onConfirm: (name) {
+        bloc.add(AddFolder(name, parentId: node.id));
+        showAppSnackBarVia(messenger, 'Folder "$name" created');
+      },
     );
   }
 

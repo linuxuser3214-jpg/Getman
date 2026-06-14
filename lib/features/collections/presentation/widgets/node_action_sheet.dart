@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
@@ -130,8 +132,18 @@ class _SheetBody extends StatelessWidget {
             label: 'DELETE',
             isDestructive: true,
             onTap: () {
-              context.read<CollectionsBloc>().add(DeleteNode(node.id));
-              Navigator.of(context).pop();
+              ConfirmDialog.show(
+                context,
+                title: node.isFolder ? 'Delete folder?' : 'Delete request?',
+                message: node.isFolder
+                    ? 'Deletes "${node.name}" and everything inside it. This cannot be undone.'
+                    : 'Deletes "${node.name}". This cannot be undone.',
+                onConfirm: () {
+                  context.read<CollectionsBloc>().add(DeleteNode(node.id));
+                  showAppSnackBar(context, 'Deleted "${node.name}"');
+                  Navigator.of(context).pop(); // close the action sheet
+                },
+              );
             },
           ),
           SizedBox(height: layout.tabSpacing),

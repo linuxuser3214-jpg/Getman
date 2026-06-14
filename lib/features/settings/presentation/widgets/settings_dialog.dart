@@ -5,6 +5,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/workspace_settings_tile.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -213,9 +214,19 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   title: Text('COOKIES',
                       style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
                   trailing: TextButton(
-                    onPressed: () async {
-                      await context.read<CookieStore>().clear();
-                      if (context.mounted) showAppSnackBar(context, 'Cookie jar cleared');
+                    onPressed: () {
+                      ConfirmDialog.show(
+                        context,
+                        title: 'Clear cookies?',
+                        message: 'Removes every stored cookie from the jar. This cannot be undone.',
+                        confirmLabel: 'CLEAR',
+                        onConfirm: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final store = context.read<CookieStore>();
+                          await store.clear();
+                          showAppSnackBarVia(messenger, 'Cookie jar cleared');
+                        },
+                      );
                     },
                     child: const Text('CLEAR'),
                   ),

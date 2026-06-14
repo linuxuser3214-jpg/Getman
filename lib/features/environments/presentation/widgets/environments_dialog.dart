@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
@@ -259,15 +261,23 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
   }
 
   void _deleteEnvironment(BuildContext context, EnvironmentEntity env) {
-    final envsBloc = context.read<EnvironmentsBloc>();
-    final settingsBloc = context.read<SettingsBloc>();
-    envsBloc.add(DeleteEnvironment(env.id));
-    if (settingsBloc.state.settings.activeEnvironmentId == env.id) {
-      settingsBloc.add(const UpdateActiveEnvironmentId(null));
-    }
-    if (_selectedId == env.id) {
-      setState(() => _selectedId = null);
-    }
+    ConfirmDialog.show(
+      context,
+      title: 'Delete environment?',
+      message: 'Deletes "${env.name}" and its variables. This cannot be undone.',
+      onConfirm: () {
+        final envsBloc = context.read<EnvironmentsBloc>();
+        final settingsBloc = context.read<SettingsBloc>();
+        envsBloc.add(DeleteEnvironment(env.id));
+        if (settingsBloc.state.settings.activeEnvironmentId == env.id) {
+          settingsBloc.add(const UpdateActiveEnvironmentId(null));
+        }
+        if (_selectedId == env.id) {
+          setState(() => _selectedId = null);
+        }
+        showAppSnackBar(context, 'Deleted "${env.name}"');
+      },
+    );
   }
 
   Future<void> _importEnvironments(BuildContext context) {
