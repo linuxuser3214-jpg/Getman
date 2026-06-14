@@ -5,6 +5,7 @@
 // case — the same construction pattern as tabs_bloc_test.dart.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/assertion_result.dart';
@@ -285,6 +286,38 @@ void main() {
 
     // Still an editor after switching to raw.
     expect(find.byType(CodeEditor), findsOneWidget);
+  });
+
+  testWidgets('copy button puts the body on the clipboard and shows feedback', (tester) async {
+    const tabId = 'tabCopy';
+    final tab = _tabWithBody(tabId, '{"ok":true}');
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+
+    await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
+
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+
+    await tester.tap(find.byTooltip('Copy response'));
+    await tester.pump(); // run the async copy
+    await tester.pump(); // surface the snackbar
+
+    expect(copied, isNotNull);
+    expect(copied, contains('"ok"'));
+    expect(find.text('Response copied'), findsOneWidget);
   });
 
   // -------------------------------------------------------------------------

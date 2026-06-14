@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/assertion_result.dart';
 import 'package:getman/core/domain/entities/extraction_result.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/utils/byte_format.dart';
 import 'package:getman/core/utils/cookie_parser.dart';
@@ -232,12 +234,40 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
     );
   }
 
-  /// Sub-threshold view: a Pretty/Raw toggle above the editor.
+  /// The text a Copy action should put on the clipboard: the verbatim large
+  /// body when highlighting is off, otherwise whatever the editor shows.
+  String _copyableText() => _largeBody != null && !_highlightingOptedIn
+      ? _largeBody!
+      : widget.responseController.text;
+
+  Future<void> _copyBody(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final text = _copyableText();
+    if (text.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: text));
+    showAppSnackBarVia(messenger, 'Response copied');
+  }
+
+  Widget _copyButton(BuildContext context) {
+    return IconButton(
+      tooltip: 'Copy response',
+      visualDensity: VisualDensity.compact,
+      icon: Icon(Icons.copy_all_outlined, size: context.appLayout.iconSize),
+      onPressed: () => _copyBody(context),
+    );
+  }
+
+  /// Sub-threshold view: a Pretty/Raw toggle (+ copy) above the editor.
   Widget _buildSmallMode() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _PrettyRawToggle(raw: _raw, onChanged: _setRaw),
+        Row(
+          children: [
+            Expanded(child: _PrettyRawToggle(raw: _raw, onChanged: _setRaw)),
+            _copyButton(context),
+          ],
+        ),
         Expanded(child: _buildEditorMode()),
       ],
     );
@@ -315,6 +345,7 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
                       ),
                     ),
                 ],
+                _copyButton(context),
               ],
             ),
           ),
