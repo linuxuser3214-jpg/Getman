@@ -42,6 +42,21 @@ void main() {
     expect(run(const Assertion(id: '1', target: AssertionTarget.bodyJsonPath, comparator: AssertionComparator.exists, path: 'missing')).passed, isFalse);
   });
 
+  test('notEquals requires the target to be present', () {
+    // Present and different -> passes.
+    expect(
+        run(const Assertion(id: '1', target: AssertionTarget.bodyJsonPath, comparator: AssertionComparator.notEquals, path: 'token', expected: 'xyz')).passed,
+        isTrue);
+    // Present and equal -> fails.
+    expect(
+        run(const Assertion(id: '1', target: AssertionTarget.bodyJsonPath, comparator: AssertionComparator.notEquals, path: 'token', expected: 'abc')).passed,
+        isFalse);
+    // Absent -> must NOT pass merely because the "(not found)" sentinel differs.
+    expect(
+        run(const Assertion(id: '1', target: AssertionTarget.bodyJsonPath, comparator: AssertionComparator.notEquals, path: 'missing', expected: 'abc')).passed,
+        isFalse);
+  });
+
   test('header exists / equals', () {
     expect(run(const Assertion(id: '1', target: AssertionTarget.header, comparator: AssertionComparator.exists, path: 'content-type')).passed, isTrue);
     expect(run(const Assertion(id: '1', target: AssertionTarget.header, path: 'content-type', expected: 'application/json')).passed, isTrue);
