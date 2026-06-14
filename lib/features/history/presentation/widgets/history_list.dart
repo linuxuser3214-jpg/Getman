@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
+import 'package:getman/core/utils/debouncer.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -17,15 +18,24 @@ class HistoryList extends StatefulWidget {
 
 class _HistoryListState extends State<HistoryList> {
   final TextEditingController _searchController = TextEditingController();
+  // Debounced query drives only the results list (via ValueListenableBuilder),
+  // so the search field and surrounding chrome don't rebuild on every keystroke
+  // and the O(n) filter runs only once typing pauses.
+  final ValueNotifier<String> _query = ValueNotifier<String>('');
+  final Debouncer _debouncer = Debouncer();
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() => setState(() {}));
+    _searchController.addListener(
+      () => _debouncer.run(() => _query.value = _searchController.text),
+    );
   }
 
   @override
   void dispose() {
+    _debouncer.dispose();
+    _query.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -57,7 +67,10 @@ class _HistoryListState extends State<HistoryList> {
             Expanded(
               child: state.isLoading && state.history.isEmpty
                   ? const Center(child: CircularProgressIndicator())
-                  : _buildList(context, state.history),
+                  : ValueListenableBuilder<String>(
+                      valueListenable: _query,
+                      builder: (context, query, _) => _buildList(context, state.history, query),
+                    ),
             ),
           ],
         );
@@ -65,8 +78,8 @@ class _HistoryListState extends State<HistoryList> {
     );
   }
 
-  Widget _buildList(BuildContext context, List<HttpRequestConfigEntity> history) {
-    final query = _searchController.text.toLowerCase();
+  Widget _buildList(BuildContext context, List<HttpRequestConfigEntity> history, String rawQuery) {
+    final query = rawQuery.toLowerCase();
     final items = query.isEmpty
         ? history
         : history.where((item) =>

@@ -40,7 +40,11 @@ class RequestView extends StatefulWidget {
 class _RequestViewState extends State<RequestView> {
   late final CodeLineEditingController _bodyController;
   late final CodeLineEditingController _responseController;
-  double? _localSplitRatio;
+  // Live drag ratio. A ValueNotifier (not setState) so dragging the splitter
+  // only re-runs the Flex layout — the captured request/response panes (and
+  // their code editors) are not rebuilt frame-by-frame. Committed to the
+  // SettingsBloc on drag end, then reset to null so the bloc value drives again.
+  final ValueNotifier<double?> _localSplitRatio = ValueNotifier<double?>(null);
 
   @override
   void initState() {
@@ -76,6 +80,7 @@ class _RequestViewState extends State<RequestView> {
     _bodyController.removeListener(_onBodyChanged);
     _bodyController.dispose();
     _responseController.dispose();
+    _localSplitRatio.dispose();
     super.dispose();
   }
 
@@ -145,36 +150,39 @@ class _RequestViewState extends State<RequestView> {
                               : LayoutBuilder(
                                   builder: (context, constraints) {
                                     final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
-                                    final currentRatio = _localSplitRatio ?? settings.splitRatio;
+                                    // Build the panes once; only the Flex (below)
+                                    // rebuilds on drag, so the editors relayout
+                                    // rather than rebuild.
+                                    final requestPane = RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController);
+                                    final responsePane = ResponseArea(tabId: widget.tabId, responseController: _responseController);
+                                    final splitter = Splitter(
+                                      isVertical: settings.isVerticalLayout,
+                                      onUpdate: (delta) {
+                                        final base = _localSplitRatio.value ?? settings.splitRatio;
+                                        _localSplitRatio.value = (base + delta / totalSize).clamp(_splitMin, _splitMax);
+                                      },
+                                      onEnd: () {
+                                        final committed = _localSplitRatio.value;
+                                        if (committed == null) return;
+                                        context.read<SettingsBloc>().add(UpdateSplitRatio(committed));
+                                        _localSplitRatio.value = null;
+                                      },
+                                    );
 
-                                    return Flex(
-                                      direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Flexible(
-                                          flex: _ratioToFlex(currentRatio),
-                                          child: RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController),
-                                        ),
-                                        Splitter(
-                                          isVertical: settings.isVerticalLayout,
-                                          onUpdate: (delta) {
-                                            setState(() {
-                                              final base = _localSplitRatio ?? settings.splitRatio;
-                                              _localSplitRatio = (base + delta / totalSize).clamp(_splitMin, _splitMax);
-                                            });
-                                          },
-                                          onEnd: () {
-                                            final committed = _localSplitRatio;
-                                            if (committed == null) return;
-                                            context.read<SettingsBloc>().add(UpdateSplitRatio(committed));
-                                            setState(() => _localSplitRatio = null);
-                                          },
-                                        ),
-                                        Flexible(
-                                          flex: _ratioToFlex(1 - currentRatio),
-                                          child: ResponseArea(tabId: widget.tabId, responseController: _responseController),
-                                        ),
-                                      ],
+                                    return ValueListenableBuilder<double?>(
+                                      valueListenable: _localSplitRatio,
+                                      builder: (context, local, _) {
+                                        final currentRatio = local ?? settings.splitRatio;
+                                        return Flex(
+                                          direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Flexible(flex: _ratioToFlex(currentRatio), child: requestPane),
+                                            splitter,
+                                            Flexible(flex: _ratioToFlex(1 - currentRatio), child: responsePane),
+                                          ],
+                                        );
+                                      },
                                     );
                                   }
                                 ),

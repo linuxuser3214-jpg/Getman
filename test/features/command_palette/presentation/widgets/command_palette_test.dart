@@ -92,9 +92,20 @@ void main() {
   testWidgets('typing filters the list', (tester) async {
     await pump(tester);
     await tester.enterText(find.byType(TextField), 'login');
+    // Search is debounced (~220ms) — advance past the window so the query lands.
+    await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();
     expect(find.text('Login'), findsOneWidget);
     expect(find.text('Production'), findsNothing);
+  });
+
+  testWidgets('Enter submits the top match without waiting for the debounce', (tester) async {
+    await pump(tester);
+    await tester.enterText(find.byType(TextField), 'login');
+    // No debounce wait — onSubmitted recomputes synchronously.
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    verify(() => tabs.add(any(that: isA<AddTab>()))).called(1);
   });
 
   testWidgets('tapping a request opens it as a tab', (tester) async {

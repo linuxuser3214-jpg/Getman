@@ -4,6 +4,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
+import 'package:getman/core/utils/debouncer.dart';
 import 'package:getman/core/utils/fuzzy_matcher.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -48,13 +49,22 @@ class CommandPalette extends StatefulWidget {
 
 class _CommandPaletteState extends State<CommandPalette> {
   final TextEditingController _query = TextEditingController();
+  // Debounced query drives only the results list, so typing doesn't rebuild the
+  // whole dialog or re-run FuzzyMatcher over every command on each keystroke.
+  final ValueNotifier<String> _queryText = ValueNotifier<String>('');
+  final Debouncer _debouncer = Debouncer();
   late final List<_Command> _all = _buildCommands();
 
   @override
   void dispose() {
+    _debouncer.dispose();
+    _queryText.dispose();
     _query.dispose();
     super.dispose();
   }
+
+  List<_Command> _resultsFor(String query) =>
+      FuzzyMatcher.filter(query, _all, (c) => '${c.label} ${c.subtitle}');
 
   List<_Command> _buildCommands() {
     final cmds = <_Command>[];
@@ -112,7 +122,6 @@ class _CommandPaletteState extends State<CommandPalette> {
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
-    final results = FuzzyMatcher.filter(_query.text, _all, (c) => '${c.label} ${c.subtitle}');
 
     return ResponsiveDialogScaffold(
       title: const Text('COMMAND PALETTE'),
@@ -131,16 +140,23 @@ class _CommandPaletteState extends State<CommandPalette> {
                 prefixIcon: Icon(Icons.search),
                 isDense: true,
               ),
-              onChanged: (_) => setState(() {}),
+              onChanged: (v) => _debouncer.run(() => _queryText.value = v),
               onSubmitted: (_) {
+                // Enter is a deliberate action — recompute synchronously against
+                // the current text so it works even before the debounce fires.
+                final results = _resultsFor(_query.text);
                 if (results.isNotEmpty) _invoke(results.first);
               },
             ),
             SizedBox(height: layout.sectionSpacing),
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 360),
-              child: results.isEmpty
-                  ? Padding(
+              child: ValueListenableBuilder<String>(
+                valueListenable: _queryText,
+                builder: (context, query, _) {
+                  final results = _resultsFor(query);
+                  if (results.isEmpty) {
+                    return Padding(
                       padding: EdgeInsets.all(layout.pagePadding),
                       child: Text(
                         'NO MATCHES',
@@ -149,24 +165,27 @@ class _CommandPaletteState extends State<CommandPalette> {
                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: results.length,
-                      itemBuilder: (context, i) {
-                        final c = results[i];
-                        return ListTile(
-                          dense: true,
-                          leading: Icon(c.icon, size: layout.iconSize),
-                          title: Text(c.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontWeight: context.appTypography.titleWeight)),
-                          subtitle: Text(c.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          onTap: () => _invoke(c),
-                        );
-                      },
-                    ),
+                    );
+                  }
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: results.length,
+                    itemBuilder: (context, i) {
+                      final c = results[i];
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(c.icon, size: layout.iconSize),
+                        title: Text(c.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: context.appTypography.titleWeight)),
+                        subtitle: Text(c.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        onTap: () => _invoke(c),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),

@@ -106,7 +106,7 @@ class _RpgAnimatedBackground extends StatefulWidget {
 }
 
 class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _controller;
   late final List<_Mote> _motes;
   late final ValueNotifier<double> _frameNotifier;
@@ -114,6 +114,7 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _frameNotifier = ValueNotifier<double>(0.0);
     _controller = AnimationController(
       vsync: this,
@@ -138,7 +139,18 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Don't burn CPU/battery animating the starfield while the app is hidden.
+    if (state == AppLifecycleState.resumed) {
+      if (!_controller.isAnimating) _controller.repeat();
+    } else {
+      _controller.stop();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _frameNotifier.dispose();
     super.dispose();
