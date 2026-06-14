@@ -2,6 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
+import 'package:getman/features/chaining/domain/entities/assertion.dart';
+import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
+import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
+import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
@@ -13,6 +17,8 @@ import 'package:mocktail/mocktail.dart';
 class MockTabsRepository extends Mock implements TabsRepository {}
 
 class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
+
+class MockGetRequestRulesUseCase extends Mock implements GetRequestRulesUseCase {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
@@ -65,11 +71,11 @@ void main() {
   }
 
   group('LoadTabs', () {
-    test('creates a single empty tab when nothing is persisted', () async {
+    test('seeds a single sample request when nothing is persisted', () async {
       await loadWith([]);
       expect(bloc.state.tabs, hasLength(1));
       expect(bloc.state.activeIndex, 0);
-      expect(bloc.state.tabs.single.config.url, isEmpty);
+      expect(bloc.state.tabs.single.config.url, 'https://httpbin.org/get');
     });
 
     test('resets stale isSending flags from a previous session', () async {
@@ -384,6 +390,46 @@ void main() {
           (s) => s.tabs.single.tabId == tabId && s.tabs.single.isSending == false,
         )),
       );
+    });
+  });
+
+  group('post-response rules', () {
+    test('runs extraction + assertions after a send and stashes results', () async {
+      final rules = MockGetRequestRulesUseCase();
+      when(() => rules.call('t1')).thenAnswer((_) async => const RequestRulesEntity(
+            configId: 't1',
+            extractionRules: [
+              ExtractionRule(id: 'e1', expression: 'token', targetVariable: 'tok'),
+            ],
+            assertions: [
+              Assertion(id: 'a1', target: AssertionTarget.statusCode, expected: '200'),
+            ],
+          ));
+      final ruleBloc = TabsBloc(
+        repository: repository,
+        sendRequestUseCase: sendRequestUseCase,
+        getRequestRulesUseCase: rules,
+      );
+      addTearDown(ruleBloc.close);
+
+      when(() => repository.getTabs()).thenAnswer((_) async => [tab('t1')]);
+      ruleBloc.add(const LoadTabs());
+      await ruleBloc.stream.firstWhere((s) => !s.isLoading && s.tabs.isNotEmpty);
+
+      stubSend(() async => const HttpResponseEntity(
+            statusCode: 200,
+            body: '{"token":"abc"}',
+            headers: {},
+            durationMs: 5,
+          ));
+      ruleBloc.add(const SendRequest(tabId: 't1'));
+      await ruleBloc.stream
+          .firstWhere((s) => (s.tabs.byId('t1')?.assertionResults.isNotEmpty ?? false));
+
+      final tabState = ruleBloc.state.tabs.byId('t1')!;
+      expect(tabState.assertionResults.single.passed, isTrue);
+      expect(tabState.extractionResults.single.variable, 'tok');
+      expect(tabState.extractionResults.single.value, 'abc');
     });
   });
 }

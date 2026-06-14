@@ -1,5 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
+import 'package:getman/core/domain/entities/assertion_result.dart';
+import 'package:getman/core/domain/entities/extraction_result.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_response.dart';
 
@@ -29,6 +31,11 @@ class HttpRequestTabEntity extends Equatable {
   final String? collectionName;
   final String tabId;
 
+  /// Transient results from the last send's extraction rules / assertions.
+  /// Not persisted (recomputed on each send); excluded from the Hive model.
+  final List<ExtractionResult> extractionResults;
+  final List<AssertionResult> assertionResults;
+
   const HttpRequestTabEntity({
     required this.config,
     required this.tabId,
@@ -36,6 +43,8 @@ class HttpRequestTabEntity extends Equatable {
     this.isSending = false,
     this.collectionNodeId,
     this.collectionName,
+    this.extractionResults = const [],
+    this.assertionResults = const [],
   });
 
   HttpRequestTabEntity copyWith({
@@ -45,6 +54,8 @@ class HttpRequestTabEntity extends Equatable {
     Object? collectionNodeId = _unset,
     Object? collectionName = _unset,
     String? tabId,
+    List<ExtractionResult>? extractionResults,
+    List<AssertionResult>? assertionResults,
   }) {
     return HttpRequestTabEntity(
       config: config ?? this.config,
@@ -57,6 +68,8 @@ class HttpRequestTabEntity extends Equatable {
           ? this.collectionName
           : collectionName as String?,
       tabId: tabId ?? this.tabId,
+      extractionResults: extractionResults ?? this.extractionResults,
+      assertionResults: assertionResults ?? this.assertionResults,
     );
   }
 
@@ -68,5 +81,7 @@ class HttpRequestTabEntity extends Equatable {
     collectionNodeId,
     collectionName,
     tabId,
+    extractionResults,
+    assertionResults,
   ];
 }

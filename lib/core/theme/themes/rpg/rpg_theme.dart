@@ -100,6 +100,7 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     codeBackground: isDark ? RpgPalette.codeBackgroundDark : RpgPalette.codeBackgroundLight,
     variableResolved: RpgPalette.statusSuccess,
     variableUnresolved: RpgPalette.statusError,
+    selectorActive: RpgPalette.gold,
   );
 
   final decoration = AppDecoration(
@@ -322,5 +323,12 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     ),
   );
 
-  return base.copyWith(extensions: [layout, palette, shape, typography, decoration]);
+  return base.copyWith(extensions: [
+    layout,
+    palette,
+    shape,
+    typography,
+    decoration,
+    const AppCopy(emptyResponse: 'CAST SEND TO SUMMON A RESPONSE'),
+  ]);
 }

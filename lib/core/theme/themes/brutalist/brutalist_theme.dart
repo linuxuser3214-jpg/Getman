@@ -45,6 +45,7 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
     codeBackground: isDark ? BrutalistPalette.backgroundDark : Colors.white,
     variableResolved: isDark ? BrutalistPalette.variableResolvedDark : BrutalistPalette.variableResolved,
     variableUnresolved: isDark ? BrutalistPalette.variableUnresolvedDark : BrutalistPalette.variableUnresolved,
+    selectorActive: isDark ? BrutalistPalette.secondaryDark : BrutalistPalette.secondary,
   );
 
   final decoration = AppDecoration(
@@ -188,5 +189,12 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
     ),
   );
 
-  return base.copyWith(extensions: [layout, palette, shape, typography, decoration]);
+  return base.copyWith(extensions: [
+    layout,
+    palette,
+    shape,
+    typography,
+    decoration,
+    const AppCopy(emptyResponse: 'HIT SEND TO GET A RESPONSE'),
+  ]);
 }

@@ -292,6 +292,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color variableResolved;
   final Color variableUnresolved;
 
+  /// Background for the active segment of a selector/toggle (body-type chips,
+  /// response Pretty/Raw toggle). Each theme maps it to its signature accent.
+  /// Pair with [Color]-derived contrast text via `ThemeData.estimateBrightnessForColor`.
+  final Color selectorActive;
+
   const AppPalette({
     required this.methodColors,
     required this.methodFallback,
@@ -304,6 +309,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.codeBackground,
     required this.variableResolved,
     required this.variableUnresolved,
+    required this.selectorActive,
   });
 
   Color methodColor(String method) =>
@@ -321,6 +327,21 @@ class AppPalette extends ThemeExtension<AppPalette> {
     return statusAccentWarning;
   }
 
+  /// Black or white — whichever yields the higher WCAG contrast on [background].
+  /// (Flutter's estimateBrightnessForColor is threshold-based and picks the
+  /// wrong one for some mid-tone colors; this direct comparison is optimal and
+  /// guarantees >= ~4.58:1 for any background.) For text/icons on method- and
+  /// status-colored chips instead of hardcoding white. (a11y)
+  Color onColor(Color background) {
+    final lum = background.computeLuminance();
+    final contrastWithWhite = 1.05 / (lum + 0.05);
+    final contrastWithBlack = (lum + 0.05) / 0.05;
+    return contrastWithWhite >= contrastWithBlack ? Colors.white : Colors.black;
+  }
+
+  Color methodOn(String method) => onColor(methodColor(method));
+  Color statusOn(int code) => onColor(statusColor(code));
+
   @override
   AppPalette copyWith({
     Map<String, Color>? methodColors,
@@ -334,6 +355,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? codeBackground,
     Color? variableResolved,
     Color? variableUnresolved,
+    Color? selectorActive,
   }) {
     return AppPalette(
       methodColors: methodColors ?? this.methodColors,
@@ -347,6 +369,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       codeBackground: codeBackground ?? this.codeBackground,
       variableResolved: variableResolved ?? this.variableResolved,
       variableUnresolved: variableUnresolved ?? this.variableUnresolved,
+      selectorActive: selectorActive ?? this.selectorActive,
     );
   }
 
@@ -365,6 +388,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       codeBackground: Color.lerp(codeBackground, other.codeBackground, t)!,
       variableResolved: Color.lerp(variableResolved, other.variableResolved, t)!,
       variableUnresolved: Color.lerp(variableUnresolved, other.variableUnresolved, t)!,
+      selectorActive: Color.lerp(selectorActive, other.selectorActive, t)!,
     );
   }
 }
@@ -513,10 +537,27 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
   AppDecoration lerp(ThemeExtension<AppDecoration>? other, double t) => this;
 }
 
+/// Per-theme user-facing copy (strings), so empty states read in each theme's
+/// voice without hardcoding text in widgets.
+class AppCopy extends ThemeExtension<AppCopy> {
+  final String emptyResponse;
+
+  const AppCopy({required this.emptyResponse});
+
+  @override
+  AppCopy copyWith({String? emptyResponse}) =>
+      AppCopy(emptyResponse: emptyResponse ?? this.emptyResponse);
+
+  // Strings don't interpolate — snap to the target.
+  @override
+  AppCopy lerp(ThemeExtension<AppCopy>? other, double t) => other is AppCopy ? other : this;
+}
+
 extension AppThemeAccess on BuildContext {
   AppLayout get appLayout => Theme.of(this).extension<AppLayout>()!;
   AppPalette get appPalette => Theme.of(this).extension<AppPalette>()!;
   AppShape get appShape => Theme.of(this).extension<AppShape>()!;
   AppTypography get appTypography => Theme.of(this).extension<AppTypography>()!;
   AppDecoration get appDecoration => Theme.of(this).extension<AppDecoration>()!;
+  AppCopy get appCopy => Theme.of(this).extension<AppCopy>()!;
 }

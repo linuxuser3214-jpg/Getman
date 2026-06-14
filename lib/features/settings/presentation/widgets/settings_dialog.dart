@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
+import 'package:getman/features/collections/presentation/widgets/workspace_settings_tile.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -25,17 +28,29 @@ class SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<SettingsDialog> {
   late final TextEditingController _historyLimitController;
+  late final TextEditingController _connectTimeoutController;
+  late final TextEditingController _sendTimeoutController;
+  late final TextEditingController _receiveTimeoutController;
+  late final TextEditingController _proxyController;
 
   @override
   void initState() {
     super.initState();
-    final initial = context.read<SettingsBloc>().state.settings.historyLimit;
-    _historyLimitController = TextEditingController(text: initial.toString());
+    final s = context.read<SettingsBloc>().state.settings;
+    _historyLimitController = TextEditingController(text: s.historyLimit.toString());
+    _connectTimeoutController = TextEditingController(text: s.connectTimeoutMs.toString());
+    _sendTimeoutController = TextEditingController(text: s.sendTimeoutMs.toString());
+    _receiveTimeoutController = TextEditingController(text: s.receiveTimeoutMs.toString());
+    _proxyController = TextEditingController(text: s.proxyUrl ?? '');
   }
 
   @override
   void dispose() {
     _historyLimitController.dispose();
+    _connectTimeoutController.dispose();
+    _sendTimeoutController.dispose();
+    _receiveTimeoutController.dispose();
+    _proxyController.dispose();
     super.dispose();
   }
 
@@ -52,7 +67,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
           title: const Text('SETTINGS'),
           content: SizedBox(
             width: context.isDialogFullscreen ? double.infinity : layout.dialogWidth,
-            child: Column(
+            child: SingleChildScrollView(
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
@@ -140,7 +156,75 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   value: settings.isCompactMode,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateCompactMode(val)),
                 ),
+                const Divider(),
+                _sectionHeader(context, 'NETWORK'),
+                _timeoutTile(context, 'CONNECT TIMEOUT (ms)', _connectTimeoutController,
+                    (v) => UpdateConnectTimeout(v)),
+                _timeoutTile(context, 'SEND TIMEOUT (ms)', _sendTimeoutController,
+                    (v) => UpdateSendTimeout(v)),
+                _timeoutTile(context, 'RECEIVE TIMEOUT (ms)', _receiveTimeoutController,
+                    (v) => UpdateReceiveTimeout(v)),
+                SwitchListTile(
+                  activeThumbColor: theme.colorScheme.secondary,
+                  activeTrackColor: theme.primaryColor,
+                  secondary: Icon(Icons.alt_route, size: layout.iconSize),
+                  title: Text('FOLLOW REDIRECTS',
+                      style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
+                  value: settings.followRedirects,
+                  onChanged: (val) => context.read<SettingsBloc>().add(UpdateFollowRedirects(val)),
+                ),
+                SwitchListTile(
+                  activeThumbColor: theme.colorScheme.secondary,
+                  activeTrackColor: theme.primaryColor,
+                  secondary: Icon(Icons.lock_outline, size: layout.iconSize),
+                  title: Text('VERIFY SSL',
+                      style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
+                  value: settings.verifySsl,
+                  onChanged: (val) => context.read<SettingsBloc>().add(UpdateVerifySsl(val)),
+                ),
+                ListTile(
+                  title: Text('PROXY (host:port)',
+                      style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
+                  subtitle: Padding(
+                    padding: EdgeInsets.only(top: layout.tabSpacing),
+                    child: TextField(
+                      controller: _proxyController,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 127.0.0.1:8888',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: layout.inputPadding,
+                          vertical: layout.inputPaddingVertical,
+                        ),
+                      ),
+                      onChanged: (val) {
+                        final trimmed = val.trim();
+                        context
+                            .read<SettingsBloc>()
+                            .add(UpdateProxyUrl(trimmed.isEmpty ? null : trimmed));
+                      },
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: Icon(Icons.cookie_outlined, size: layout.iconSize),
+                  title: Text('COOKIES',
+                      style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      await context.read<CookieStore>().clear();
+                      if (context.mounted) showAppSnackBar(context, 'Cookie jar cleared');
+                    },
+                    child: const Text('CLEAR'),
+                  ),
+                ),
+                const Divider(),
+                _sectionHeader(context, 'COLLECTIONS'),
+                const WorkspaceSettingsTile(),
               ],
+              ),
             ),
           ),
           actions: [
@@ -148,6 +232,54 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ],
         );
       },
+    );
+  }
+
+  Widget _sectionHeader(BuildContext context, String label) {
+    final layout = context.appLayout;
+    return Padding(
+      padding: EdgeInsets.only(left: layout.inputPadding, top: layout.tabSpacing, bottom: layout.tabSpacing),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: layout.fontSizeSmall,
+            fontWeight: context.appTypography.displayWeight,
+            color: Theme.of(context).colorScheme.secondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _timeoutTile(
+    BuildContext context,
+    String label,
+    TextEditingController controller,
+    SettingsEvent Function(int ms) event,
+  ) {
+    final layout = context.appLayout;
+    return ListTile(
+      title: Text(label,
+          style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
+      trailing: SizedBox(
+        width: 90,
+        child: TextField(
+          keyboardType: TextInputType.number,
+          controller: controller,
+          decoration: InputDecoration(
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: layout.inputPadding,
+              vertical: layout.inputPaddingVertical,
+            ),
+          ),
+          onChanged: (val) {
+            final ms = int.tryParse(val);
+            if (ms != null) context.read<SettingsBloc>().add(event(ms));
+          },
+        ),
+      ),
     );
   }
 }

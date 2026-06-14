@@ -35,6 +35,27 @@ class SettingsModel extends HiveObject {
   @HiveField(8)
   String? activeEnvironmentId;
 
+  @HiveField(9, defaultValue: 30000)
+  int connectTimeoutMs;
+
+  @HiveField(10, defaultValue: 30000)
+  int sendTimeoutMs;
+
+  @HiveField(11, defaultValue: 60000)
+  int receiveTimeoutMs;
+
+  @HiveField(12, defaultValue: true)
+  bool followRedirects;
+
+  @HiveField(13, defaultValue: true)
+  bool verifySsl;
+
+  @HiveField(14)
+  String? proxyUrl;
+
+  @HiveField(15)
+  String? workspacePath;
+
   SettingsModel({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
@@ -45,6 +66,13 @@ class SettingsModel extends HiveObject {
     this.sideMenuWidth = 300.0,
     this.themeId = kBrutalistThemeId,
     this.activeEnvironmentId,
+    this.connectTimeoutMs = 30000,
+    this.sendTimeoutMs = 30000,
+    this.receiveTimeoutMs = 60000,
+    this.followRedirects = true,
+    this.verifySsl = true,
+    this.proxyUrl,
+    this.workspacePath,
   });
 
   SettingsModel copyWith({
@@ -57,6 +85,13 @@ class SettingsModel extends HiveObject {
     double? sideMenuWidth,
     String? themeId,
     Object? activeEnvironmentId = _unchanged,
+    int? connectTimeoutMs,
+    int? sendTimeoutMs,
+    int? receiveTimeoutMs,
+    bool? followRedirects,
+    bool? verifySsl,
+    Object? proxyUrl = _unchanged,
+    Object? workspacePath = _unchanged,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -70,6 +105,14 @@ class SettingsModel extends HiveObject {
       activeEnvironmentId: identical(activeEnvironmentId, _unchanged)
           ? this.activeEnvironmentId
           : activeEnvironmentId as String?,
+      connectTimeoutMs: connectTimeoutMs ?? this.connectTimeoutMs,
+      sendTimeoutMs: sendTimeoutMs ?? this.sendTimeoutMs,
+      receiveTimeoutMs: receiveTimeoutMs ?? this.receiveTimeoutMs,
+      followRedirects: followRedirects ?? this.followRedirects,
+      verifySsl: verifySsl ?? this.verifySsl,
+      proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
+      workspacePath:
+          identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
     );
   }
 
@@ -83,6 +126,13 @@ class SettingsModel extends HiveObject {
     'sideMenuWidth': sideMenuWidth,
     'themeId': themeId,
     'activeEnvironmentId': activeEnvironmentId,
+    'connectTimeoutMs': connectTimeoutMs,
+    'sendTimeoutMs': sendTimeoutMs,
+    'receiveTimeoutMs': receiveTimeoutMs,
+    'followRedirects': followRedirects,
+    'verifySsl': verifySsl,
+    'proxyUrl': proxyUrl,
+    'workspacePath': workspacePath,
   };
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -95,6 +145,13 @@ class SettingsModel extends HiveObject {
     sideMenuWidth: (json['sideMenuWidth'] ?? 300.0).toDouble(),
     themeId: json['themeId'] ?? kBrutalistThemeId,
     activeEnvironmentId: json['activeEnvironmentId'] as String?,
+    connectTimeoutMs: json['connectTimeoutMs'] ?? 30000,
+    sendTimeoutMs: json['sendTimeoutMs'] ?? 30000,
+    receiveTimeoutMs: json['receiveTimeoutMs'] ?? 60000,
+    followRedirects: json['followRedirects'] ?? true,
+    verifySsl: json['verifySsl'] ?? true,
+    proxyUrl: json['proxyUrl'] as String?,
+    workspacePath: json['workspacePath'] as String?,
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
@@ -107,6 +164,13 @@ class SettingsModel extends HiveObject {
     sideMenuWidth: entity.sideMenuWidth,
     themeId: entity.themeId,
     activeEnvironmentId: entity.activeEnvironmentId,
+    connectTimeoutMs: entity.connectTimeoutMs,
+    sendTimeoutMs: entity.sendTimeoutMs,
+    receiveTimeoutMs: entity.receiveTimeoutMs,
+    followRedirects: entity.followRedirects,
+    verifySsl: entity.verifySsl,
+    proxyUrl: entity.proxyUrl,
+    workspacePath: entity.workspacePath,
   );
 
   SettingsEntity toEntity() => SettingsEntity(
@@ -119,5 +183,12 @@ class SettingsModel extends HiveObject {
     sideMenuWidth: sideMenuWidth,
     themeId: themeId,
     activeEnvironmentId: activeEnvironmentId,
+    connectTimeoutMs: connectTimeoutMs,
+    sendTimeoutMs: sendTimeoutMs,
+    receiveTimeoutMs: receiveTimeoutMs,
+    followRedirects: followRedirects,
+    verifySsl: verifySsl,
+    proxyUrl: proxyUrl,
+    workspacePath: workspacePath,
   );
 }

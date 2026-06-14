@@ -70,6 +70,7 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
     codeBackground: isDark ? EditorialPalette.codeBackgroundDark : EditorialPalette.codeBackgroundLight,
     variableResolved: EditorialPalette.statusAccentSuccess,
     variableUnresolved: EditorialPalette.statusAccentError,
+    selectorActive: EditorialPalette.accent,
   );
 
   final decoration = AppDecoration(
@@ -243,5 +244,12 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
     ),
   );
 
-  return base.copyWith(extensions: [layout, palette, shape, typography, decoration]);
+  return base.copyWith(extensions: [
+    layout,
+    palette,
+    shape,
+    typography,
+    decoration,
+    const AppCopy(emptyResponse: 'Awaiting the first response'),
+  ]);
 }

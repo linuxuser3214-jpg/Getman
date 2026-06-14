@@ -141,5 +141,13 @@ void main() {
 
       expect(collectionsBloc.state.collections.map((n) => n.id), containsAll(['parent', 'imp']));
     });
+
+    test('ReplaceCollections swaps the whole tree', () async {
+      const replacement = CollectionNodeEntity(id: 'ws', name: 'FromDisk', isFolder: true);
+      collectionsBloc.add(const ReplaceCollections([replacement]));
+      await untilCalled(() => mockRepository.saveCollections(any()));
+
+      expect(collectionsBloc.state.collections.map((n) => n.id), ['ws']);
+    });
   });
 }

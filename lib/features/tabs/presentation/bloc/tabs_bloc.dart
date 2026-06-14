@@ -5,6 +5,10 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_service.dart';
+import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
+import 'package:getman/features/chaining/domain/logic/assertion_engine.dart';
+import 'package:getman/features/chaining/domain/logic/extraction_engine.dart';
+import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
@@ -48,6 +52,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   final TabsRepository repository;
   final SendRequestUseCase sendRequestUseCase;
 
+  /// Optional: when provided, post-response extraction + assertions run after
+  /// each send. Nullable so tests can construct the bloc without it.
+  final GetRequestRulesUseCase? getRequestRulesUseCase;
+
   final _RequestManager _requests = _RequestManager();
 
   /// Tabs edited since the last flush. The debounce timer persists only these
@@ -62,6 +70,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   TabsBloc({
     required this.repository,
     required this.sendRequestUseCase,
+    this.getRequestRulesUseCase,
   }) : super(const TabsState()) {
     on<LoadTabs>(_onLoadTabs);
     on<AddTab>(_onAddTab);
@@ -137,10 +146,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     try {
       final tabs = await repository.getTabs();
       if (tabs.isEmpty) {
+        // First run (nothing persisted): seed a working sample request so the
+        // user can hit SEND immediately rather than facing a blank URL bar.
         final newTabId = _uuid.v4();
         final newTab = HttpRequestTabEntity(
           tabId: newTabId,
-          config: HttpRequestConfigEntity(id: newTabId, url: ''),
+          config: HttpRequestConfigEntity(id: newTabId, method: 'GET', url: 'https://httpbin.org/get'),
         );
         emit(state.copyWith(
           tabs: [newTab],
@@ -318,7 +329,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final config = tab.config;
     final handle = _requests.start(tabId);
 
-    emit(state.copyWith(tabs: _replaceTabById(state.tabs, tab.copyWith(isSending: true))));
+    // Clear the previous run's rule results when a new send starts.
+    emit(state.copyWith(tabs: _replaceTabById(state.tabs,
+        tab.copyWith(isSending: true, extractionResults: const [], assertionResults: const []))));
 
     try {
       final response = await sendRequestUseCase(
@@ -332,6 +345,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         response: response,
       ));
       _markResponseDirty(tabId);
+      await _applyRules(emit, tabId, config, response);
     } on NetworkFailure catch (f) {
       _requests.finish(tabId);
 
@@ -340,16 +354,19 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         return;
       }
 
+      final errorResponse = HttpResponseEntity(
+        statusCode: f.statusCode ?? 0,
+        body: f.message,
+        headers: const {},
+        durationMs: 0,
+      );
       _applyToTab(emit, tabId, (live) => live.copyWith(
         isSending: false,
-        response: HttpResponseEntity(
-          statusCode: f.statusCode ?? 0,
-          body: f.message,
-          headers: const {},
-          durationMs: 0,
-        ),
+        response: errorResponse,
       ));
       _markResponseDirty(tabId);
+      // Assertions are meaningful on error responses too (e.g. "status in 2xx").
+      await _applyRules(emit, tabId, config, errorResponse);
     } catch (e) {
       // Anything unexpected must still release the tab — otherwise it is
       // stuck on "SENDING" with no way to retry or cancel.
@@ -378,6 +395,34 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final live = state.tabs.byId(tabId);
     if (live == null) return;
     emit(state.copyWith(tabs: _replaceTabById(state.tabs, transform(live))));
+  }
+
+  /// Loads the request's rules and runs the extraction + assertion engines
+  /// against [response], stashing the (transient) results on the tab. No-op
+  /// when no rules use case is wired or the request has no rules. The captured
+  /// values are written back to the environment by a widget-layer coordinator.
+  Future<void> _applyRules(
+    Emitter<TabsState> emit,
+    String tabId,
+    HttpRequestConfigEntity config,
+    HttpResponseEntity response,
+  ) async {
+    final useCase = getRequestRulesUseCase;
+    if (useCase == null) return;
+    RequestRulesEntity rules;
+    try {
+      rules = await useCase(config.id);
+    } on Failure catch (f) {
+      debugPrint('Loading rules failed: ${f.toString()}');
+      return;
+    }
+    if (rules.isEmpty) return;
+    final extraction = ExtractionEngine.run(rules.extractionRules, response);
+    final assertions = AssertionEngine.run(rules.assertions, response);
+    _applyToTab(emit, tabId, (live) => live.copyWith(
+          extractionResults: extraction,
+          assertionResults: assertions,
+        ));
   }
 
   List<HttpRequestTabEntity> _replaceTabById(List<HttpRequestTabEntity> tabs, HttpRequestTabEntity replacement) {
