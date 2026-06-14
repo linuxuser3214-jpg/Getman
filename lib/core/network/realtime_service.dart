@@ -96,9 +96,14 @@ class _SseConnection implements RealtimeConnection {
         _emit(RealtimeFrame.error('No response body'));
         return;
       }
-      _sub = body.stream.listen(
-        (bytes) {
-          for (final event in _parser.addChunk(utf8.decode(bytes, allowMalformed: true))) {
+      // Decode through a single streaming UTF-8 decoder so a multi-byte code
+      // point split across two network chunks buffers across the boundary
+      // instead of being corrupted into U+FFFD on each side. `bind` accepts the
+      // covariant Stream<Uint8List>; `.transform` would not type-check.
+      final decoded = const Utf8Decoder(allowMalformed: true).bind(body.stream);
+      _sub = decoded.listen(
+        (text) {
+          for (final event in _parser.addChunk(text)) {
             _emit(RealtimeFrame.incoming(event));
           }
         },
