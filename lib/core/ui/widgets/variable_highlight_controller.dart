@@ -11,6 +11,24 @@ class VariableHighlightController extends TextEditingController {
   Color? _resolvedColor;
   Color? _unresolvedColor;
 
+  // Per-paint memo: the variable scan depends only on `text`, so we recompute
+  // it only when the text actually changes — not on every repaint (cursor
+  // blink, focus, theme-driven paints). Resolved-vs-unresolved coloring is
+  // decided per token at span-build time from `_variables`, so variable/color
+  // updates do not invalidate this cache.
+  String? _cachedText;
+  List<VariableMatch>? _cachedMatches;
+
+  List<VariableMatch> _matchesFor(String current) {
+    if (_cachedText == current && _cachedMatches != null) {
+      return _cachedMatches!;
+    }
+    final matches = EnvironmentResolver.findVariables(current).toList();
+    _cachedText = current;
+    _cachedMatches = matches;
+    return matches;
+  }
+
   VariableHighlightController({
     super.text,
     Map<String, String> variables = const {},
@@ -48,7 +66,7 @@ class VariableHighlightController extends TextEditingController {
       return TextSpan(style: style, text: current);
     }
 
-    final matches = EnvironmentResolver.findVariables(current).toList();
+    final matches = _matchesFor(current);
     if (matches.isEmpty) {
       return TextSpan(style: style, text: current);
     }

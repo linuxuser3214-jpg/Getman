@@ -5,6 +5,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
+import 'package:getman/core/utils/debouncer.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
@@ -25,6 +26,9 @@ class CollectionsList extends StatefulWidget {
 class _CollectionsListState extends State<CollectionsList> {
   late final TreeController<CollectionNodeEntity> _treeController;
   final TextEditingController _searchController = TextEditingController();
+  // Defers the recursive filter + expandAll() animation until typing pauses, so
+  // each keystroke doesn't walk the whole tree and re-trigger expansion.
+  final Debouncer _searchDebouncer = Debouncer();
 
   @override
   void initState() {
@@ -34,12 +38,12 @@ class _CollectionsListState extends State<CollectionsList> {
       childrenProvider: (node) => node.children,
     );
     _rebuildTree();
-    _searchController.addListener(_rebuildTree);
+    _searchController.addListener(() => _searchDebouncer.run(_rebuildTree));
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_rebuildTree);
+    _searchDebouncer.dispose();
     _treeController.dispose();
     _searchController.dispose();
     super.dispose();

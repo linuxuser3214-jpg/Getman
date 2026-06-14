@@ -84,4 +84,49 @@ void main() {
     await bloc.stream.firstWhere((s) => !s.sessionFor('t1').connected);
     expect(bloc.state.sessionFor('t1').connected, isFalse);
   });
+
+  test('coalesces a burst of frames into far fewer state emissions, in order', () async {
+    await connect();
+    final emissions = <int>[];
+    final sub = bloc.stream.listen((s) => emissions.add(s.sessionFor('t1').frames.length));
+
+    for (var i = 0; i < 20; i++) {
+      fake.controller.add(RealtimeFrame.incoming('m$i'));
+    }
+    await bloc.stream.firstWhere((s) => s.sessionFor('t1').frames.length == 20);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await sub.cancel();
+
+    expect(
+      bloc.state.sessionFor('t1').frames.map((f) => f.text).toList(),
+      List.generate(20, (i) => 'm$i'),
+      reason: 'all frames preserved in arrival order',
+    );
+    expect(emissions.length, lessThan(20),
+        reason: 'a synchronous burst collapses to far fewer emissions than frames');
+  });
+
+  test('enforces the 500-frame cap, keeping the newest', () async {
+    await connect();
+    for (var i = 0; i < 600; i++) {
+      fake.controller.add(RealtimeFrame.incoming('m$i'));
+    }
+    await bloc.stream.firstWhere((s) => s.sessionFor('t1').frames.length >= 500);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    final frames = bloc.state.sessionFor('t1').frames;
+    expect(frames.length, 500);
+    expect(frames.last.text, 'm599');
+    expect(frames.first.text, 'm100'); // oldest 100 trimmed
+  });
+
+  test('does not emit buffered frames after disconnect', () async {
+    await connect();
+    fake.controller.add(RealtimeFrame.incoming('late'));
+    await Future<void>.delayed(Duration.zero); // let the buffer arm its flush timer
+    bloc.add(const Disconnect('t1'));
+    await bloc.stream.firstWhere((s) => !s.sessionFor('t1').connected);
+    await Future<void>.delayed(const Duration(milliseconds: 30)); // past the coalesce window
+    expect(bloc.state.sessionFor('t1').frames, isEmpty);
+  });
 }
