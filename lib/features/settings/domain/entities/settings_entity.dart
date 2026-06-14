@@ -7,6 +7,12 @@ const Object _unchanged = Object();
 class SettingsEntity extends Equatable {
   final int historyLimit;
   final bool saveResponseInHistory;
+
+  /// When `true`, response bodies over the large-viewer threshold are
+  /// prettified and syntax-highlighted automatically instead of falling back
+  /// to the plain-text "large response" viewer. The user opts into the extra
+  /// render cost deliberately (default `false`).
+  final bool alwaysPrettifyLargeResponses;
   final bool isDarkMode;
   final bool isCompactMode;
   final bool isVerticalLayout;
@@ -36,6 +42,7 @@ class SettingsEntity extends Equatable {
   const SettingsEntity({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
+    this.alwaysPrettifyLargeResponses = false,
     this.isDarkMode = false,
     this.isCompactMode = false,
     this.isVerticalLayout = false,
@@ -56,6 +63,7 @@ class SettingsEntity extends Equatable {
   SettingsEntity copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
+    bool? alwaysPrettifyLargeResponses,
     bool? isDarkMode,
     bool? isCompactMode,
     bool? isVerticalLayout,
@@ -75,6 +83,8 @@ class SettingsEntity extends Equatable {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
       saveResponseInHistory: saveResponseInHistory ?? this.saveResponseInHistory,
+      alwaysPrettifyLargeResponses:
+          alwaysPrettifyLargeResponses ?? this.alwaysPrettifyLargeResponses,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       isCompactMode: isCompactMode ?? this.isCompactMode,
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
@@ -112,6 +122,7 @@ class SettingsEntity extends Equatable {
   List<Object?> get props => [
     historyLimit,
     saveResponseInHistory,
+    alwaysPrettifyLargeResponses,
     isDarkMode,
     isCompactMode,
     isVerticalLayout,

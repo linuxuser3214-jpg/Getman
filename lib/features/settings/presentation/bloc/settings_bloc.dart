@@ -24,6 +24,8 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
           historyLimit: e.historyLimit < _historyLimitMin ? _historyLimitMin : e.historyLimit,
         )));
     on<UpdateSaveResponseInHistory>((e, emit) => _apply(emit, (s) => s.copyWith(saveResponseInHistory: e.save)));
+    on<UpdateAlwaysPrettifyLargeResponses>(
+        (e, emit) => _apply(emit, (s) => s.copyWith(alwaysPrettifyLargeResponses: e.value)));
     on<UpdateSplitRatio>((e, emit) => _apply(emit, (s) => s.copyWith(splitRatio: e.ratio)));
     on<UpdateSideMenuWidth>((e, emit) => _apply(emit, (s) => s.copyWith(sideMenuWidth: e.width)));
     on<UpdateThemeId>((e, emit) => _apply(emit, (s) => s.copyWith(themeId: e.themeId)));

@@ -108,6 +108,22 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   value: settings.saveResponseInHistory,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateSaveResponseInHistory(val)),
                 ),
+                SwitchListTile(
+                  activeThumbColor: theme.colorScheme.secondary,
+                  activeTrackColor: theme.primaryColor,
+                  secondary: Icon(Icons.data_object, size: layout.iconSize),
+                  title: Text(
+                    'ALWAYS PRETTIFY LARGE RESPONSES',
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
+                  ),
+                  subtitle: Text(
+                    'Format & highlight big bodies instead of plain text (may be slow)',
+                    style: TextStyle(fontSize: layout.fontSizeSmall),
+                  ),
+                  value: settings.alwaysPrettifyLargeResponses,
+                  onChanged: (val) =>
+                      context.read<SettingsBloc>().add(UpdateAlwaysPrettifyLargeResponses(val)),
+                ),
                 const Divider(),
                 SwitchListTile(
                   activeThumbColor: theme.colorScheme.secondary,

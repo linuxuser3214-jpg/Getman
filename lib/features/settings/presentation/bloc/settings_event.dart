@@ -42,6 +42,13 @@ class UpdateSaveResponseInHistory extends SettingsEvent {
   List<Object?> get props => [save];
 }
 
+class UpdateAlwaysPrettifyLargeResponses extends SettingsEvent {
+  final bool value;
+  const UpdateAlwaysPrettifyLargeResponses(this.value);
+  @override
+  List<Object?> get props => [value];
+}
+
 class UpdateSplitRatio extends SettingsEvent {
   final double ratio;
   const UpdateSplitRatio(this.ratio);

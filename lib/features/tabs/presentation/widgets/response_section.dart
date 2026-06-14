@@ -10,6 +10,8 @@ import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/utils/byte_format.dart';
 import 'package:getman/core/utils/cookie_parser.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -174,6 +176,23 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
     final syncId = ++_pendingSyncId;
 
     if (rawBody != null && rawBody.length > kLargeResponseViewerChars) {
+      // Opt-in setting: prettify + highlight large bodies automatically (the
+      // user accepts the render cost). The over-1-MB placeholder is a known
+      // non-JSON sentinel, so it always stays in plain-text mode.
+      final autoPrettify =
+          context.read<SettingsBloc>().state.settings.alwaysPrettifyLargeResponses &&
+              rawBody != kResponseBodyTooLargePlaceholder;
+      if (autoPrettify) {
+        final prettified = await JsonUtils.prettify(rawBody);
+        if (!mounted || syncId != _pendingSyncId) return;
+        widget.responseController.text = prettified;
+        setState(() {
+          _largeBody = rawBody;
+          _showFullPreview = false;
+          _highlightingOptedIn = true;
+        });
+        return;
+      }
       // Large path — skip prettify and editor; go to plain-text mode.
       if (!mounted || syncId != _pendingSyncId) return;
       setState(() {
@@ -222,16 +241,32 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<TabsBloc, TabsState>(
-      listenWhen: (prev, next) {
-        final prevTab = prev.tabs.byId(widget.tabId);
-        final nextTab = next.tabs.byId(widget.tabId);
-        return prevTab?.response?.body != nextTab?.response?.body;
-      },
-      listener: (context, state) {
-        final tab = state.tabs.byId(widget.tabId);
-        _syncBody(tab?.response?.body);
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<TabsBloc, TabsState>(
+          listenWhen: (prev, next) {
+            final prevTab = prev.tabs.byId(widget.tabId);
+            final nextTab = next.tabs.byId(widget.tabId);
+            return prevTab?.response?.body != nextTab?.response?.body;
+          },
+          listener: (context, state) {
+            final tab = state.tabs.byId(widget.tabId);
+            _syncBody(tab?.response?.body);
+          },
+        ),
+        // Re-render the current body when the user flips the prettify-large
+        // setting, so the change is visible without re-sending.
+        BlocListener<SettingsBloc, SettingsState>(
+          listenWhen: (prev, next) =>
+              prev.settings.alwaysPrettifyLargeResponses !=
+              next.settings.alwaysPrettifyLargeResponses,
+          listener: (context, state) {
+            final body =
+                context.read<TabsBloc>().state.tabs.byId(widget.tabId)?.response?.body;
+            _syncBody(body);
+          },
+        ),
+      ],
       child: _largeBody != null ? _buildLargeMode(context) : _buildSmallMode(),
     );
   }

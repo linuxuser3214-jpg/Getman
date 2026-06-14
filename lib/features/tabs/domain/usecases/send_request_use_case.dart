@@ -59,7 +59,10 @@ class SendRequestUseCase {
       final historyConfig = settings.saveResponseInHistory
           ? config.copyWith(
               responseBody: cappedBody,
-              responseHeaders: response?.headers ?? const {},
+              // Typed empty literal: `copyWith` casts to `Map<String, String>?`,
+              // and a bare `const {}` is `Map<dynamic, dynamic>` — which throws
+              // on the failure path (response == null) and drops the record.
+              responseHeaders: response?.headers ?? const <String, String>{},
               statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
               durationMs: response?.durationMs ?? 0,
             )

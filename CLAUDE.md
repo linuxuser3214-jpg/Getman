@@ -111,6 +111,8 @@ As of the pluggable-themes refactor, `SettingsModel` also carries a `String them
 
 `SettingsModel` also carries `String? activeEnvironmentId` at `HiveField(8)` (nullable, no default — `null` means "No Environment"). This is the id of the environment whose variables get substituted into `{{var}}` placeholders at send time. `SettingsEntity.copyWith` uses a sentinel (`_unchanged` `Object` constant) so the caller can explicitly clear the id back to `null`.
 
+`SettingsModel` carries `bool alwaysPrettifyLargeResponses` at `HiveField(17)` (default `false`). When `true`, `_ResponseBodyView` prettifies + highlights bodies over `kLargeResponseViewerChars` automatically (auto-opts into the editor) instead of the plain-text large viewer — the user accepts the render cost. The `kResponseBodyTooLargePlaceholder` sentinel always stays plain text. (Highest `HiveField` on `SettingsModel`; next free: 18.)
+
 After editing any `@HiveType` field, regenerate:
 ```
 dart run build_runner build --delete-conflicting-outputs
@@ -225,6 +227,7 @@ Verification bar: **`fvm flutter analyze` produces `No issues found!` AND `fvm f
 - **BLoC tab lookups**: always `state.tabs.firstWhereOrNull((t) => t.tabId == id)`. Never index by position across state emissions — positions can shift. This applies to event *payloads* too: identity-addressed `TabsEvent`s carry `tabId`, not `index` (see §4.2).
 - **`listenWhen` / `buildWhen` are not optional**: `RequestView` rebuilds are expensive; narrow selectors are how we keep the editor responsive.
 - **Text controllers vs editor controllers**: `KeyValueListEditor` uses `TextEditingController`; the body and response panels use `re_editor.CodeLineEditingController`. Don't mix.
+- **JSON syntax highlighting is synchronous, not `codeTheme`**: re_editor's built-in highlighter runs in an `isolate_manager` worker whose coloured results never reach the paint path in this app (everything rendered in the base text colour). `JsonCodeEditor` therefore does **not** set `CodeEditorStyle.codeTheme`; colours come from `jsonHighlightSpanBuilder` (in `json_code_editor.dart`), a per-line `re_highlight` pass wired via the controller's `spanBuilder`. Always build controllers fed to `JsonCodeEditor` with `createJsonCodeController()` (request body + response, both in `request_view.dart`). Per-line is accurate for JSON (tokens never span lines) and viewport-bound (cheap); non-JSON lines fall back to the base colour. **Do not reinstate `codeTheme`** — it silently reverts to single-colour.
 - **`_setControllerPreservingEnd`** (in `url_bar.dart`) is the only safe way to push text into a `TextEditingController` without jumping the cursor during an echo-write.
 - **Key/value editing is one widget**: `KeyValueListEditor` (`core/ui/widgets/`) backs params (ordered list), headers (map), and environment variables (map) via decode/encode/equals codecs. Its `_lastEmitted` echo-suppression keeps focus and half-typed state alive across the BLoC round-trip — never bypass it by writing a bespoke row editor.
 - **Keyboard shortcuts** are declared in `main.dart` (global) and in `RequestView` / `MainScreen` (scoped `Actions`). The `NewTabIntent` Action is at the root; `CloseTabIntent` and `SendRequestIntent` at `MainScreen`; `SaveRequestIntent` and `BeautifyJsonIntent` inside `RequestView`. Put intents where `context.read<TabsBloc>()` is reachable.

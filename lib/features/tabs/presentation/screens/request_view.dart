@@ -17,6 +17,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart';
@@ -49,8 +50,8 @@ class _RequestViewState extends State<RequestView> {
   @override
   void initState() {
     super.initState();
-    _bodyController = CodeLineEditingController();
-    _responseController = CodeLineEditingController();
+    _bodyController = createJsonCodeController();
+    _responseController = createJsonCodeController();
     _bodyController.addListener(_onBodyChanged);
   }
 

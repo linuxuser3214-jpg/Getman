@@ -59,9 +59,13 @@ class SettingsModel extends HiveObject {
   @HiveField(16)
   String? workspaceBookmark;
 
+  @HiveField(17, defaultValue: false)
+  bool alwaysPrettifyLargeResponses;
+
   SettingsModel({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
+    this.alwaysPrettifyLargeResponses = false,
     this.isDarkMode = false,
     this.isCompactMode = false,
     this.isVerticalLayout = false,
@@ -82,6 +86,7 @@ class SettingsModel extends HiveObject {
   SettingsModel copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
+    bool? alwaysPrettifyLargeResponses,
     bool? isDarkMode,
     bool? isCompactMode,
     bool? isVerticalLayout,
@@ -101,6 +106,8 @@ class SettingsModel extends HiveObject {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
       saveResponseInHistory: saveResponseInHistory ?? this.saveResponseInHistory,
+      alwaysPrettifyLargeResponses:
+          alwaysPrettifyLargeResponses ?? this.alwaysPrettifyLargeResponses,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       isCompactMode: isCompactMode ?? this.isCompactMode,
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
@@ -127,6 +134,7 @@ class SettingsModel extends HiveObject {
   Map<String, dynamic> toJson() => {
     'historyLimit': historyLimit,
     'saveResponseInHistory': saveResponseInHistory,
+    'alwaysPrettifyLargeResponses': alwaysPrettifyLargeResponses,
     'isDarkMode': isDarkMode,
     'isCompactMode': isCompactMode,
     'isVerticalLayout': isVerticalLayout,
@@ -147,6 +155,7 @@ class SettingsModel extends HiveObject {
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
     historyLimit: json['historyLimit'] ?? 100,
     saveResponseInHistory: json['saveResponseInHistory'] ?? false,
+    alwaysPrettifyLargeResponses: json['alwaysPrettifyLargeResponses'] ?? false,
     isDarkMode: json['isDarkMode'] ?? false,
     isCompactMode: json['isCompactMode'] ?? false,
     isVerticalLayout: json['isVerticalLayout'] ?? false,
@@ -167,6 +176,7 @@ class SettingsModel extends HiveObject {
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
     historyLimit: entity.historyLimit,
     saveResponseInHistory: entity.saveResponseInHistory,
+    alwaysPrettifyLargeResponses: entity.alwaysPrettifyLargeResponses,
     isDarkMode: entity.isDarkMode,
     isCompactMode: entity.isCompactMode,
     isVerticalLayout: entity.isVerticalLayout,
@@ -187,6 +197,7 @@ class SettingsModel extends HiveObject {
   SettingsEntity toEntity() => SettingsEntity(
     historyLimit: historyLimit,
     saveResponseInHistory: saveResponseInHistory,
+    alwaysPrettifyLargeResponses: alwaysPrettifyLargeResponses,
     isDarkMode: isDarkMode,
     isCompactMode: isCompactMode,
     isVerticalLayout: isVerticalLayout,
