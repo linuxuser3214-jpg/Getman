@@ -60,7 +60,9 @@ class CodeGenService {
             if (!_hasKey(headers, auth.apiKeyName)) headers[auth.apiKeyName] = auth.apiKeyValue;
           } else {
             final sep = url.contains('?') ? '&' : '?';
-            url += '$sep${auth.apiKeyName}=${auth.apiKeyValue}';
+            final name = Uri.encodeComponent(auth.apiKeyName);
+            final value = Uri.encodeComponent(auth.apiKeyValue);
+            url += '$sep$name=$value';
           }
         }
     }
@@ -97,20 +99,20 @@ class CodeGenService {
     final b = StringBuffer('curl --request ${e.method} \\\n');
     b.write("  --url '${e.url}'");
     e.headers.forEach((k, v) {
-      b.write(" \\\n  --header '$k: ${_sq(v)}'");
+      b.write(" \\\n  --header '$k: ${_shellSq(v)}'");
     });
     switch (e.bodyType) {
       case BodyType.none:
         break;
       case BodyType.raw:
-        if (e.rawBody.isNotEmpty) b.write(" \\\n  --data '${_sq(e.rawBody)}'");
+        if (e.rawBody.isNotEmpty) b.write(" \\\n  --data '${_shellSq(e.rawBody)}'");
       case BodyType.urlencoded:
-        b.write(" \\\n  --data '${_sq(_urlEncodedString(e.formFields))}'");
+        b.write(" \\\n  --data '${_shellSq(_urlEncodedString(e.formFields))}'");
       case BodyType.multipart:
         for (final f in e.formFields) {
           if (f.name.isEmpty) continue;
           final v = f.isFile ? '@${f.filePath ?? ''}' : f.value;
-          b.write(" \\\n  --form '${_sq('${f.name}=$v')}'");
+          b.write(" \\\n  --form '${_shellSq('${f.name}=$v')}'");
         }
       case BodyType.binary:
         b.write(" \\\n  --data-binary '@${e.binaryPath ?? ''}'");
@@ -224,16 +226,25 @@ class CodeGenService {
     return '{${entries.join(', ')}}';
   }
 
-  /// Escapes single quotes for embedding inside a `'...'` literal (shell/JS/py).
-  static String _sq(String v) => v.replaceAll('\n', '\\n').replaceAll("'", "\\'");
+  /// Escapes a value for embedding inside a `'...'` literal in JS/Python
+  /// (backslash first so it isn't double-processed, then newline, then quote).
+  static String _sq(String v) =>
+      v.replaceAll('\\', '\\\\').replaceAll('\n', '\\n').replaceAll("'", "\\'");
 
-  /// Quotes a JS string with backticks when it spans lines, else single quotes.
-  static String _jsString(String v) =>
-      v.contains('\n') ? '`$v`' : "'${v.replaceAll("'", "\\'")}'";
+  /// POSIX single-quote escaping for shell (curl): a literal `'` becomes the
+  /// `'\''` idiom (close, escaped quote, reopen). Newlines are literal inside
+  /// single quotes, so they're left as-is.
+  static String _shellSq(String v) => v.replaceAll("'", "'\\''");
 
-  /// Python: triple-quote multiline payloads, else single-quote.
-  static String _pyString(String v) =>
-      v.contains('\n') ? "'''$v'''" : "'${v.replaceAll("'", "\\'")}'";
+  /// A JS string literal. Multiline payloads use a JSON-encoded double-quoted
+  /// literal (so embedded backticks / `\${...}` can't form a template literal);
+  /// single-line uses a simple single-quoted literal.
+  static String _jsString(String v) => v.contains('\n') ? jsonEncode(v) : "'${_sq(v)}'";
+
+  /// A Python string literal. Multiline payloads use a JSON-encoded
+  /// double-quoted literal (valid Python — so an embedded `'''` can't break
+  /// it); single-line uses a simple single-quoted literal.
+  static String _pyString(String v) => v.contains('\n') ? jsonEncode(v) : "'${_sq(v)}'";
 
   static bool _hasKey(Map<String, String> h, String name) {
     final l = name.toLowerCase();

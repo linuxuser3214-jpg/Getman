@@ -65,6 +65,26 @@ void main() {
       final out = CodeGenService.generate(config, CodeGenTarget.curl);
       expect(out, contains('https://api.dev/y?k=v'));
     });
+
+    test('api key value in query is URL-encoded', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/y',
+        auth: {'type': 'apikey', 'key': 'k', 'value': 'a b&c', 'addTo': 'query'},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.curl);
+      expect(out, contains('https://api.dev/y?k=a%20b%26c'));
+    });
+
+    test('escapes a single quote in a header value with the POSIX idiom', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {'X-Note': "it's fine"},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.curl);
+      expect(out, contains(r"X-Note: it'\''s fine"));
+    });
   });
 
   group('JavaScript fetch', () {
@@ -75,6 +95,19 @@ void main() {
       expect(out, contains("'Authorization': 'Bearer {{token}}'"));
       expect(out, contains('body:'));
     });
+
+    test('multiline body is a safe double-quoted literal, not a template literal', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        method: 'POST',
+        url: 'https://api.dev/x',
+        body: 'line1\n' r'`back` ${x}',
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.jsFetch);
+      expect(out, contains('body: "'), reason: 'double-quoted, so backtick/\${} are literal');
+      expect(out, isNot(contains('body: `')), reason: 'must not wrap in a template literal');
+      expect(out, contains(r'\n'), reason: 'newline escaped into a single-line literal');
+    });
   });
 
   group('Python requests', () {
@@ -84,6 +117,19 @@ void main() {
       expect(out, contains("requests.request('POST'"));
       expect(out, contains('headers=headers'));
       expect(out, contains('data='));
+    });
+
+    test('multiline body is a double-quoted literal, not triple-single-quoted', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        method: 'POST',
+        url: 'https://api.dev/x',
+        body: "a\n'''b",
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.pythonRequests);
+      expect(out, contains('data = "'),
+          reason: 'double-quoted, so an embedded triple-quote cannot break it');
+      expect(out, isNot(contains("data = '''")));
     });
   });
 }
