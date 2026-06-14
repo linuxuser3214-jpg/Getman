@@ -13,6 +13,16 @@ class HttpResponseEntity extends Equatable {
     required this.durationMs,
   });
 
+  /// Returns a copy with [body] replaced, keeping status/headers/duration —
+  /// used when an over-limit response body is swapped for a placeholder before
+  /// persisting.
+  HttpResponseEntity copyWithBody(String body) => HttpResponseEntity(
+        statusCode: statusCode,
+        body: body,
+        headers: headers,
+        durationMs: durationMs,
+      );
+
   @override
   List<Object?> get props => [statusCode, body, headers, durationMs];
 }

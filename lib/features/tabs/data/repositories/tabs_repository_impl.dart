@@ -54,14 +54,7 @@ class TabsRepositoryImpl implements TabsRepository {
   HttpRequestTabModel _toPersistableModel(HttpRequestTabEntity entity) {
     final response = entity.response;
     final capped = response != null && response.body.length > kMaxPersistedResponseBodyChars
-        ? entity.copyWith(
-            response: HttpResponseEntity(
-              statusCode: response.statusCode,
-              body: kResponseBodyTooLargePlaceholder,
-              headers: response.headers,
-              durationMs: response.durationMs,
-            ),
-          )
+        ? entity.copyWith(response: response.copyWithBody(kResponseBodyTooLargePlaceholder))
         : entity;
     return HttpRequestTabModel.fromEntity(capped);
   }
