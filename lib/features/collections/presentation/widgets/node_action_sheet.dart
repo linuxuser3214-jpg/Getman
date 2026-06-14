@@ -22,8 +22,8 @@ class NodeActionSheet {
       context: context,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(context.appShape.sheetRadius)),
       ),
       builder: (sheetContext) => BlocProvider.value(
         value: collectionsBloc,
@@ -208,8 +208,8 @@ class _MoveToSheet {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       useSafeArea: true,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(context.appShape.sheetRadius)),
       ),
       builder: (sheetContext) {
         final theme = Theme.of(sheetContext);
