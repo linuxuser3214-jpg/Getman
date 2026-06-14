@@ -75,6 +75,14 @@ void main() {
     expect(store.cookieHeaderFor(uri), isNull);
   });
 
+  test('cookieHeaderFor orders longer paths first (RFC 6265 5.4)', () {
+    final uri = Uri.parse('https://api.dev/v1/users');
+    store.storeFromSetCookie(uri, 'broad=1; Path=/');
+    store.storeFromSetCookie(uri, 'narrow=2; Path=/v1/users');
+    // More-specific (longer) path is sent first, regardless of insertion order.
+    expect(store.cookieHeaderFor(uri), 'narrow=2; broad=1');
+  });
+
   test('clear empties memory and durable storage', () async {
     store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'sid=abc');
     await store.clear();

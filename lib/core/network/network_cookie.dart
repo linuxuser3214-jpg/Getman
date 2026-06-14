@@ -39,9 +39,17 @@ class NetworkCookie extends Equatable {
     final d = _stripLeadingDot(domain.toLowerCase());
     final domainOk = host == d || host.endsWith('.$d');
     if (!domainOk) return false;
-    if (!(path == '/' || uri.path.startsWith(path))) return false;
+    if (!_pathMatches(uri.path.isEmpty ? '/' : uri.path)) return false;
     if (secure && uri.scheme != 'https') return false;
     return true;
+  }
+
+  /// RFC 6265 §5.1.4 path-match: equal, or a prefix ending on a `/` boundary,
+  /// so `Path=/api` matches `/api` and `/api/x` but not the sibling `/apixyz`.
+  bool _pathMatches(String requestPath) {
+    if (path == '/' || requestPath == path) return true;
+    if (!requestPath.startsWith(path)) return false;
+    return path.endsWith('/') || requestPath[path.length] == '/';
   }
 
   /// Parses a `Set-Cookie` header (possibly carrying several cookies) into
