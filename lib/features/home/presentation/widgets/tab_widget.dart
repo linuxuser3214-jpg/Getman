@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
@@ -194,12 +195,16 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
-          onTap: () => tabsBloc.add(DuplicateTab(tab.tabId)),
+          onTap: () {
+            tabsBloc.add(DuplicateTab(tab.tabId));
+            showAppSnackBar(context, 'Tab duplicated');
+          },
           child: _buildMenuItem(context, Icons.copy, 'DUPLICATE'),
         ),
         PopupMenuItem(
           onTap: () {
             Clipboard.setData(ClipboardData(text: tab.config.url));
+            showAppSnackBar(context, 'URL copied');
           },
           child: _buildMenuItem(context, Icons.link, 'COPY URL'),
         ),

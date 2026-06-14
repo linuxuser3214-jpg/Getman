@@ -131,30 +131,83 @@ class _CollectionsListState extends State<CollectionsList> {
             ),
           ),
           Expanded(
-            child: context.isPhone
-                ? AnimatedTreeView<CollectionNodeEntity>(
-                    treeController: _treeController,
-                    nodeBuilder: (context, entry) => _CollectionNodeWidget(
-                      entry: entry,
-                      onToggle: () => _treeController.toggleExpansion(entry.node),
-                    ),
-                  )
-                : DragTarget<String>(
-                    onAcceptWithDetails: (details) => context.read<CollectionsBloc>().add(MoveNode(details.data, null)),
-                    builder: (context, candidateData, rejectedData) {
-                      return AnimatedTreeView<CollectionNodeEntity>(
+            child: BlocBuilder<CollectionsBloc, CollectionsState>(
+              // Only switch between loading / empty / tree — not on every tree
+              // mutation (the AnimatedTreeView is driven by _treeController).
+              buildWhen: (p, n) =>
+                  p.isLoading != n.isLoading ||
+                  p.collections.isEmpty != n.collections.isEmpty,
+              builder: (context, state) {
+                if (state.isLoading && state.collections.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (state.collections.isEmpty) {
+                  return _buildEmptyState(context);
+                }
+                return context.isPhone
+                    ? AnimatedTreeView<CollectionNodeEntity>(
                         treeController: _treeController,
-                        nodeBuilder: (context, entry) {
-                          return _CollectionNodeWidget(
-                            entry: entry,
-                            onToggle: () => _treeController.toggleExpansion(entry.node),
+                        nodeBuilder: (context, entry) => _CollectionNodeWidget(
+                          entry: entry,
+                          onToggle: () => _treeController.toggleExpansion(entry.node),
+                        ),
+                      )
+                    : DragTarget<String>(
+                        onAcceptWithDetails: (details) =>
+                            context.read<CollectionsBloc>().add(MoveNode(details.data, null)),
+                        builder: (context, candidateData, rejectedData) {
+                          return AnimatedTreeView<CollectionNodeEntity>(
+                            treeController: _treeController,
+                            nodeBuilder: (context, entry) {
+                              return _CollectionNodeWidget(
+                                entry: entry,
+                                onToggle: () => _treeController.toggleExpansion(entry.node),
+                              );
+                            },
                           );
                         },
                       );
-                    },
-                  ),
+              },
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final layout = context.appLayout;
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(layout.pagePadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.folder_open_outlined,
+                size: layout.iconSize * 2, color: theme.dividerColor),
+            SizedBox(height: layout.sectionSpacing),
+            Text(
+              'NO COLLECTIONS YET',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: layout.fontSizeNormal,
+                fontWeight: context.appTypography.displayWeight,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+            SizedBox(height: layout.tabSpacing),
+            Text(
+              'Save a request or import from Postman to get started.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: layout.fontSizeSmall,
+                fontWeight: context.appTypography.bodyWeight,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
