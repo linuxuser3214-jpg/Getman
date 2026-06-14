@@ -62,6 +62,9 @@ class SettingsModel extends HiveObject {
   @HiveField(17, defaultValue: false)
   bool alwaysPrettifyLargeResponses;
 
+  @HiveField(18, defaultValue: 5)
+  int maxRedirects;
+
   SettingsModel({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
@@ -77,6 +80,7 @@ class SettingsModel extends HiveObject {
     this.sendTimeoutMs = 30000,
     this.receiveTimeoutMs = 60000,
     this.followRedirects = true,
+    this.maxRedirects = 5,
     this.verifySsl = true,
     this.proxyUrl,
     this.workspacePath,
@@ -98,6 +102,7 @@ class SettingsModel extends HiveObject {
     int? sendTimeoutMs,
     int? receiveTimeoutMs,
     bool? followRedirects,
+    int? maxRedirects,
     bool? verifySsl,
     Object? proxyUrl = _unchanged,
     Object? workspacePath = _unchanged,
@@ -121,6 +126,7 @@ class SettingsModel extends HiveObject {
       sendTimeoutMs: sendTimeoutMs ?? this.sendTimeoutMs,
       receiveTimeoutMs: receiveTimeoutMs ?? this.receiveTimeoutMs,
       followRedirects: followRedirects ?? this.followRedirects,
+      maxRedirects: maxRedirects ?? this.maxRedirects,
       verifySsl: verifySsl ?? this.verifySsl,
       proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
       workspacePath:
@@ -146,6 +152,7 @@ class SettingsModel extends HiveObject {
     'sendTimeoutMs': sendTimeoutMs,
     'receiveTimeoutMs': receiveTimeoutMs,
     'followRedirects': followRedirects,
+    'maxRedirects': maxRedirects,
     'verifySsl': verifySsl,
     'proxyUrl': proxyUrl,
     'workspacePath': workspacePath,
@@ -167,6 +174,7 @@ class SettingsModel extends HiveObject {
     sendTimeoutMs: json['sendTimeoutMs'] ?? 30000,
     receiveTimeoutMs: json['receiveTimeoutMs'] ?? 60000,
     followRedirects: json['followRedirects'] ?? true,
+    maxRedirects: json['maxRedirects'] ?? 5,
     verifySsl: json['verifySsl'] ?? true,
     proxyUrl: json['proxyUrl'] as String?,
     workspacePath: json['workspacePath'] as String?,
@@ -188,6 +196,7 @@ class SettingsModel extends HiveObject {
     sendTimeoutMs: entity.sendTimeoutMs,
     receiveTimeoutMs: entity.receiveTimeoutMs,
     followRedirects: entity.followRedirects,
+    maxRedirects: entity.maxRedirects,
     verifySsl: entity.verifySsl,
     proxyUrl: entity.proxyUrl,
     workspacePath: entity.workspacePath,
@@ -209,6 +218,7 @@ class SettingsModel extends HiveObject {
     sendTimeoutMs: sendTimeoutMs,
     receiveTimeoutMs: receiveTimeoutMs,
     followRedirects: followRedirects,
+    maxRedirects: maxRedirects,
     verifySsl: verifySsl,
     proxyUrl: proxyUrl,
     workspacePath: workspacePath,

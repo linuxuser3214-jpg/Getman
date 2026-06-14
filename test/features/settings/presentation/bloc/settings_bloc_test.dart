@@ -43,6 +43,17 @@ void main() {
     expect(bloc.state.settings.followRedirects, isFalse);
   });
 
+  test('UpdateMaxRedirects updates and persists; negative clamps to zero', () async {
+    bloc.add(const UpdateMaxRedirects(3));
+    await bloc.stream.firstWhere((s) => s.settings.maxRedirects == 3);
+    expect(bloc.state.settings.maxRedirects, 3);
+    verify(() => save.call(any())).called(1);
+
+    bloc.add(const UpdateMaxRedirects(-1));
+    await bloc.stream.firstWhere((s) => s.settings.maxRedirects == 0);
+    expect(bloc.state.settings.maxRedirects, 0);
+  });
+
   test('UpdateProxyUrl sets and clears the proxy', () async {
     bloc.add(const UpdateProxyUrl('127.0.0.1:8888'));
     await bloc.stream.firstWhere((s) => s.settings.proxyUrl == '127.0.0.1:8888');

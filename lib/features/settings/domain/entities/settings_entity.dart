@@ -26,6 +26,9 @@ class SettingsEntity extends Equatable {
   final int sendTimeoutMs;
   final int receiveTimeoutMs;
   final bool followRedirects;
+
+  /// Max redirects to follow when [followRedirects] is on (Dio default: 5).
+  final int maxRedirects;
   final bool verifySsl;
   final String? proxyUrl;
 
@@ -54,6 +57,7 @@ class SettingsEntity extends Equatable {
     this.sendTimeoutMs = 30000,
     this.receiveTimeoutMs = 60000,
     this.followRedirects = true,
+    this.maxRedirects = 5,
     this.verifySsl = true,
     this.proxyUrl,
     this.workspacePath,
@@ -75,6 +79,7 @@ class SettingsEntity extends Equatable {
     int? sendTimeoutMs,
     int? receiveTimeoutMs,
     bool? followRedirects,
+    int? maxRedirects,
     bool? verifySsl,
     Object? proxyUrl = _unchanged,
     Object? workspacePath = _unchanged,
@@ -98,6 +103,7 @@ class SettingsEntity extends Equatable {
       sendTimeoutMs: sendTimeoutMs ?? this.sendTimeoutMs,
       receiveTimeoutMs: receiveTimeoutMs ?? this.receiveTimeoutMs,
       followRedirects: followRedirects ?? this.followRedirects,
+      maxRedirects: maxRedirects ?? this.maxRedirects,
       verifySsl: verifySsl ?? this.verifySsl,
       proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
       workspacePath:
@@ -114,6 +120,7 @@ class SettingsEntity extends Equatable {
         sendTimeoutMs: sendTimeoutMs,
         receiveTimeoutMs: receiveTimeoutMs,
         followRedirects: followRedirects,
+        maxRedirects: maxRedirects,
         verifySsl: verifySsl,
         proxyUrl: proxyUrl,
       );
@@ -134,6 +141,7 @@ class SettingsEntity extends Equatable {
     sendTimeoutMs,
     receiveTimeoutMs,
     followRedirects,
+    maxRedirects,
     verifySsl,
     proxyUrl,
     workspacePath,

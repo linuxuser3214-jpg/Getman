@@ -34,6 +34,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<UpdateSendTimeout>((e, emit) => _apply(emit, (s) => s.copyWith(sendTimeoutMs: _clampTimeout(e.ms))));
     on<UpdateReceiveTimeout>((e, emit) => _apply(emit, (s) => s.copyWith(receiveTimeoutMs: _clampTimeout(e.ms))));
     on<UpdateFollowRedirects>((e, emit) => _apply(emit, (s) => s.copyWith(followRedirects: e.value)));
+    on<UpdateMaxRedirects>((e, emit) => _apply(emit, (s) => s.copyWith(maxRedirects: _clampRedirects(e.value))));
     on<UpdateVerifySsl>((e, emit) => _apply(emit, (s) => s.copyWith(verifySsl: e.value)));
     on<UpdateProxyUrl>((e, emit) => _apply(emit, (s) => s.copyWith(proxyUrl: e.url)));
     // The bookmark is always set in lockstep with the path (both null on
@@ -44,6 +45,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   // 0 disables the timeout (Dio treats Duration.zero as no limit); never negative.
   static int _clampTimeout(int ms) => ms < 0 ? 0 : ms;
+
+  // 0 means "do not follow redirects"; never negative.
+  static int _clampRedirects(int v) => v < 0 ? 0 : v;
 
   Future<void> _apply(
     Emitter<SettingsState> emit,

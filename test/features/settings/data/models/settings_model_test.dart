@@ -72,6 +72,7 @@ void main() {
       expect(e.sendTimeoutMs, 30000);
       expect(e.receiveTimeoutMs, 60000);
       expect(e.followRedirects, isTrue);
+      expect(e.maxRedirects, 5);
       expect(e.verifySsl, isTrue);
       expect(e.proxyUrl, isNull);
       expect(e.workspacePath, isNull);
@@ -83,6 +84,7 @@ void main() {
         sendTimeoutMs: 2000,
         receiveTimeoutMs: 3000,
         followRedirects: false,
+        maxRedirects: 2,
         verifySsl: false,
         proxyUrl: 'localhost:8888',
         workspacePath: '/tmp/ws',
@@ -92,9 +94,15 @@ void main() {
       expect(back.sendTimeoutMs, 2000);
       expect(back.receiveTimeoutMs, 3000);
       expect(back.followRedirects, isFalse);
+      expect(back.maxRedirects, 2);
       expect(back.verifySsl, isFalse);
       expect(back.proxyUrl, 'localhost:8888');
       expect(back.workspacePath, '/tmp/ws');
+    });
+
+    test('maxRedirects defaults to 5 for legacy json without the field', () {
+      final back = SettingsModel.fromJson({'historyLimit': 50});
+      expect(back.maxRedirects, 5);
     });
 
     test('entity roundtrip preserves the new fields', () {

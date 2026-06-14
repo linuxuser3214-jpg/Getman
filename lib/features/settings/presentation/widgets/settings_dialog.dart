@@ -33,6 +33,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   late final TextEditingController _connectTimeoutController;
   late final TextEditingController _sendTimeoutController;
   late final TextEditingController _receiveTimeoutController;
+  late final TextEditingController _maxRedirectsController;
   late final TextEditingController _proxyController;
 
   @override
@@ -43,6 +44,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _connectTimeoutController = TextEditingController(text: s.connectTimeoutMs.toString());
     _sendTimeoutController = TextEditingController(text: s.sendTimeoutMs.toString());
     _receiveTimeoutController = TextEditingController(text: s.receiveTimeoutMs.toString());
+    _maxRedirectsController = TextEditingController(text: s.maxRedirects.toString());
     _proxyController = TextEditingController(text: s.proxyUrl ?? '');
   }
 
@@ -52,6 +54,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _connectTimeoutController.dispose();
     _sendTimeoutController.dispose();
     _receiveTimeoutController.dispose();
+    _maxRedirectsController.dispose();
     _proxyController.dispose();
     super.dispose();
   }
@@ -191,6 +194,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   value: settings.followRedirects,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateFollowRedirects(val)),
                 ),
+                if (settings.followRedirects)
+                  _timeoutTile(context, 'MAX REDIRECTS', _maxRedirectsController,
+                      (v) => UpdateMaxRedirects(v)),
                 SwitchListTile(
                   activeThumbColor: theme.colorScheme.secondary,
                   activeTrackColor: theme.primaryColor,

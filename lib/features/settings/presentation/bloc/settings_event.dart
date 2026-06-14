@@ -105,6 +105,13 @@ class UpdateFollowRedirects extends SettingsEvent {
   List<Object?> get props => [value];
 }
 
+class UpdateMaxRedirects extends SettingsEvent {
+  final int value;
+  const UpdateMaxRedirects(this.value);
+  @override
+  List<Object?> get props => [value];
+}
+
 class UpdateVerifySsl extends SettingsEvent {
   final bool value;
   const UpdateVerifySsl(this.value);

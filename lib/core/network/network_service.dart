@@ -31,6 +31,7 @@ class NetworkService {
       sendTimeout: Duration(milliseconds: config.sendTimeoutMs),
       receiveTimeout: Duration(milliseconds: config.receiveTimeoutMs),
       followRedirects: config.followRedirects,
+      maxRedirects: config.maxRedirects,
       validateStatus: (_) => true,
       listFormat: ListFormat.multi,
       responseType: ResponseType.plain,
@@ -52,7 +53,8 @@ class NetworkService {
       ..connectTimeout = Duration(milliseconds: config.connectTimeoutMs)
       ..sendTimeout = Duration(milliseconds: config.sendTimeoutMs)
       ..receiveTimeout = Duration(milliseconds: config.receiveTimeoutMs)
-      ..followRedirects = config.followRedirects;
+      ..followRedirects = config.followRedirects
+      ..maxRedirects = config.maxRedirects;
     configureHttpAdapter(_dio, verifySsl: config.verifySsl, proxyUrl: config.proxyUrl);
   }
 

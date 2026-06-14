@@ -6,6 +6,9 @@ class NetworkConfig {
   final int sendTimeoutMs;
   final int receiveTimeoutMs;
   final bool followRedirects;
+
+  /// Max redirects to follow when [followRedirects] is true (Dio default: 5).
+  final int maxRedirects;
   final bool verifySsl;
   final String? proxyUrl;
 
@@ -14,6 +17,7 @@ class NetworkConfig {
     this.sendTimeoutMs = 30000,
     this.receiveTimeoutMs = 60000,
     this.followRedirects = true,
+    this.maxRedirects = 5,
     this.verifySsl = true,
     this.proxyUrl,
   });
