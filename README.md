@@ -125,6 +125,10 @@ fvm flutter pub get
 fvm flutter run -d macos      # or -d windows / -d linux / -d chrome
 ```
 
+For full per-platform **release** builds (macOS / Windows / Linux / web),
+required toolchains, and build troubleshooting, see
+[`docs/BUILD.md`](./docs/BUILD.md).
+
 Generated Hive adapters are committed — no build_runner step needed for a
 plain run. After changing any `@HiveType` field:
 
@@ -147,21 +151,25 @@ change.
 
 Releases are built and published by `.github/workflows/release.yml` on
 every pushed tag that matches `v*.*.*`. The workflow produces one artifact
-per platform and attaches them all to a **draft** GitHub Release, which
-you review and publish manually.
+per platform and attaches them all to a GitHub Release that is **published
+automatically**, using the matching section of `CHANGELOG.md` as the release
+notes (with GitHub's auto-generated commit/PR notes appended).
 
 ### Cut a new version
 
 1. Bump `version:` in `pubspec.yaml` (e.g. `1.0.0+1` → `1.0.1+2`).
-2. Commit and push to `master`.
-3. Tag and push:
+2. Add a `## [X.Y.Z]` section to [`CHANGELOG.md`](./CHANGELOG.md) — the
+   release job uses it as the release body (tag `vX.Y.Z` → the `[X.Y.Z]`
+   heading).
+3. Commit and push to `master`.
+4. Tag and push:
    ```sh
    git tag v1.0.1
    git push origin v1.0.1
    ```
-4. Watch the run in the repo's **Actions** tab. When all four build jobs
-   finish, a draft release appears under **Releases** — review the
-   auto-generated notes and hit **Publish**.
+5. Watch the run in the repo's **Actions** tab. When all four build jobs
+   finish, the release is **published automatically** under **Releases**
+   with all four artifacts attached.
 
 ### Test the workflow without cutting a release
 
