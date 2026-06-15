@@ -15,7 +15,7 @@ workflow. Runs on macOS, Windows, and Linux.
 
 - **Tabbed request UI** — multiple concurrent requests, each with its own state,
   response cache, and in-flight cancellation.
-- **All common HTTP methods** — GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS.
+- **Common HTTP methods** — GET, POST, PUT, DELETE, PATCH.
 - **URL bar** with live query-parameter editing and `{{variable}}` highlighting.
 - **Body types** — none, raw, `x-www-form-urlencoded`, `multipart/form-data`
   (with file uploads), and binary.
