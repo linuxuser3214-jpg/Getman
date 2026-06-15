@@ -35,6 +35,24 @@ void main() {
     }
 
     testWidgets(
+      'request-tab labels are white (active + inactive) in dark mode',
+      (tester) async {
+        final tabs = draculaTheme(Brightness.dark).tabBarTheme;
+        expect(tabs.labelColor, Colors.white);
+        expect(tabs.unselectedLabelColor, Colors.white);
+      },
+    );
+
+    testWidgets(
+      'request-tab labels are black (active + inactive) in light/Alucard',
+      (tester) async {
+        final tabs = draculaTheme(Brightness.light).tabBarTheme;
+        expect(tabs.labelColor, Colors.black);
+        expect(tabs.unselectedLabelColor, Colors.black);
+      },
+    );
+
+    testWidgets(
       'panelBox returns a BoxDecoration with a soft (blurred) shadow, '
       'not a hard offset',
       (tester) async {

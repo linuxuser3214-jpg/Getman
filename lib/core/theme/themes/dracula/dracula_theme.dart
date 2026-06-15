@@ -34,6 +34,13 @@ ThemeData draculaTheme(Brightness brightness, {bool isCompact = false}) {
   // light-mode (Alucard) purple is deep and needs white.
   final onPrimary = isDark ? DraculaPalette.backgroundDark : Colors.white;
   final onSecondary = isDark ? DraculaPalette.backgroundDark : Colors.white;
+  // Request-tab (TabWidget) label color. The active tab sits on the surface
+  // (not the purple indicator), so onPrimary would be unreadable there — dark
+  // text on the dark surface / white text on the white Alucard surface. Use a
+  // single high-contrast color for both active and inactive in each mode
+  // (active/inactive stay distinct via background, font weight, and the purple
+  // top accent line): white on dark, black on light.
+  final tabLabelColor = isDark ? Colors.white : Colors.black;
 
   final layout = isCompact ? AppLayout.compact : AppLayout.normal;
   const shape = AppShape(
@@ -160,8 +167,8 @@ ThemeData draculaTheme(Brightness brightness, {bool isCompact = false}) {
     ),
     tabBarTheme: TabBarThemeData(
       dividerColor: Colors.transparent,
-      labelColor: onPrimary,
-      unselectedLabelColor: textSoft,
+      labelColor: tabLabelColor,
+      unselectedLabelColor: tabLabelColor,
       indicatorSize: TabBarIndicatorSize.tab,
       indicator: BoxDecoration(
         color: currentPrimary,
