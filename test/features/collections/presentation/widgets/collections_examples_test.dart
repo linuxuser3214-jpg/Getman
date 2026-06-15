@@ -130,7 +130,8 @@ void main() {
     await pump(tester);
 
     // The count badge shows; the example row is hidden until expanded.
-    expect(find.text('GETUSERS'), findsOneWidget);
+    // The node name renders verbatim (no uppercasing).
+    expect(find.text('GetUsers'), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
     expect(find.text('My Example'), findsNothing);
 

@@ -425,7 +425,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          node.name.toUpperCase(),
+                          node.name,
                           style: TextStyle(
                             fontSize: layout.fontSizeNormal,
                             fontWeight: context.appTypography.displayWeight,
@@ -516,7 +516,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          node.name.toUpperCase(),
+                          node.name,
                           style: TextStyle(
                             fontSize: layout.fontSizeNormal,
                             fontWeight: context.appTypography.titleWeight,
@@ -561,7 +561,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
             color: theme.primaryColor,
           ),
           child: Text(
-            node.name.toUpperCase(),
+            node.name,
             style: TextStyle(
               fontSize: layout.fontSizeNormal,
               fontWeight: context.appTypography.displayWeight,
