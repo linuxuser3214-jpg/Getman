@@ -198,6 +198,7 @@ class _UrlBarState extends State<UrlBar> {
                         SizedBox(width: gap),
                         Expanded(
                           child: TextField(
+                            key: const ValueKey('url_field'),
                             controller: _urlController,
                             focusNode: _urlFocusNode,
                             style: TextStyle(

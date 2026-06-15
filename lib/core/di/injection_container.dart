@@ -58,21 +58,41 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 
 final GetIt sl = GetIt.instance;
 
-Future<SettingsEntity> init() async {
-  await Hive.initFlutter();
+// Hive adapters register only once per process (re-registering a typeId throws,
+// and there is no unregister). [reset] keeps them registered while tearing down
+// get_it + boxes, so [init] must not re-register them on a second call (E2E
+// boots the app once per test). Guarded by this flag.
+bool _adaptersRegistered = false;
 
-  Hive
-    ..registerAdapter(SettingsModelAdapter())
-    ..registerAdapter(HttpRequestConfigAdapter())
-    ..registerAdapter(HttpRequestTabModelAdapter())
-    ..registerAdapter(CollectionNodeAdapter())
-    ..registerAdapter(SavedExampleModelAdapter())
-    ..registerAdapter(EnvironmentModelAdapter())
-    ..registerAdapter(MultipartFieldModelAdapter())
-    ..registerAdapter(StoredCookieModelAdapter())
-    ..registerAdapter(ExtractionRuleModelAdapter())
-    ..registerAdapter(AssertionModelAdapter())
-    ..registerAdapter(RequestRulesModelAdapter());
+/// Boots the dependency graph and returns the settings to launch with.
+///
+/// [storageDirectoryOverride] points Hive at a specific directory instead of
+/// the platform app-support dir. Production passes nothing (uses
+/// `initFlutter`); E2E/integration tests pass a throwaway temp dir so a test
+/// run never reads or wipes the developer's real saved data. Pair with [reset]
+/// between tests.
+Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
+  if (storageDirectoryOverride != null) {
+    Hive.init(storageDirectoryOverride);
+  } else {
+    await Hive.initFlutter();
+  }
+
+  if (!_adaptersRegistered) {
+    Hive
+      ..registerAdapter(SettingsModelAdapter())
+      ..registerAdapter(HttpRequestConfigAdapter())
+      ..registerAdapter(HttpRequestTabModelAdapter())
+      ..registerAdapter(CollectionNodeAdapter())
+      ..registerAdapter(SavedExampleModelAdapter())
+      ..registerAdapter(EnvironmentModelAdapter())
+      ..registerAdapter(MultipartFieldModelAdapter())
+      ..registerAdapter(StoredCookieModelAdapter())
+      ..registerAdapter(ExtractionRuleModelAdapter())
+      ..registerAdapter(AssertionModelAdapter())
+      ..registerAdapter(RequestRulesModelAdapter());
+    _adaptersRegistered = true;
+  }
 
   // Open every box in PARALLEL (Future.wait) so cold start is bounded by the
   // slowest single box, not their sum. The cookies + request-rules boxes are
@@ -252,4 +272,14 @@ Future<void> openAndHydrateDeferredBoxes(InMemoryCookieStore store) async {
   ]);
   await HiveCookiePersistence.migrateLegacyKeysIfNeeded();
   store.hydrate();
+}
+
+/// Tears down the DI container and closes all Hive boxes so [init] can be
+/// called again with a fresh storage directory. Used by the E2E harness
+/// between flows; not part of the production boot path. Registered Hive
+/// adapters intentionally survive (Hive cannot unregister them, and [init]
+/// guards against re-adding them).
+Future<void> reset() async {
+  await sl.reset();
+  await Hive.close();
 }

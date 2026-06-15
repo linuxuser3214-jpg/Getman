@@ -1,0 +1,12 @@
+# E2E tests live outside lib/, so they cannot be imported via `package:getman/`
+# — the shared harness in support/ must be reached with relative imports. We
+# keep the full project lint baseline here and only relax the two rules that are
+# meaningless for test files that import sibling test helpers.
+include: ../analysis_options.yaml
+
+linter:
+  rules:
+    # support/ helpers are reachable only relatively from here (not under lib/).
+    always_use_package_imports: false
+    # E2E helpers are internal test scaffolding, not a published API surface.
+    public_member_api_docs: false

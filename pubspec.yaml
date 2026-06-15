@@ -39,8 +39,17 @@ dev_dependencies:
   getman_lints:
     path: tools/getman_lints
   hive_ce_generator: ">=1.4.0 <2.0.0"
+  integration_test:
+    sdk: flutter
   mocktail: ^1.0.5
   path_provider_platform_interface: ^2.1.2
+  # E2E: patrol's finder API (the `$` PatrolTester) running on top of Flutter's
+  # integration_test, driving the real app on macOS via
+  # `fvm flutter test integration_test -d macos`. We depend on patrol_finders
+  # (not the full `patrol` package) because patrol's native automation does not
+  # support macOS desktop (alpha, no native support); the finder API is all we
+  # need and runs under integration_test without a native test harness.
+  patrol_finders: ^3.2.0
   plugin_platform_interface: ^2.1.8
   very_good_analysis: ^10.2.0
 
