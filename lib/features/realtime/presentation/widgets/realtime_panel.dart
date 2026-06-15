@@ -114,6 +114,7 @@ class _RealtimePanelState extends State<RealtimePanel> {
                 children: [
                   Expanded(
                     child: TextField(
+                      key: const ValueKey('realtime_message_input'),
                       controller: _composer,
                       enabled: connected,
                       autocorrect: false,
@@ -128,6 +129,7 @@ class _RealtimePanelState extends State<RealtimePanel> {
                   SizedBox(width: layout.tabSpacing),
                   context.appDecoration.wrapInteractive(
                     child: ElevatedButton(
+                      key: const ValueKey('realtime_send_button'),
                       onPressed: connected ? _send : null,
                       child: Text(
                         'SEND',

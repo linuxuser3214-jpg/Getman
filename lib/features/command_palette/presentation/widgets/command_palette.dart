@@ -214,6 +214,7 @@ class _CommandPaletteState extends State<CommandPalette> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
+              key: const ValueKey('palette_search_field'),
               controller: _query,
               autofocus: true,
               autocorrect: false,
@@ -262,6 +263,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                         itemBuilder: (context, i) {
                           final c = results[i];
                           return ColoredBox(
+                            key: ValueKey('palette_result_$i'),
                             color: i == selected
                                 ? highlight
                                 : Colors.transparent,

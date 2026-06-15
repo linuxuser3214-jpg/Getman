@@ -192,6 +192,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       ),
                     ),
                     trailing: DropdownButton<String>(
+                      key: const ValueKey('theme_dropdown'),
                       value: settings.themeId,
                       underline: const SizedBox.shrink(),
                       items: [
@@ -330,6 +331,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         TextButton(
+                          key: const ValueKey('cookies_manage_button'),
                           onPressed: () => CookieManagerDialog.show(context),
                           child: const Text('MANAGE'),
                         ),

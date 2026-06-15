@@ -225,6 +225,7 @@ class _UrlBarState extends State<UrlBar> {
                         if (!isNarrow) ...[
                           context.appDecoration.wrapInteractive(
                             child: IconButton(
+                              key: const ValueKey('code_export_button'),
                               icon: Icon(
                                 Icons.code,
                                 color: theme.colorScheme.secondary,
@@ -344,6 +345,7 @@ class _UrlBarState extends State<UrlBar> {
                           SizedBox(width: gap),
                           context.appDecoration.wrapInteractive(
                             child: IconButton(
+                              key: const ValueKey('save_request_button'),
                               icon: Icon(
                                 tab.collectionNodeId != null
                                     ? Icons.save

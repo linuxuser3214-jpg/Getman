@@ -29,6 +29,7 @@ class RequestConfigSection extends StatelessWidget {
           const BrandedTabBar(
             labels: ['PARAMS', 'AUTH', 'HEADERS', 'BODY', 'RULES'],
             isScrollable: true,
+            tabKeyPrefix: 'reqtab',
           ),
           Expanded(
             child: Container(

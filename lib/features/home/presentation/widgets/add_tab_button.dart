@@ -24,6 +24,7 @@ class AddTabButton extends StatelessWidget {
       ),
       child: context.appDecoration.wrapInteractive(
         child: IconButton(
+          key: const ValueKey('add_tab_button'),
           icon: Icon(
             Icons.add,
             size: layout.addIconSize,

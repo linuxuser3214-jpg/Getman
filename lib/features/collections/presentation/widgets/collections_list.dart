@@ -586,6 +586,7 @@ class _NodeContextMenu extends StatelessWidget {
     final layout = context.appLayout;
 
     return PopupMenuButton<String>(
+      key: ValueKey('node_menu_${node.id}'),
       icon: Icon(
         Icons.more_vert,
         size: layout.iconSize,

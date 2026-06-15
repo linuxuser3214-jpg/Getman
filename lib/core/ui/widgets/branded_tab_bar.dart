@@ -14,12 +14,19 @@ class BrandedTabBar extends StatelessWidget implements PreferredSizeWidget {
     this.isScrollable = false,
     this.padding,
     this.labelPadding,
+    this.tabKeyPrefix,
   });
   final List<String> labels;
   final TabController? controller;
   final bool isScrollable;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? labelPadding;
+
+  /// When set, each [Tab] gets a stable `ValueKey('<prefix>_tab_<label>')` so
+  /// E2E tests can target a specific tab even when labels collide across panels
+  /// (e.g. request and response both have a `BODY` tab). Null leaves tabs
+  /// unkeyed (the production default).
+  final String? tabKeyPrefix;
 
   @override
   Size get preferredSize => const Size.fromHeight(kTextTabBarHeight);
@@ -56,7 +63,15 @@ class BrandedTabBar extends StatelessWidget implements PreferredSizeWidget {
         fontWeight: context.appTypography.displayWeight,
         overflow: TextOverflow.fade,
       ),
-      tabs: [for (final label in labels) Tab(text: label)],
+      tabs: [
+        for (final label in labels)
+          Tab(
+            key: tabKeyPrefix == null
+                ? null
+                : ValueKey('${tabKeyPrefix}_tab_$label'),
+            text: label,
+          ),
+      ],
     );
   }
 }

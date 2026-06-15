@@ -236,6 +236,7 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
           return const SizedBox.shrink();
         }
         return IconButton(
+          key: const ValueKey('save_as_example_button'),
           tooltip: 'Save as example',
           visualDensity: VisualDensity.compact,
           icon: Icon(
@@ -455,6 +456,7 @@ class _PrettyRawToggle extends StatelessWidget {
     return context.appDecoration.wrapInteractive(
       onTap: onTap,
       child: Container(
+        key: ValueKey('body_toggle_$label'),
         padding: EdgeInsets.symmetric(
           horizontal: layout.badgePaddingHorizontal + 4,
           vertical: layout.badgePaddingVertical + 2,

@@ -43,6 +43,7 @@ class RequestKindMethodSelector extends StatelessWidget {
         children: [
           DropdownButtonHideUnderline(
             child: DropdownButton<RequestKind>(
+              key: const ValueKey('request_kind_selector'),
               dropdownColor: theme.colorScheme.surface,
               value: tab.config.kind,
               style: TextStyle(
@@ -73,6 +74,7 @@ class RequestKindMethodSelector extends StatelessWidget {
             SizedBox(width: smallGap),
             DropdownButtonHideUnderline(
               child: DropdownButton<String>(
+                key: const ValueKey('method_selector'),
                 dropdownColor: theme.colorScheme.surface,
                 value: tab.config.method,
                 style: TextStyle(

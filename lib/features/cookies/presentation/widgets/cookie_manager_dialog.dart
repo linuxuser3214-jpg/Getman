@@ -207,6 +207,7 @@ class _CookieManagerDialogState extends State<CookieManagerDialog> {
         ),
       ),
       trailing: IconButton(
+        key: ValueKey('delete_cookie_${cookie.name}'),
         icon: Icon(
           Icons.delete_outline,
           size: layout.iconSize,

@@ -181,6 +181,7 @@ class ResponseSection extends StatelessWidget {
                   children: [
                     const BrandedTabBar(
                       labels: ['BODY', 'HEADERS', 'COOKIES', 'TESTS'],
+                      tabKeyPrefix: 'resptab',
                     ),
                     Expanded(
                       child: Container(

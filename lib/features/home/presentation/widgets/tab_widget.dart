@@ -172,6 +172,7 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
                             ),
                           SizedBox(width: layout.tabSpacing),
                           IconButton(
+                            key: ValueKey('tab_close_${tab.tabId}'),
                             icon: Icon(
                               Icons.close,
                               size: layout.tabCloseIconSize,

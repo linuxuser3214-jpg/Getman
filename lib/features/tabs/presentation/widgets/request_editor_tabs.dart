@@ -94,6 +94,7 @@ class ParamsTabView extends StatelessWidget {
               KeyValueListEditor<List<QueryParamEntity>>(
                 items: tab.config.params,
                 variableContext: varContext,
+                fieldPrefix: 'param',
                 decode: (params) => [for (final p in params) (p.key, p.value)],
                 encode: (rows) => [
                   for (final (key, value) in rows)
@@ -141,6 +142,7 @@ class HeadersTabView extends StatelessWidget {
               KeyValueListEditor<Map<String, String>>(
                 items: tab.config.headers,
                 variableContext: varContext,
+                fieldPrefix: 'header',
                 decode: (headers) => [
                   for (final e in headers.entries) (e.key, e.value),
                 ],
@@ -241,6 +243,7 @@ class _BodyTypeSelector extends StatelessWidget {
         children: [
           for (final type in BodyType.values)
             _BodyTypeChip(
+              key: ValueKey('bodytype_${_labels[type]!}'),
               label: _labels[type]!,
               active: type == active,
               onTap: () {
@@ -265,6 +268,7 @@ class _BodyTypeChip extends StatelessWidget {
     required this.label,
     required this.active,
     required this.onTap,
+    super.key,
   });
   final String label;
   final bool active;

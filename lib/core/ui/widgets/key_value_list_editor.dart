@@ -28,6 +28,7 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
     this.secretKeys,
     this.onSecretKeysChanged,
     this.variableContext,
+    this.fieldPrefix,
   });
   final T items;
   final ValueChanged<T> onChanged;
@@ -49,6 +50,12 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   /// pass null, leaving value fields as plain text. Note: this is unrelated to
   /// [secretKeys], which toggles per-row secret obscuring in the env editor.
   final VariableHoverContext? variableContext;
+
+  /// When set, each row's key/value [TextField] gets a stable
+  /// `ValueKey('<prefix>_key_<index>')` / `ValueKey('<prefix>_val_<index>')` so
+  /// E2E tests can target a specific row in a specific editor (params/headers/
+  /// env vars all use this widget). Null (the default) leaves fields unkeyed.
+  final String? fieldPrefix;
 
   @override
   State<KeyValueListEditor<T>> createState() => _KeyValueListEditorState<T>();
@@ -188,6 +195,8 @@ class _KeyValueListEditorState<T extends Object>
 
         return _KeyValueRow(
           key: ValueKey(_keyControllers[index]),
+          rowIndex: index,
+          fieldPrefix: widget.fieldPrefix,
           keyController: _keyControllers[index],
           valController: _valControllers[index],
           layout: layout,
@@ -229,10 +238,14 @@ class _KeyValueRow extends StatefulWidget {
     required this.onValChanged,
     required this.onDelete,
     super.key,
+    this.rowIndex = 0,
+    this.fieldPrefix,
     this.showSecretToggle = false,
     this.isSecret = false,
     this.onToggleSecret,
   });
+  final int rowIndex;
+  final String? fieldPrefix;
   final TextEditingController keyController;
   final TextEditingController valController;
   final AppLayout layout;
@@ -270,6 +283,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
     );
 
     final keyField = TextField(
+      key: widget.fieldPrefix == null
+          ? null
+          : ValueKey('${widget.fieldPrefix}_key_${widget.rowIndex}'),
       style: textStyle,
       decoration: InputDecoration(
         hintText: 'KEY',
@@ -282,6 +298,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
       onChanged: widget.onKeyChanged,
     );
     final valueField = TextField(
+      key: widget.fieldPrefix == null
+          ? null
+          : ValueKey('${widget.fieldPrefix}_val_${widget.rowIndex}'),
       style: textStyle,
       obscureText: widget.isSecret && !_revealed,
       decoration: InputDecoration(

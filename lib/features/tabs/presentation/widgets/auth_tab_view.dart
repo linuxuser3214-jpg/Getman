@@ -137,6 +137,7 @@ class _AuthTabViewState extends State<AuthTabView> {
           _label(context, 'AUTH TYPE'),
           SizedBox(height: layout.tabSpacing),
           DropdownButton<AuthType>(
+            key: const ValueKey('auth_type_dropdown'),
             value: _type,
             isExpanded: true,
             items: [
@@ -231,6 +232,7 @@ class _AuthTabViewState extends State<AuthTabView> {
           _label(context, label),
           SizedBox(height: layout.tabSpacing),
           TextField(
+            key: ValueKey('auth_field_$label'),
             controller: controller,
             obscureText: obscure,
             autocorrect: false,
