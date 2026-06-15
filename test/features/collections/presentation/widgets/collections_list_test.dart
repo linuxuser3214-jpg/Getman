@@ -74,12 +74,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // Folder is collapsed initially → its child is not rendered.
-    expect(find.text('CHILDREQ'), findsNothing);
+    // Names render verbatim (no uppercasing).
+    expect(find.text('ChildReq'), findsNothing);
 
     // Expand the folder.
-    await tester.tap(find.text('FOLDER'));
+    await tester.tap(find.text('Folder'));
     await tester.pumpAndSettle();
-    expect(find.text('CHILDREQ'), findsOneWidget);
+    expect(find.text('ChildReq'), findsOneWidget);
 
     // Rename the child *inside* the folder. This rewrites the folder's
     // ancestor chain into a non-equal entity — the case that collapsed it.
@@ -88,6 +89,6 @@ void main() {
     await tester.pumpAndSettle();
 
     // The folder must still be expanded, showing the renamed child.
-    expect(find.text('CHILDRENAMED'), findsOneWidget);
+    expect(find.text('ChildRenamed'), findsOneWidget);
   });
 }

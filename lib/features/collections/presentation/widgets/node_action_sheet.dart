@@ -67,7 +67,7 @@ class _SheetBody extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    node.name.toUpperCase(),
+                    node.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -274,7 +274,7 @@ class _MoveToSheet {
                     children: [
                       Expanded(
                         child: Text(
-                          'MOVE "${source.name.toUpperCase()}" TO...',
+                          'MOVE "${source.name}" TO...',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -305,8 +305,7 @@ class _MoveToSheet {
                       for (final f in folders)
                         _Action(
                           icon: Icons.folder,
-                          label:
-                              '${'  ' * f.depth}${f.node.name.toUpperCase()}',
+                          label: '${'  ' * f.depth}${f.node.name}',
                           onTap: () {
                             bloc.add(MoveNode(source.id, f.node.id));
                             Navigator.of(sheetContext).pop();
