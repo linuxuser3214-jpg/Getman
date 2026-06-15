@@ -2,6 +2,14 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 
+/// Reports a hovered `{{var}}` token: its [name] and the global pointer
+/// position (so the owner can anchor a popover). Set by the owning widget.
+typedef VariableEnterCallback =
+    void Function(
+      String name,
+      Offset globalPosition,
+    );
+
 class VariableHighlightController extends TextEditingController {
   VariableHighlightController({
     super.text,
@@ -14,6 +22,12 @@ class VariableHighlightController extends TextEditingController {
   // `didChangeDependencies`; until then tokens render unhighlighted.
   Color? _resolvedColor;
   Color? _unresolvedColor;
+
+  /// Optional hover sink. When set, each `{{var}}` token span reports pointer
+  /// enter/exit so the owner can show/hide a resolution popover. Null = no
+  /// hover behavior (unchanged rendering).
+  VariableEnterCallback? onVariableEnter;
+  VoidCallback? onVariableExit;
 
   // Per-paint memo: the variable scan depends only on `text`, so we recompute
   // it only when the text actually changes — not on every repaint (cursor
@@ -88,10 +102,18 @@ class VariableHighlightController extends TextEditingController {
         color: resolved ? resolvedColor : unresolvedColor,
         fontWeight: FontWeight.w800,
       );
+      final enter = onVariableEnter;
+      final exit = onVariableExit;
       children.add(
         TextSpan(
           style: highlightStyle,
           text: current.substring(match.start, match.end),
+          // Hover is tracked only when an enter sink is wired; exit is paired
+          // under the same guard so callers can't get unpaired exit events.
+          onEnter: enter == null
+              ? null
+              : (event) => enter(match.name, event.position),
+          onExit: enter == null ? null : (_) => exit?.call(),
         ),
       );
       cursor = match.end;
