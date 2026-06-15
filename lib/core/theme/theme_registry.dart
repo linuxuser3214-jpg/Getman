@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/theme/themes/dracula/dracula_theme.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_theme.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_theme.dart';
 
@@ -37,6 +38,11 @@ const Map<String, ThemeDescriptor> appThemes = {
     id: kRpgThemeId,
     displayName: 'ARCANE QUEST',
     builder: rpgTheme,
+  ),
+  kDraculaThemeId: ThemeDescriptor(
+    id: kDraculaThemeId,
+    displayName: 'DRACULA',
+    builder: draculaTheme,
   ),
 };
 
