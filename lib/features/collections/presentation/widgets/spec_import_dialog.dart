@@ -158,7 +158,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
 
   void _import() {
     final result = _result;
-    if (result == null || _selected.isEmpty) return;
+    if (result == null || _selected.isEmpty || !mounted) return;
     Navigator.pop(context);
     widget.onImport(applySelection(result, _selected));
   }

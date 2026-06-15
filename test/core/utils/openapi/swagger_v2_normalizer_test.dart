@@ -81,4 +81,40 @@ void main() {
     expect(post.body!.contentType, 'application/json');
     expect(post.body!.raw, contains('"name"'));
   });
+
+  test('non-body params extract default / enum / x-example values', () {
+    final api = normalizeSwaggerV2({
+      'swagger': '2.0',
+      'info': {'title': 'P'},
+      'host': 'h',
+      'basePath': '/',
+      'schemes': ['https'],
+      'paths': {
+        '/x': {
+          'get': {
+            'summary': 'X',
+            'parameters': [
+              {'name': 'page', 'in': 'query', 'type': 'integer', 'default': 1},
+              {
+                'name': 'status',
+                'in': 'query',
+                'type': 'string',
+                'enum': ['active', 'inactive'],
+              },
+              {
+                'name': 'X-Tenant',
+                'in': 'header',
+                'type': 'string',
+                'x-example': 'acme',
+              },
+            ],
+          },
+        },
+      },
+    });
+    final get = api.operations.single;
+    expect(get.queryParams[0].value, '1'); // default
+    expect(get.queryParams[1].value, 'active'); // first enum
+    expect(get.headerParams.single.value, 'acme'); // x-example
+  });
 }

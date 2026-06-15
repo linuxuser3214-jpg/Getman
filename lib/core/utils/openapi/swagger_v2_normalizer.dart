@@ -94,11 +94,13 @@ NormalizedOperation _operation({
       switch (location) {
         case 'query':
           if (pName != null) {
-            query.add(NormalizedParam(name: pName));
+            query.add(NormalizedParam(name: pName, value: _paramValue(param)));
           }
         case 'header':
           if (pName != null) {
-            headers.add(NormalizedParam(name: pName));
+            headers.add(
+              NormalizedParam(name: pName, value: _paramValue(param)),
+            );
           }
         case 'formData':
           if (pName != null) {
@@ -196,6 +198,19 @@ Map<String, NormalizedSecurityScheme> _securityDefinitions(
     }
   }
   return out;
+}
+
+/// Extracts an example value from a Swagger 2.0 non-body parameter, which
+/// carries `default` / `enum` / `x-example` directly on the parameter object
+/// (unlike OpenAPI 3.x, which nests them under `schema`).
+String _paramValue(Map<String, dynamic> param) {
+  final explicit = param['x-example'] ?? param['default'];
+  if (explicit != null) return explicit.toString();
+  final enumValues = param['enum'];
+  if (enumValues is List && enumValues.isNotEmpty) {
+    return enumValues.first.toString();
+  }
+  return '';
 }
 
 String? _firstSchemeName(Object? security) {
