@@ -37,6 +37,12 @@ class EnvironmentResolver {
 
   static bool isDynamic(String name) => dynamicNames.contains(name);
 
+  /// Public accessor for a dynamic variable's freshly-generated value, or null
+  /// if [name] is not a recognized dynamic variable. Each call regenerates —
+  /// matching send-time behavior — so the hover tooltip shows a representative
+  /// sample, not a pinned value.
+  static String? resolveDynamic(String name) => _resolveDynamic(name);
+
   static String? _resolveDynamic(String name) {
     switch (name) {
       case r'$guid':
