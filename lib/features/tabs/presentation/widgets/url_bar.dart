@@ -6,8 +6,10 @@ import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
+import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
 import 'package:getman/core/utils/curl_utils.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/core/utils/variable_resolution_helper.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
@@ -45,6 +47,7 @@ class UrlBar extends StatefulWidget {
 
 class _UrlBarState extends State<UrlBar> {
   late final VariableHighlightController _urlController;
+  final VariableHoverController _hoverController = VariableHoverController();
   late final FocusNode _urlFocusNode;
   UrlFocusRegistry? _focusRegistry;
 
@@ -53,7 +56,9 @@ class _UrlBarState extends State<UrlBar> {
     super.initState();
     // Token colors come from AppPalette in didChangeDependencies — never
     // hardcode them here (CLAUDE.md §4.10).
-    _urlController = VariableHighlightController();
+    _urlController = VariableHighlightController()
+      ..onVariableEnter = _showVariablePopover
+      ..onVariableExit = _hoverController.scheduleHide;
     // Register this tab's URL field so the Cmd/Ctrl+L shortcut can focus it.
     _urlFocusNode = FocusNode(debugLabel: 'url_${widget.tabId}');
     _focusRegistry = context.read<UrlFocusRegistry>()
@@ -89,10 +94,31 @@ class _UrlBarState extends State<UrlBar> {
     );
   }
 
+  // Resolves the full active environment (not just its variables, as
+  // _activeVariables does) because the popover needs the name + secretKeys to
+  // mask secrets and label the source. Both read live bloc state at call time.
+  void _showVariablePopover(String name, Offset globalPosition) {
+    if (!mounted) return;
+    final envState = context.read<EnvironmentsBloc>().state;
+    final settings = context.read<SettingsBloc>().state.settings;
+    final env = ActiveEnvironmentHelper.activeEnvironment(
+      envState.environments,
+      settings.activeEnvironmentId,
+    );
+    final data = VariableResolutionHelper.classify(
+      name: name,
+      variables: env?.variables ?? const {},
+      secretKeys: env?.secretKeys ?? const {},
+      environmentName: env?.name,
+    );
+    _hoverController.showFor(context, data, globalPosition);
+  }
+
   @override
   void dispose() {
     _focusRegistry?.unregister(widget.tabId, _urlFocusNode);
     _urlFocusNode.dispose();
+    _hoverController.dispose();
     _urlController.dispose();
     super.dispose();
   }
@@ -172,6 +198,7 @@ class _UrlBarState extends State<UrlBar> {
                         SizedBox(width: gap),
                         Expanded(
                           child: TextField(
+                            key: const ValueKey('url_field'),
                             controller: _urlController,
                             focusNode: _urlFocusNode,
                             style: TextStyle(
@@ -198,6 +225,7 @@ class _UrlBarState extends State<UrlBar> {
                         if (!isNarrow) ...[
                           context.appDecoration.wrapInteractive(
                             child: IconButton(
+                              key: const ValueKey('code_export_button'),
                               icon: Icon(
                                 Icons.code,
                                 color: theme.colorScheme.secondary,
@@ -317,6 +345,7 @@ class _UrlBarState extends State<UrlBar> {
                           SizedBox(width: gap),
                           context.appDecoration.wrapInteractive(
                             child: IconButton(
+                              key: const ValueKey('save_request_button'),
                               icon: Icon(
                                 tab.collectionNodeId != null
                                     ? Icons.save

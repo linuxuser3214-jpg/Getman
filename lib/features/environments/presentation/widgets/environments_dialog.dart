@@ -225,6 +225,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
             ),
             context.appDecoration.wrapInteractive(
               child: IconButton(
+                key: const ValueKey('new_environment_button'),
                 icon: Icon(Icons.add, size: layout.iconSize),
                 tooltip: 'NEW ENVIRONMENT',
                 onPressed: () => _createEnvironment(context),

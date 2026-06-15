@@ -52,6 +52,7 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextField(
+          key: const ValueKey('env_name_field'),
           controller: _nameController,
           decoration: const InputDecoration(labelText: 'NAME'),
           style: TextStyle(
@@ -73,6 +74,7 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
         Expanded(
           child: KeyValueListEditor<Map<String, String>>(
             items: widget.environment.variables,
+            fieldPrefix: 'env_var',
             decode: (variables) => [
               for (final e in variables.entries) (e.key, e.value),
             ],

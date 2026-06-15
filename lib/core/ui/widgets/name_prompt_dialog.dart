@@ -91,6 +91,7 @@ class _NamePromptDialogState extends State<NamePromptDialog> {
     return ResponsiveDialogScaffold(
       title: Text(widget.title),
       content: TextField(
+        key: const ValueKey('name_prompt_field'),
         controller: _controller,
         autofocus: true,
         minLines: widget.multiline ? 3 : 1,

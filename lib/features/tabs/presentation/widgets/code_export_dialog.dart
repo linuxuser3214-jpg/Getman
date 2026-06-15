@@ -47,6 +47,7 @@ class _CodeExportDialogState extends State<CodeExportDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButton<CodeGenTarget>(
+              key: const ValueKey('code_gen_target_dropdown'),
               value: _target,
               isExpanded: true,
               items: [
@@ -76,6 +77,7 @@ class _CodeExportDialogState extends State<CodeExportDialog> {
                 child: SingleChildScrollView(
                   child: SelectableText(
                     code,
+                    key: const ValueKey('generated_code_text'),
                     style: TextStyle(
                       fontFamily: context.appTypography.codeFontFamily,
                       fontSize: layout.fontSizeCode,

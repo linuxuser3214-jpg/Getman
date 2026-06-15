@@ -75,9 +75,10 @@ class _RulesTabViewState extends State<RulesTabView> {
         padding: EdgeInsets.all(layout.pagePadding),
         children: [
           const _Header(label: 'EXTRACT VARIABLES'),
-          for (final rule in _draft.extractionRules)
+          for (final (i, rule) in _draft.extractionRules.indexed)
             _ExtractionRuleRow(
               key: ValueKey('x_${rule.id}'),
+              index: i,
               rule: rule,
               onChanged: _updateExtraction,
               onDelete: () {
@@ -107,9 +108,10 @@ class _RulesTabViewState extends State<RulesTabView> {
           ),
           SizedBox(height: layout.sectionSpacing),
           const _Header(label: 'ASSERTIONS'),
-          for (final a in _draft.assertions)
+          for (final (i, a) in _draft.assertions.indexed)
             _AssertionRow(
               key: ValueKey('a_${a.id}'),
+              index: i,
               assertion: a,
               onChanged: _updateAssertion,
               onDelete: () {
@@ -189,11 +191,13 @@ class _AddButton extends StatelessWidget {
 
 class _ExtractionRuleRow extends StatefulWidget {
   const _ExtractionRuleRow({
+    required this.index,
     required this.rule,
     required this.onChanged,
     required this.onDelete,
     super.key,
   });
+  final int index;
   final ExtractionRule rule;
   final ValueChanged<ExtractionRule> onChanged;
   final VoidCallback onDelete;
@@ -247,6 +251,7 @@ class _ExtractionRuleRowState extends State<_ExtractionRuleRow> {
       onDelete: widget.onDelete,
       children: [
         DropdownButton<ExtractionKind>(
+          key: ValueKey('extraction_kind_${widget.index}'),
           value: _kind,
           isDense: true,
           items: [
@@ -264,16 +269,28 @@ class _ExtractionRuleRowState extends State<_ExtractionRuleRow> {
           context,
           _expression,
           _kind == ExtractionKind.header ? 'HEADER NAME' : 'EXPRESSION',
+          ValueKey('extraction_expr_${widget.index}'),
         ),
         SizedBox(height: layout.tabSpacing),
-        _field(context, _target, 'TARGET VARIABLE'),
+        _field(
+          context,
+          _target,
+          'TARGET VARIABLE',
+          ValueKey('extraction_target_${widget.index}'),
+        ),
       ],
     );
   }
 
-  Widget _field(BuildContext context, TextEditingController c, String hint) {
+  Widget _field(
+    BuildContext context,
+    TextEditingController c,
+    String hint,
+    Key fieldKey,
+  ) {
     final layout = context.appLayout;
     return TextField(
+      key: fieldKey,
       controller: c,
       autocorrect: false,
       enableSuggestions: false,
@@ -297,11 +314,13 @@ class _ExtractionRuleRowState extends State<_ExtractionRuleRow> {
 
 class _AssertionRow extends StatefulWidget {
   const _AssertionRow({
+    required this.index,
     required this.assertion,
     required this.onChanged,
     required this.onDelete,
     super.key,
   });
+  final int index;
   final Assertion assertion;
   final ValueChanged<Assertion> onChanged;
   final VoidCallback onDelete;
@@ -377,6 +396,7 @@ class _AssertionRowState extends State<_AssertionRow> {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             DropdownButton<AssertionTarget>(
+              key: ValueKey('assertion_target_${widget.index}'),
               value: _target,
               isDense: true,
               items: [
@@ -390,6 +410,7 @@ class _AssertionRowState extends State<_AssertionRow> {
               },
             ),
             DropdownButton<AssertionComparator>(
+              key: ValueKey('assertion_comp_${widget.index}'),
               value: _comparator,
               isDense: true,
               items: [
@@ -410,6 +431,7 @@ class _AssertionRowState extends State<_AssertionRow> {
             context,
             _path,
             _target == AssertionTarget.header ? 'HEADER NAME' : 'JSONPath',
+            ValueKey('assertion_path_${widget.index}'),
           ),
         ],
         if (_needsExpected) ...[
@@ -420,15 +442,22 @@ class _AssertionRowState extends State<_AssertionRow> {
             _comparator == AssertionComparator.inRange
                 ? 'EXPECTED (lo-hi)'
                 : 'EXPECTED',
+            ValueKey('assertion_expected_${widget.index}'),
           ),
         ],
       ],
     );
   }
 
-  Widget _field(BuildContext context, TextEditingController c, String hint) {
+  Widget _field(
+    BuildContext context,
+    TextEditingController c,
+    String hint,
+    Key fieldKey,
+  ) {
     final layout = context.appLayout;
     return TextField(
+      key: fieldKey,
       controller: c,
       autocorrect: false,
       enableSuggestions: false,

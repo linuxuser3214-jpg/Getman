@@ -41,6 +41,7 @@ class SideMenu extends StatelessWidget {
                 labels: ['COLLECTIONS', 'HISTORY'],
                 padding: EdgeInsets.zero,
                 labelPadding: EdgeInsets.symmetric(horizontal: 4),
+                tabKeyPrefix: 'menutab',
               ),
             ),
             const Expanded(
@@ -95,6 +96,7 @@ class _SideMenuHeader extends StatelessWidget {
             children: [
               context.appDecoration.wrapInteractive(
                 child: IconButton(
+                  key: const ValueKey('new_folder_button'),
                   icon: Icon(
                     Icons.create_new_folder,
                     color: theme.colorScheme.onSurface,
@@ -106,6 +108,7 @@ class _SideMenuHeader extends StatelessWidget {
               ),
               context.appDecoration.wrapInteractive(
                 child: IconButton(
+                  key: const ValueKey('settings_button'),
                   icon: Icon(
                     Icons.settings,
                     color: theme.colorScheme.onSurface,

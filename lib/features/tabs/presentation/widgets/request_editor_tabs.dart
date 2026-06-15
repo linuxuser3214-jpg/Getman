@@ -7,9 +7,15 @@ import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
+import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/path_utils.dart';
+import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -25,6 +31,42 @@ import 'package:re_editor/re_editor.dart';
 /// The three request-editor tab bodies (PARAMS / HEADERS / BODY), shared by
 /// the split-pane [RequestConfigSection] and the phone [UnifiedRequestPanel]
 /// so both layouts stay behaviorally identical.
+
+/// Recomputes the active-environment [VariableHoverContext] and rebuilds when
+/// the environment set or the active-environment id changes, so value-field
+/// hover popovers always reflect the current environment.
+class _VariableContextBuilder extends StatelessWidget {
+  const _VariableContextBuilder({required this.builder});
+
+  final Widget Function(BuildContext, VariableHoverContext) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      buildWhen: (p, n) =>
+          p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
+      builder: (context, settingsState) {
+        return BlocBuilder<EnvironmentsBloc, EnvironmentsState>(
+          buildWhen: (p, n) => p.environments != n.environments,
+          builder: (context, envState) {
+            final env = ActiveEnvironmentHelper.activeEnvironment(
+              envState.environments,
+              settingsState.settings.activeEnvironmentId,
+            );
+            return builder(
+              context,
+              VariableHoverContext(
+                variables: env?.variables ?? const {},
+                secretKeys: env?.secretKeys ?? const {},
+                environmentName: env?.name,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
 
 const ListEquality<QueryParamEntity> _queryParamListEquality =
     ListEquality<QueryParamEntity>();
@@ -47,24 +89,32 @@ class ParamsTabView extends StatelessWidget {
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
-        return KeyValueListEditor<List<QueryParamEntity>>(
-          items: tab.config.params,
-          decode: (params) => [for (final p in params) (p.key, p.value)],
-          encode: (rows) => [
-            for (final (key, value) in rows)
-              if (key.isNotEmpty) QueryParamEntity(key: key, value: value),
-          ],
-          equals: _queryParamListEquality.equals,
-          onChanged: (list) {
-            final bloc = context.read<TabsBloc>();
-            final current = bloc.state.tabs.byId(tabId);
-            if (current == null) return;
-            bloc.add(
-              UpdateTab(
-                current.copyWith(config: current.config.copyWith(params: list)),
+        return _VariableContextBuilder(
+          builder: (context, varContext) =>
+              KeyValueListEditor<List<QueryParamEntity>>(
+                items: tab.config.params,
+                variableContext: varContext,
+                fieldPrefix: 'param',
+                decode: (params) => [for (final p in params) (p.key, p.value)],
+                encode: (rows) => [
+                  for (final (key, value) in rows)
+                    if (key.isNotEmpty)
+                      QueryParamEntity(key: key, value: value),
+                ],
+                equals: _queryParamListEquality.equals,
+                onChanged: (list) {
+                  final bloc = context.read<TabsBloc>();
+                  final current = bloc.state.tabs.byId(tabId);
+                  if (current == null) return;
+                  bloc.add(
+                    UpdateTab(
+                      current.copyWith(
+                        config: current.config.copyWith(params: list),
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
         );
       },
     );
@@ -87,26 +137,33 @@ class HeadersTabView extends StatelessWidget {
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
-        return KeyValueListEditor<Map<String, String>>(
-          items: tab.config.headers,
-          decode: (headers) => [
-            for (final e in headers.entries) (e.key, e.value),
-          ],
-          encode: (rows) => {
-            for (final (key, value) in rows)
-              if (key.isNotEmpty) key: value,
-          },
-          equals: stringMapEquality.equals,
-          onChanged: (map) {
-            final bloc = context.read<TabsBloc>();
-            final current = bloc.state.tabs.byId(tabId);
-            if (current == null) return;
-            bloc.add(
-              UpdateTab(
-                current.copyWith(config: current.config.copyWith(headers: map)),
+        return _VariableContextBuilder(
+          builder: (context, varContext) =>
+              KeyValueListEditor<Map<String, String>>(
+                items: tab.config.headers,
+                variableContext: varContext,
+                fieldPrefix: 'header',
+                decode: (headers) => [
+                  for (final e in headers.entries) (e.key, e.value),
+                ],
+                encode: (rows) => {
+                  for (final (key, value) in rows)
+                    if (key.isNotEmpty) key: value,
+                },
+                equals: stringMapEquality.equals,
+                onChanged: (map) {
+                  final bloc = context.read<TabsBloc>();
+                  final current = bloc.state.tabs.byId(tabId);
+                  if (current == null) return;
+                  bloc.add(
+                    UpdateTab(
+                      current.copyWith(
+                        config: current.config.copyWith(headers: map),
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
         );
       },
     );
@@ -186,6 +243,7 @@ class _BodyTypeSelector extends StatelessWidget {
         children: [
           for (final type in BodyType.values)
             _BodyTypeChip(
+              key: ValueKey('bodytype_${_labels[type]!}'),
               label: _labels[type]!,
               active: type == active,
               onTap: () {
@@ -210,6 +268,7 @@ class _BodyTypeChip extends StatelessWidget {
     required this.label,
     required this.active,
     required this.onTap,
+    super.key,
   });
   final String label;
   final bool active;
@@ -324,7 +383,7 @@ class _BinaryBodyPicker extends StatelessWidget {
   final String tabId;
 
   Future<void> _pick(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.pickFiles();
     if (result == null || result.files.isEmpty) return;
     final picked = result.files.single;
     if (picked.path == null) {

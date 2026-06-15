@@ -59,6 +59,7 @@ class _SelectorButton extends StatelessWidget {
     // + tab chip + + button + env selector all fit on a phone tab bar.
     final iconOnly = context.useTabSwitcher;
     return PopupMenuButton<String>(
+      key: const ValueKey('environment_selector'),
       tooltip: 'Environment · ${_activeLabel()}',
       position: PopupMenuPosition.under,
       color: theme.colorScheme.surface,

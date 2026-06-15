@@ -6,6 +6,8 @@ import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_event.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 
 /// CONNECT / DISCONNECT button for WebSocket & SSE requests, driven by the
 /// realtime connection status for this tab.
@@ -33,23 +35,31 @@ class RealtimeButton extends StatelessWidget {
         final connected = rt.sessionFor(tabId).connected;
         return context.appDecoration.wrapInteractive(
           child: ElevatedButton(
+            key: const ValueKey('realtime_connect_button'),
             onPressed: () {
               final bloc = context.read<RealtimeBloc>();
               if (connected) {
                 bloc.add(Disconnect(tabId));
-              } else {
-                bloc.add(
-                  Connect(
-                    tabId: tabId,
-                    kind: config.kind,
-                    url: EnvironmentResolver.resolve(config.url, activeVars),
-                    headers: EnvironmentResolver.resolveMap(
-                      config.headers,
-                      activeVars,
-                    ),
-                  ),
-                );
+                return;
               }
+              // Read the tab's current config at press time. The URL bar does
+              // not rebuild on URL edits (perf), so the constructor-captured
+              // [config] can carry a stale URL; fall back to it only if the tab
+              // is gone.
+              final current =
+                  context.read<TabsBloc>().state.tabs.byId(tabId)?.config ??
+                  config;
+              bloc.add(
+                Connect(
+                  tabId: tabId,
+                  kind: current.kind,
+                  url: EnvironmentResolver.resolve(current.url, activeVars),
+                  headers: EnvironmentResolver.resolveMap(
+                    current.headers,
+                    activeVars,
+                  ),
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: connected ? theme.colorScheme.error : null,
