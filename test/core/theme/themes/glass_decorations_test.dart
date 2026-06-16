@@ -38,4 +38,22 @@ void main() {
       ),
     );
   });
+
+  testWidgets('GlassWallpaper survives an animate flip without crashing', (
+    tester,
+  ) async {
+    Widget host({required bool animate}) => MaterialApp(
+      theme: glassTheme(Brightness.dark),
+      home: GlassWallpaper(animate: animate, child: const SizedBox()),
+    );
+    await tester.pumpWidget(host(animate: false));
+    await tester.pumpWidget(host(animate: true)); // creates the controller
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    // End on the static variant so didUpdateWidget disposes the controller
+    // (avoids a pending-timer error at teardown).
+    await tester.pumpWidget(host(animate: false));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
 }

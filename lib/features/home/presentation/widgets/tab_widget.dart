@@ -284,7 +284,7 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
           position.dx + 1,
           position.dy + 1,
         ),
-        color: theme.scaffoldBackgroundColor,
+        color: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(context.appShape.panelRadius),
           side: BorderSide(
