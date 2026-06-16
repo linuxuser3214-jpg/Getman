@@ -43,6 +43,24 @@ class _GlassPressState extends State<GlassPress>
   }
 
   @override
+  void didUpdateWidget(GlassPress old) {
+    super.didUpdateWidget(old);
+    if (old.animate == widget.animate) return;
+    if (widget.animate) {
+      _controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 120),
+      );
+      _scale = Tween<double>(begin: 1, end: widget.scaleDown).animate(
+        CurvedAnimation(parent: _controller!, curve: Curves.easeOut),
+      );
+    } else {
+      _controller?.dispose();
+      _controller = null;
+    }
+  }
+
+  @override
   void dispose() {
     _controller?.dispose();
     super.dispose();

@@ -3,6 +3,7 @@ import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_theme.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_theme.dart';
+import 'package:getman/core/theme/themes/glass/glass_theme.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_theme.dart';
 
 typedef AppThemeBuilder =
@@ -47,6 +48,11 @@ const Map<String, ThemeDescriptor> appThemes = {
     id: kDraculaThemeId,
     displayName: 'DRACULA',
     builder: draculaTheme,
+  ),
+  kGlassThemeId: ThemeDescriptor(
+    id: kGlassThemeId,
+    displayName: 'LIQUID GLASS',
+    builder: glassTheme,
   ),
 };
 
