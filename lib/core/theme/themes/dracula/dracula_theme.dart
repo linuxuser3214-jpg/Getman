@@ -9,7 +9,11 @@ import 'package:google_fonts/google_fonts.dart';
 /// light uses the project's official "Alucard" light companion. Visual
 /// personality is clean & flat (soft rounded corners, thin purple-tinted
 /// borders, gentle shadows — no hard offsets, no animated background).
-ThemeData draculaTheme(Brightness brightness, {bool isCompact = false}) {
+ThemeData draculaTheme(
+  Brightness brightness, {
+  bool isCompact = false,
+  bool reduceEffects = false,
+}) {
   final isDark = brightness == Brightness.dark;
   final background = isDark
       ? DraculaPalette.backgroundDark

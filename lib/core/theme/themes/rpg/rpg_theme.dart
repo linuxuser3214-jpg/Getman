@@ -7,7 +7,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// Arcane Quest — an RPG-flavoured theme with sparkle-on-tap, animated
 /// starfield background, glowing gold panels, and carved-stone typography.
-ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
+ThemeData rpgTheme(
+  Brightness brightness, {
+  bool isCompact = false,
+  bool reduceEffects = false,
+}) {
   final isDark = brightness == Brightness.dark;
   final background = isDark
       ? RpgPalette.backgroundDark

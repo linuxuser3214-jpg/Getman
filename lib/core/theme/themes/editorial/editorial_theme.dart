@@ -5,7 +5,11 @@ import 'package:getman/core/theme/themes/editorial/editorial_fade.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_palette.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
+ThemeData editorialTheme(
+  Brightness brightness, {
+  bool isCompact = false,
+  bool reduceEffects = false,
+}) {
   final isDark = brightness == Brightness.dark;
   final paper = isDark
       ? EditorialPalette.paperDark

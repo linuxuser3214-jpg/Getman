@@ -6,7 +6,11 @@ import 'package:getman/core/theme/themes/editorial/editorial_theme.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_theme.dart';
 
 typedef AppThemeBuilder =
-    ThemeData Function(Brightness brightness, {bool isCompact});
+    ThemeData Function(
+      Brightness brightness, {
+      bool isCompact,
+      bool reduceEffects,
+    });
 
 /// Everything a theme registration needs: identity (persisted in settings),
 /// a display name for the UI picker, and the actual builder.
@@ -52,26 +56,31 @@ ThemeDescriptor resolveThemeDescriptor(String? themeId) =>
 AppThemeBuilder resolveTheme(String? themeId) =>
     resolveThemeDescriptor(themeId).builder;
 
-// Cache keyed by (resolved theme id, brightness, isCompact).
-// ThemeData is immutable and theme builders are pure functions of these three
-// inputs, so entries are safe to share indefinitely.
-// Bounded: themes × brightness × compact ≤ ~12 entries total.
-final Map<(String, Brightness, bool), ThemeData> _themeDataCache = {};
+// Cache keyed by (resolved theme id, brightness, isCompact, reduceEffects).
+// ThemeData is immutable and theme builders are pure functions of these inputs,
+// so entries are safe to share indefinitely.
+// Bounded: themes × brightness × compact × reduceEffects ≤ ~16 entries total.
+final Map<(String, Brightness, bool, bool), ThemeData> _themeDataCache = {};
 
 /// Resolve and build the [ThemeData] for [themeId], caching by
-/// (resolved theme id, brightness, isCompact) so repeated calls during
-/// BLoC rebuilds never re-run the expensive theme builder.
+/// (resolved theme id, brightness, isCompact, reduceEffects) so repeated calls
+/// during BLoC rebuilds never re-run the expensive theme builder.
 ThemeData resolveThemeData(
   String? themeId,
   Brightness brightness, {
   required bool isCompact,
+  bool reduceEffects = false,
 }) {
   // Resolve the id first so an unknown id shares a cache entry with the
   // fallback theme rather than creating a separate (never-reused) entry.
   final resolvedId = resolveThemeDescriptor(themeId).id;
-  final key = (resolvedId, brightness, isCompact);
+  final key = (resolvedId, brightness, isCompact, reduceEffects);
   return _themeDataCache.putIfAbsent(
     key,
-    () => resolveTheme(resolvedId)(brightness, isCompact: isCompact),
+    () => resolveTheme(resolvedId)(
+      brightness,
+      isCompact: isCompact,
+      reduceEffects: reduceEffects,
+    ),
   );
 }
