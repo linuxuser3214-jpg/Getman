@@ -12,6 +12,7 @@ import 'package:getman/core/utils/fuzzy_matcher.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -26,12 +27,14 @@ class CommandPalette extends StatefulWidget {
     required this.collectionsBloc,
     required this.environmentsBloc,
     required this.settingsBloc,
+    required this.historyBloc,
     super.key,
   });
   final TabsBloc tabsBloc;
   final CollectionsBloc collectionsBloc;
   final EnvironmentsBloc environmentsBloc;
   final SettingsBloc settingsBloc;
+  final HistoryBloc historyBloc;
 
   static Future<void> show(BuildContext context) {
     return showResponsiveDialog(
@@ -41,6 +44,7 @@ class CommandPalette extends StatefulWidget {
         collectionsBloc: context.read<CollectionsBloc>(),
         environmentsBloc: context.read<EnvironmentsBloc>(),
         settingsBloc: context.read<SettingsBloc>(),
+        historyBloc: context.read<HistoryBloc>(),
       ),
     );
   }
@@ -72,8 +76,12 @@ class _CommandPaletteState extends State<CommandPalette> {
     super.dispose();
   }
 
+  static String _matchString(_Command c) => c.matchExtra.isEmpty
+      ? '${c.label} ${c.subtitle}'
+      : '${c.label} ${c.subtitle} ${c.matchExtra}';
+
   List<_Command> _resultsFor(String query) =>
-      FuzzyMatcher.filter(query, _all, (c) => '${c.label} ${c.subtitle}');
+      FuzzyMatcher.filter(query, _all, _matchString);
 
   void _onQueryChanged(String v) {
     _debouncer.run(() {
@@ -131,6 +139,23 @@ class _CommandPaletteState extends State<CommandPalette> {
         ),
       );
     }
+
+    // History source: newest-first (the repository already reverses insertion
+    // order). Opens an UNLINKED tab from the stored, templated config —
+    // matching history_list.dart verbatim (no collectionNodeId/Name) so a
+    // re-send never compares against / overwrites a collection node, and the
+    // {{var}} placeholders stay unresolved for re-sending under another env.
+    for (final config in widget.historyBloc.state.history) {
+      cmds.add(
+        _Command(
+          label: config.url.isEmpty ? '(NO URL)' : config.url,
+          subtitle: 'History',
+          icon: Icons.history,
+          matchExtra: config.method,
+          run: () => widget.tabsBloc.add(AddTab(config: config.copyWith())),
+        ),
+      );
+    }
     return cmds;
   }
 
@@ -153,6 +178,7 @@ class _CommandPaletteState extends State<CommandPalette> {
             label: node.name,
             subtitle: path.isEmpty ? 'Request' : path,
             icon: Icons.http,
+            matchExtra: config == null ? '' : '${config.method} ${config.url}',
             run: () => widget.tabsBloc.add(
               AddTab(
                 config: config,
@@ -220,7 +246,9 @@ class _CommandPaletteState extends State<CommandPalette> {
               autocorrect: false,
               enableSuggestions: false,
               decoration: const InputDecoration(
-                hintText: 'Jump to a request, environment, or theme…',
+                hintText:
+                    'Jump to a request, history entry, environment, '
+                    'or theme…',
                 prefixIcon: Icon(Icons.search),
                 isDense: true,
               ),
@@ -306,11 +334,18 @@ class _Command {
     required this.subtitle,
     required this.icon,
     required this.run,
+    this.matchExtra = '',
   });
   final String label;
   final String subtitle;
   final IconData icon;
   final VoidCallback run;
+
+  /// Extra text folded into the fuzzy-match string but NOT displayed — lets a
+  /// saved request match by method + URL (and a history entry by method)
+  /// without changing the visible label/subtitle. Default `''` keeps
+  /// environment/theme commands matching on label + subtitle only.
+  final String matchExtra;
 }
 
 class _MoveSelectionIntent extends Intent {

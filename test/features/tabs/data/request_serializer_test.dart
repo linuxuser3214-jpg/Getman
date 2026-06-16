@@ -299,5 +299,30 @@ void main() {
     test('binary with no file path returns null', () async {
       expect(await build(cfg(bodyType: BodyType.binary)), isNull);
     });
+
+    // Regression: the binary path-guard must fire BEFORE
+    // BodyTypeUtils.applyContentType so a no-file binary request leaves
+    // Content-Type completely unset.
+    test('binary with null file path leaves Content-Type unset', () async {
+      headers.clear(); // start with no content-type
+      final result = await build(cfg(bodyType: BodyType.binary));
+      expect(result, isNull);
+      expect(
+        headers.keys.any((k) => k.toLowerCase() == 'content-type'),
+        isFalse,
+      );
+    });
+
+    test('binary with empty file path leaves Content-Type unset', () async {
+      headers.clear();
+      final result = await build(
+        cfg(bodyType: BodyType.binary, bodyFilePath: ''),
+      );
+      expect(result, isNull);
+      expect(
+        headers.keys.any((k) => k.toLowerCase() == 'content-type'),
+        isFalse,
+      );
+    });
   });
 }

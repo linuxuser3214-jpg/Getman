@@ -83,6 +83,10 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
     selectorActive: isDark
         ? BrutalistPalette.secondaryDark
         : BrutalistPalette.secondary,
+    diffAddedForeground: Colors.green.shade700,
+    diffAddedBackground: Colors.green.shade700.withValues(alpha: 0.14),
+    diffRemovedForeground: Colors.red.shade700,
+    diffRemovedBackground: Colors.red.shade700.withValues(alpha: 0.14),
   );
 
   final decoration = AppDecoration(

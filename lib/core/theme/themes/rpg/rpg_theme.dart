@@ -111,6 +111,10 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     variableResolved: RpgPalette.statusSuccess,
     variableUnresolved: RpgPalette.statusError,
     selectorActive: RpgPalette.gold,
+    diffAddedForeground: RpgPalette.statusSuccess,
+    diffAddedBackground: RpgPalette.statusSuccess.withValues(alpha: 0.16),
+    diffRemovedForeground: RpgPalette.statusError,
+    diffRemovedBackground: RpgPalette.statusError.withValues(alpha: 0.16),
   );
 
   final decoration = AppDecoration(

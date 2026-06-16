@@ -40,6 +40,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     required this.splitterGrabSize,
     required this.splitterLineSize,
     required this.foldGutterWidth,
+    required this.quickListMaxHeight,
   });
   final double pagePadding;
   final double sectionSpacing;
@@ -83,6 +84,10 @@ class AppLayout extends ThemeExtension<AppLayout> {
   /// beside the line-number column in `JsonCodeEditor`.
   final double foldGutterWidth;
 
+  /// Max height of the scrollable row list in compact overlays such as the
+  /// quick environment switcher — caps the list so the modal stays bounded.
+  final double quickListMaxHeight;
+
   @override
   AppLayout copyWith({
     bool? isCompact,
@@ -123,6 +128,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     double? splitterGrabSize,
     double? splitterLineSize,
     double? foldGutterWidth,
+    double? quickListMaxHeight,
   }) {
     return AppLayout(
       isCompact: isCompact ?? this.isCompact,
@@ -168,6 +174,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
       splitterGrabSize: splitterGrabSize ?? this.splitterGrabSize,
       splitterLineSize: splitterLineSize ?? this.splitterLineSize,
       foldGutterWidth: foldGutterWidth ?? this.foldGutterWidth,
+      quickListMaxHeight: quickListMaxHeight ?? this.quickListMaxHeight,
     );
   }
 
@@ -229,6 +236,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
       splitterGrabSize: l(splitterGrabSize, other.splitterGrabSize),
       splitterLineSize: l(splitterLineSize, other.splitterLineSize),
       foldGutterWidth: l(foldGutterWidth, other.foldGutterWidth),
+      quickListMaxHeight: l(quickListMaxHeight, other.quickListMaxHeight),
     );
   }
 
@@ -271,6 +279,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     splitterGrabSize: 40,
     splitterLineSize: 3,
     foldGutterWidth: 20,
+    quickListMaxHeight: 360,
   );
 
   static const compact = AppLayout(
@@ -312,5 +321,6 @@ class AppLayout extends ThemeExtension<AppLayout> {
     splitterGrabSize: 28,
     splitterLineSize: 2,
     foldGutterWidth: 16,
+    quickListMaxHeight: 280,
   );
 }

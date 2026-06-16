@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,7 +15,6 @@ import 'package:getman/features/collections/data/services/workspace_sync_service
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/workspace_sync_listener.dart';
-import 'package:getman/features/command_palette/presentation/widgets/command_palette.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
@@ -116,6 +113,10 @@ final Map<ShortcutActivator, Intent> appShortcuts = {
       const CommandPaletteIntent(),
   const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
       const CommandPaletteIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyE, control: true):
+      const SwitchEnvironmentIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyE, meta: true):
+      const SwitchEnvironmentIntent(),
   const SingleActivator(LogicalKeyboardKey.tab, control: true):
       const NextTabIntent(),
   const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
@@ -194,13 +195,14 @@ class MyApp extends StatelessWidget {
                         onInvoke: (intent) =>
                             context.read<TabsBloc>().add(const AddTab()),
                       ),
-                      CommandPaletteIntent:
-                          CallbackAction<CommandPaletteIntent>(
-                            onInvoke: (intent) {
-                              unawaited(CommandPalette.show(context));
-                              return null;
-                            },
-                          ),
+                      // CommandPaletteIntent / SwitchEnvironmentIntent are
+                      // wired in MainScreen, not here. Their actions open a
+                      // dialog via showDialog, which needs a context *below*
+                      // MaterialApp (for MaterialLocalizations) and below the
+                      // router's Navigator. This Actions sits above
+                      // MaterialApp, so a dialog launched from here would throw
+                      // "No MaterialLocalizations found". NewTabIntent stays —
+                      // it only reads a bloc.
                     },
                     child: MaterialApp.router(
                       title: 'GETMAN',

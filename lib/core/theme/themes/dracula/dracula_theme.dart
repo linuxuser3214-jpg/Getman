@@ -115,6 +115,22 @@ ThemeData draculaTheme(Brightness brightness, {bool isCompact = false}) {
         ? DraculaPalette.variableUnresolvedDark
         : DraculaPalette.variableUnresolvedLight,
     selectorActive: currentPrimary,
+    diffAddedForeground: isDark
+        ? DraculaPalette.statusSuccessDark
+        : DraculaPalette.statusSuccessLight,
+    diffAddedBackground:
+        (isDark
+                ? DraculaPalette.statusSuccessDark
+                : DraculaPalette.statusSuccessLight)
+            .withValues(alpha: 0.16),
+    diffRemovedForeground: isDark
+        ? DraculaPalette.statusErrorDark
+        : DraculaPalette.statusErrorLight,
+    diffRemovedBackground:
+        (isDark
+                ? DraculaPalette.statusErrorDark
+                : DraculaPalette.statusErrorLight)
+            .withValues(alpha: 0.16),
   );
 
   final decoration = AppDecoration(

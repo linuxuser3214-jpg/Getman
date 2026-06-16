@@ -14,6 +14,8 @@ import 'package:getman/features/command_palette/presentation/widgets/command_pal
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
+import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -28,11 +30,14 @@ class MockEnvironmentsBloc extends Mock implements EnvironmentsBloc {}
 
 class MockSettingsBloc extends Mock implements SettingsBloc {}
 
+class MockHistoryBloc extends Mock implements HistoryBloc {}
+
 void main() {
   late MockTabsBloc tabs;
   late MockCollectionsBloc collections;
   late MockEnvironmentsBloc environments;
   late MockSettingsBloc settings;
+  late MockHistoryBloc history;
 
   setUpAll(() {
     registerFallbackValue(const AddTab());
@@ -44,6 +49,7 @@ void main() {
     collections = MockCollectionsBloc();
     environments = MockEnvironmentsBloc();
     settings = MockSettingsBloc();
+    history = MockHistoryBloc();
 
     when(() => collections.state).thenReturn(
       CollectionsState(
@@ -72,6 +78,7 @@ void main() {
         environments: [EnvironmentEntity(id: 'e1', name: 'Production')],
       ),
     );
+    when(() => history.state).thenReturn(const HistoryState());
     when(() => tabs.add(any())).thenReturn(null);
     when(() => settings.add(any())).thenReturn(null);
   });
@@ -86,6 +93,7 @@ void main() {
             collectionsBloc: collections,
             environmentsBloc: environments,
             settingsBloc: settings,
+            historyBloc: history,
           ),
         ),
       ),
@@ -155,5 +163,104 @@ void main() {
     verify(
       () => settings.add(any(that: isA<UpdateActiveEnvironmentId>())),
     ).called(1);
+  });
+
+  testWidgets('request matches by URL fragment, not just name', (tester) async {
+    // Seed a leaf whose NAME ('Widgets List') does not contain the URL token
+    // 'orders' — only the URL does. Proves the widened match string.
+    when(() => collections.state).thenReturn(
+      CollectionsState(
+        collections: const [
+          CollectionNodeEntity(
+            id: 'r2',
+            name: 'Widgets List',
+            isFolder: false,
+            config: HttpRequestConfigEntity(
+              id: 'c2',
+              url: 'https://api.dev/orders',
+            ),
+          ),
+        ],
+      ),
+    );
+    await pump(tester);
+    await tester.enterText(find.byType(TextField), 'orders');
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
+    // The displayed label is still the node name — the URL only widened the
+    // hidden match text.
+    expect(find.text('Widgets List'), findsOneWidget);
+  });
+
+  testWidgets('request matches by HTTP method', (tester) async {
+    when(() => collections.state).thenReturn(
+      CollectionsState(
+        collections: const [
+          CollectionNodeEntity(
+            id: 'r3',
+            name: 'Remove User',
+            isFolder: false,
+            config: HttpRequestConfigEntity(
+              id: 'c3',
+              method: 'DELETE',
+              url: 'https://api.dev/users/1',
+            ),
+          ),
+        ],
+      ),
+    );
+    await pump(tester);
+    await tester.enterText(find.byType(TextField), 'delete');
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove User'), findsOneWidget);
+  });
+
+  testWidgets(
+    'history entry appears with a History subtitle and opens unlinked',
+    (tester) async {
+      when(() => history.state).thenReturn(
+        const HistoryState(
+          history: [
+            HttpRequestConfigEntity(
+              id: 'h1',
+              method: 'POST',
+              url: 'https://api.example.com/orders',
+            ),
+          ],
+        ),
+      );
+      await pump(tester);
+      await tester.enterText(find.byType(TextField), 'orders');
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      // The URL is the row label; 'History' is the source-tag subtitle.
+      expect(find.text('https://api.example.com/orders'), findsOneWidget);
+      expect(find.text('History'), findsOneWidget);
+
+      await tester.tap(find.text('https://api.example.com/orders'));
+      await tester.pumpAndSettle();
+
+      final captured =
+          verify(
+                () => tabs.add(captureAny(that: isA<AddTab>())),
+              ).captured.single
+              as AddTab;
+      expect(captured.config?.url, 'https://api.example.com/orders');
+      expect(captured.config?.method, 'POST');
+      // Unlinked tab — Locked Decision 4.
+      expect(captured.collectionNodeId, isNull);
+      expect(captured.collectionName, isNull);
+    },
+  );
+
+  testWidgets('empty history adds no History row', (tester) async {
+    // history.state already stubbed empty in setUp.
+    await pump(tester);
+    expect(find.text('History'), findsNothing);
+    // Existing sources still render.
+    expect(find.text('Login'), findsOneWidget);
+    expect(find.text('Production'), findsOneWidget);
   });
 }

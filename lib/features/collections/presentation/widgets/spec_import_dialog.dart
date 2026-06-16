@@ -2,7 +2,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/openapi/collection_builder.dart';
@@ -11,10 +10,8 @@ import 'package:getman/core/utils/openapi/normalized_api.dart';
 import 'package:getman/core/utils/openapi/spec_loader.dart';
 import 'package:getman/core/utils/openapi/spec_normalizer.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
-
-/// Where the spec text comes from: a picked file, a pasted string, or a remote
-/// URL fetched via [NetworkService].
-enum _Source { file, paste, url }
+import 'package:getman/features/collections/presentation/widgets/spec_import_preview.dart';
+import 'package:getman/features/collections/presentation/widgets/spec_import_source.dart';
 
 /// Multi-step importer for OpenAPI 3.x / Swagger 2.0 specs (JSON or YAML).
 ///
@@ -61,7 +58,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
   final TextEditingController _pasteController = TextEditingController();
   final TextEditingController _urlController = TextEditingController();
 
-  _Source _source = _Source.file;
+  SpecImportSource _source = SpecImportSource.file;
   ImportResult? _result;
   Set<String> _selected = <String>{};
   String? _error;
@@ -128,7 +125,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
     }
   }
 
-  void _setSource(_Source source) {
+  void _setSource(SpecImportSource source) {
     if (source == _source) return;
     setState(() => _source = source);
   }
@@ -187,12 +184,12 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
             // Afterwards, collapse to a compact "re-parse" row so the
             // selectable preview is the primary content.
             if (result == null) ...[
-              _SourceSelector(source: _source, onChanged: _setSource),
+              SpecImportSourceSelector(source: _source, onChanged: _setSource),
               SizedBox(height: layout.sectionSpacing),
               _buildSourceInput(context),
               if (_error != null) ...[
                 SizedBox(height: layout.tabSpacing),
-                _ErrorText(message: _error!),
+                SpecImportErrorText(message: _error!),
               ],
             ] else ...[
               Align(
@@ -206,7 +203,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
               SizedBox(height: layout.tabSpacing),
               Flexible(
                 child: SingleChildScrollView(
-                  child: _ImportPreview(
+                  child: SpecImportPreview(
                     result: result,
                     selected: _selected,
                     onToggleFolder: _toggleFolder,
@@ -233,7 +230,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
 
   Widget _buildSourceInput(BuildContext context) {
     switch (_source) {
-      case _Source.file:
+      case SpecImportSource.file:
         return Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -242,7 +239,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
             label: const Text('PICK FILE'),
           ),
         );
-      case _Source.paste:
+      case SpecImportSource.paste:
         final layout = context.appLayout;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -266,7 +263,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
             ),
           ],
         );
-      case _Source.url:
+      case SpecImportSource.url:
         final layout = context.appLayout;
         return Row(
           children: [
@@ -288,285 +285,5 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
           ],
         );
     }
-  }
-}
-
-/// The FILE / PASTE / URL segmented control.
-class _SourceSelector extends StatelessWidget {
-  const _SourceSelector({required this.source, required this.onChanged});
-
-  final _Source source;
-  final ValueChanged<_Source> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final layout = context.appLayout;
-    return Row(
-      children: [
-        for (final entry in const {
-          _Source.file: 'FILE',
-          _Source.paste: 'PASTE',
-          _Source.url: 'URL',
-        }.entries) ...[
-          if (entry.key != _Source.file) SizedBox(width: layout.tabSpacing),
-          Expanded(
-            child: _SourceButton(
-              label: entry.value,
-              selected: source == entry.key,
-              onTap: () => onChanged(entry.key),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _SourceButton extends StatelessWidget {
-  const _SourceButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-    return context.appDecoration.wrapInteractive(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: layout.buttonPaddingVertical),
-        decoration: BoxDecoration(
-          color: selected ? theme.primaryColor : theme.colorScheme.surface,
-          border: Border.all(
-            color: theme.dividerColor,
-            width: layout.borderThick,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected
-                ? theme.colorScheme.onPrimary
-                : theme.colorScheme.onSurface,
-            fontWeight: context.appTypography.displayWeight,
-            fontSize: layout.fontSizeNormal,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The selectable preview: folder rows (tristate group checkbox) with their
-/// indented request leaves, plus an environment summary and warnings.
-class _ImportPreview extends StatelessWidget {
-  const _ImportPreview({
-    required this.result,
-    required this.selected,
-    required this.onToggleFolder,
-    required this.onToggleLeaf,
-  });
-
-  final ImportResult result;
-  final Set<String> selected;
-  final void Function(CollectionNodeEntity folder, {required bool select})
-  onToggleFolder;
-  final void Function(String id, {required bool select}) onToggleLeaf;
-
-  @override
-  Widget build(BuildContext context) {
-    final layout = context.appLayout;
-    final palette = context.appPalette;
-    final typography = context.appTypography;
-    final theme = Theme.of(context);
-
-    final environments = result.environments;
-    final envLabel = environments.isEmpty
-        ? 'Creates no environments.'
-        : 'Creates ${environments.length} environment(s): '
-              '${environments.map((e) => e.name).join(', ')}';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final child in result.root.children) ...[
-          if (child.isFolder)
-            _FolderRow(
-              folder: child,
-              selected: selected,
-              onToggleFolder: onToggleFolder,
-              onToggleLeaf: onToggleLeaf,
-            )
-          else
-            _LeafRow(
-              leaf: child,
-              selected: selected.contains(child.id),
-              onChanged: (value) =>
-                  onToggleLeaf(child.id, select: value ?? false),
-            ),
-        ],
-        SizedBox(height: layout.sectionSpacing),
-        Text(
-          envLabel,
-          style: TextStyle(
-            fontSize: layout.fontSizeNormal,
-            fontWeight: typography.bodyWeight,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-        for (final warning in result.warnings) ...[
-          SizedBox(height: layout.tabSpacing),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.warning_amber_rounded,
-                size: layout.smallIconSize,
-                color: palette.statusWarning,
-              ),
-              SizedBox(width: layout.tabSpacing),
-              Expanded(
-                child: Text(
-                  warning,
-                  style: TextStyle(
-                    fontSize: layout.fontSizeSmall,
-                    fontWeight: typography.bodyWeight,
-                    color: palette.statusWarning,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _FolderRow extends StatelessWidget {
-  const _FolderRow({
-    required this.folder,
-    required this.selected,
-    required this.onToggleFolder,
-    required this.onToggleLeaf,
-  });
-
-  final CollectionNodeEntity folder;
-  final Set<String> selected;
-  final void Function(CollectionNodeEntity folder, {required bool select})
-  onToggleFolder;
-  final void Function(String id, {required bool select}) onToggleLeaf;
-
-  @override
-  Widget build(BuildContext context) {
-    final layout = context.appLayout;
-    final typography = context.appTypography;
-    final theme = Theme.of(context);
-
-    final leaves = folder.children.where((c) => !c.isFolder).toList();
-    final selectedCount = leaves.where((l) => selected.contains(l.id)).length;
-    final value = selectedCount == 0
-        ? false
-        : (selectedCount == leaves.length ? true : null);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Checkbox(
-              tristate: true,
-              value: value,
-              onChanged: (_) => onToggleFolder(folder, select: value != true),
-            ),
-            Expanded(
-              child: Text(
-                folder.name,
-                style: TextStyle(
-                  fontSize: layout.fontSizeNormal,
-                  fontWeight: typography.titleWeight,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            ),
-          ],
-        ),
-        for (final leaf in leaves)
-          Padding(
-            padding: EdgeInsets.only(left: layout.depthPaddingMultiplier),
-            child: _LeafRow(
-              leaf: leaf,
-              selected: selected.contains(leaf.id),
-              onChanged: (v) => onToggleLeaf(leaf.id, select: v ?? false),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _LeafRow extends StatelessWidget {
-  const _LeafRow({
-    required this.leaf,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  final CollectionNodeEntity leaf;
-  final bool selected;
-  final ValueChanged<bool?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final layout = context.appLayout;
-    final typography = context.appTypography;
-    final theme = Theme.of(context);
-    final method = leaf.config?.method ?? 'GET';
-
-    return Row(
-      children: [
-        Checkbox(value: selected, onChanged: onChanged),
-        MethodBadge(method: method, small: true),
-        SizedBox(width: layout.tabSpacing),
-        Expanded(
-          child: Text(
-            leaf.name,
-            style: TextStyle(
-              fontSize: layout.fontSizeNormal,
-              fontWeight: typography.bodyWeight,
-              color: theme.colorScheme.onSurface,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ErrorText extends StatelessWidget {
-  const _ErrorText({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final layout = context.appLayout;
-    final theme = Theme.of(context);
-    return Text(
-      message,
-      style: TextStyle(
-        fontSize: layout.fontSizeSmall,
-        fontWeight: context.appTypography.bodyWeight,
-        color: theme.colorScheme.error,
-      ),
-    );
   }
 }

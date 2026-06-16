@@ -20,6 +20,10 @@ void main() {
     variableResolved: Color(0xFF16A34A),
     variableUnresolved: Color(0xFFDC2626),
     selectorActive: Color(0xFF6D28D9),
+    diffAddedBackground: Color(0x2216A34A),
+    diffAddedForeground: Color(0xFF16A34A),
+    diffRemovedBackground: Color(0x22DC2626),
+    diffRemovedForeground: Color(0xFFDC2626),
   );
 
   group('AppPalette', () {
@@ -80,6 +84,23 @@ void main() {
       expect(copy.selectorActive, const Color(0xFF123456));
     });
 
+    test('copyWith preserves and overrides diff colors', () {
+      final preserved = palette.copyWith(
+        codeBackground: const Color(0xFF222222),
+      );
+      expect(preserved.diffAddedForeground, const Color(0xFF16A34A));
+      expect(preserved.diffAddedBackground, const Color(0x2216A34A));
+      expect(preserved.diffRemovedForeground, const Color(0xFFDC2626));
+      expect(preserved.diffRemovedBackground, const Color(0x22DC2626));
+
+      final overridden = palette.copyWith(
+        diffAddedForeground: const Color(0xFF00FF00),
+        diffRemovedForeground: const Color(0xFFFF0000),
+      );
+      expect(overridden.diffAddedForeground, const Color(0xFF00FF00));
+      expect(overridden.diffRemovedForeground, const Color(0xFFFF0000));
+    });
+
     test('lerp interpolates colors and picks other.methodColors map', () {
       final other = palette.copyWith(
         methodColors: const {'GET': Color(0xFF000000)},
@@ -90,6 +111,20 @@ void main() {
       expect(mid.methodColors['GET'], const Color(0xFF000000));
       expect(mid.statusSuccess, Colors.white);
       expect(mid.selectorActive, Colors.white);
+    });
+
+    test('lerp interpolates the diff colors', () {
+      final other = palette.copyWith(
+        diffAddedForeground: const Color(0xFF000000),
+        diffRemovedForeground: const Color(0xFF000000),
+        diffAddedBackground: const Color(0xFF000000),
+        diffRemovedBackground: const Color(0xFF000000),
+      );
+      final end = palette.lerp(other, 1);
+      expect(end.diffAddedForeground, const Color(0xFF000000));
+      expect(end.diffRemovedForeground, const Color(0xFF000000));
+      expect(end.diffAddedBackground, const Color(0xFF000000));
+      expect(end.diffRemovedBackground, const Color(0xFF000000));
     });
   });
 }
