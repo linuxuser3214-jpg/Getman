@@ -138,7 +138,7 @@ class CodeGenService {
     final opts = StringBuffer()..write("  method: '${e.method}',\n");
     if (e.headers.isNotEmpty) {
       opts.write('  headers: {\n');
-      e.headers.forEach((k, v) => opts.write("    '$k': '${_sq(v)}',\n"));
+      _writeHeaders(opts, e.headers, '    ');
       opts.write('  },\n');
     }
     switch (e.bodyType) {
@@ -183,7 +183,7 @@ class CodeGenService {
     final b = StringBuffer('import requests\n\n')
       ..write("url = '${e.url}'\n")
       ..write('headers = {\n');
-    e.headers.forEach((k, v) => b.write("    '$k': '${_sq(v)}',\n"));
+    _writeHeaders(b, e.headers, '    ');
     b.write('}\n');
 
     final extra = <String>['headers=headers'];
@@ -235,7 +235,7 @@ class CodeGenService {
     final isMultipart = e.bodyType == BodyType.multipart;
     if (e.headers.isNotEmpty || isMultipart) {
       opts.write('  headers: {\n');
-      e.headers.forEach((k, v) => opts.write("    '$k': '${_sq(v)}',\n"));
+      _writeHeaders(opts, e.headers, '    ');
       // form.getHeaders() carries the multipart boundary content-type.
       if (isMultipart) opts.write('    ...form.getHeaders(),\n');
       opts.write('  },\n');
@@ -442,6 +442,15 @@ class CodeGenService {
 
   // ---- helpers ----
 
+  /// Writes `'key': 'value',` lines (single-quoted, escaped) at [indent].
+  static void _writeHeaders(
+    StringBuffer buffer,
+    Map<String, String> headers,
+    String indent,
+  ) {
+    headers.forEach((k, v) => buffer.write("$indent'$k': '${_sq(v)}',\n"));
+  }
+
   static String _contentTypeOf(Map<String, String> headers, String fallback) {
     for (final entry in headers.entries) {
       if (entry.key.toLowerCase() == 'content-type') return entry.value;
@@ -472,10 +481,15 @@ class CodeGenService {
     return '{${entries.join(', ')}}';
   }
 
-  /// Escapes a value for embedding inside a `'...'` literal in JS/Python
-  /// (backslash first so it isn't double-processed, then newline, then quote).
-  static String _sq(String v) =>
-      v.replaceAll(r'\', r'\\').replaceAll('\n', r'\n').replaceAll("'", r"\'");
+  /// Shared escaper: backslash first (so it isn't double-processed), then
+  /// newline, then the delimiting [quote] character.
+  static String _escape(String v, String quote) => v
+      .replaceAll(r'\', r'\\')
+      .replaceAll('\n', r'\n')
+      .replaceAll(quote, '\\$quote');
+
+  /// Escapes a value for embedding inside a `'...'` literal in JS/Python.
+  static String _sq(String v) => _escape(v, "'");
 
   /// POSIX single-quote escaping for shell (curl): a literal `'` becomes the
   /// `'\''` idiom (close, escaped quote, reopen). Newlines are literal inside
@@ -500,10 +514,8 @@ class CodeGenService {
   static String _dqString(String v) =>
       v.contains('\n') ? jsonEncode(v) : '"${_dq(v)}"';
 
-  /// Escapes a value for embedding inside a `"..."` literal (backslash first,
-  /// then newline, then the double quote).
-  static String _dq(String v) =>
-      v.replaceAll(r'\', r'\\').replaceAll('\n', r'\n').replaceAll('"', r'\"');
+  /// Escapes a value for embedding inside a `"..."` literal.
+  static String _dq(String v) => _escape(v, '"');
 }
 
 class _Effective {
