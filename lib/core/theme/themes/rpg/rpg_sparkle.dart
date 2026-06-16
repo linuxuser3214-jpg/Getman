@@ -17,10 +17,15 @@ class RpgSparkle extends StatefulWidget {
     super.key,
     this.onTap,
     this.scaleDown = 0.96,
+    this.sparkle = true,
   });
   final Widget child;
   final VoidCallback? onTap;
   final double scaleDown;
+
+  /// When false (reduced visual effects), tap-down skips the particle burst;
+  /// the scale-press still fires (it's cheap and transient).
+  final bool sparkle;
 
   @override
   State<RpgSparkle> createState() => _RpgSparkleState();
@@ -112,7 +117,7 @@ class _RpgSparkleState extends State<RpgSparkle> with TickerProviderStateMixin {
       behavior: HitTestBehavior.opaque,
       onTapDown: (details) {
         unawaited(_scaleController.forward());
-        _emitBurst(details.localPosition);
+        if (widget.sparkle) _emitBurst(details.localPosition);
       },
       onTapUp: (_) {
         unawaited(_scaleController.reverse());

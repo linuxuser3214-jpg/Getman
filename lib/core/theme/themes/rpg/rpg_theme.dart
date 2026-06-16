@@ -124,9 +124,15 @@ ThemeData rpgTheme(
   final decoration = AppDecoration(
     panelBox: rpgPanelBox,
     tabShape: rpgTabShape,
-    wrapInteractive: ({required child, onTap, scaleDown}) =>
-        RpgSparkle(onTap: onTap, scaleDown: scaleDown ?? 0.96, child: child),
-    scaffoldBackground: rpgScaffoldBackground,
+    wrapInteractive: ({required child, onTap, scaleDown}) => RpgSparkle(
+      onTap: onTap,
+      scaleDown: scaleDown ?? 0.96,
+      sparkle: !reduceEffects,
+      child: child,
+    ),
+    scaffoldBackground: reduceEffects
+        ? rpgStaticScaffoldBackground
+        : rpgScaffoldBackground,
   );
 
   final cinzelUppercase = TextStyle(
