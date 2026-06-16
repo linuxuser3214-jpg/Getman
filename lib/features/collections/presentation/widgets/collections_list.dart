@@ -7,9 +7,7 @@ import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
-import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
-import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/utils/debouncer.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
@@ -19,6 +17,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_menu.dart';
+import 'package:getman/features/collections/presentation/widgets/example_menu.dart';
 import 'package:getman/features/collections/presentation/widgets/node_action_sheet.dart';
 import 'package:getman/features/collections/presentation/widgets/spec_import_dialog.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
@@ -751,102 +750,17 @@ class _ExampleRowState extends State<_ExampleRow> {
                         ),
                       ),
                     ),
-                    _ExampleMenu(item: widget.item),
+                    ExampleMenu(
+                      nodeId: widget.item.nodeId,
+                      exampleId: widget.item.example.id,
+                      exampleName: widget.item.example.name,
+                    ),
                   ],
                 ),
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Rename/delete menu for a single saved example (works on desktop + phone).
-class _ExampleMenu extends StatelessWidget {
-  const _ExampleMenu({required this.item});
-  final _ExampleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-
-    return PopupMenuButton<String>(
-      icon: Icon(
-        Icons.more_vert,
-        size: layout.smallIconSize,
-        color: theme.colorScheme.onSurface,
-      ),
-      color: theme.colorScheme.surface,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-        side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-      ),
-      onSelected: (val) {
-        switch (val) {
-          case 'rename':
-            _rename(context);
-          case 'delete':
-            _delete(context);
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: 'rename',
-          child: Text(
-            'RENAME',
-            style: TextStyle(
-              fontSize: layout.fontSizeSmall,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          child: Text(
-            'DELETE',
-            style: TextStyle(
-              fontSize: layout.fontSizeSmall,
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.error,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _rename(BuildContext context) {
-    final bloc = context.read<CollectionsBloc>();
-    final messenger = ScaffoldMessenger.of(context);
-    unawaited(
-      NamePromptDialog.show(
-        context,
-        title: 'RENAME EXAMPLE',
-        initialText: item.example.name,
-        onConfirm: (name) {
-          bloc.add(RenameExample(item.nodeId, item.example.id, name));
-          showAppSnackBarVia(messenger, 'Renamed to "$name"');
-        },
-      ),
-    );
-  }
-
-  void _delete(BuildContext context) {
-    final bloc = context.read<CollectionsBloc>();
-    final messenger = ScaffoldMessenger.of(context);
-    unawaited(
-      ConfirmDialog.show(
-        context,
-        title: 'Delete example?',
-        message: 'Deletes "${item.example.name}". This cannot be undone.',
-        onConfirm: () {
-          bloc.add(DeleteExample(item.nodeId, item.example.id));
-          showAppSnackBarVia(messenger, 'Deleted "${item.example.name}"');
-        },
       ),
     );
   }
