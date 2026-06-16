@@ -21,6 +21,11 @@ Widget _noopWrap({
   double? scaleDown,
 }) => child;
 Widget _noopScaffoldBg(BuildContext ctx, {required Widget child}) => child;
+Widget _noopFrost(
+  BuildContext ctx, {
+  required Widget child,
+  BorderRadius? borderRadius,
+}) => child;
 
 void main() {
   group('AppDecoration', () {
@@ -44,6 +49,24 @@ void main() {
       expect(identical(copy.tabShape, a.tabShape), isTrue);
       expect(identical(copy.wrapInteractive, a.wrapInteractive), isTrue);
     });
+
+    test(
+      'copyWith preserves frost when not supplied and swaps when supplied',
+      () {
+        final base = a.copyWith(frost: _noopFrost);
+        // No-arg copyWith: frost is preserved.
+        final preserved = base.copyWith();
+        expect(identical(preserved.frost, _noopFrost), isTrue);
+        // copyWith with a distinct frost: frost is replaced.
+        Widget altFrost(
+          BuildContext ctx, {
+          required Widget child,
+          BorderRadius? borderRadius,
+        }) => child;
+        final swapped = base.copyWith(frost: altFrost);
+        expect(identical(swapped.frost, altFrost), isTrue);
+      },
+    );
 
     test('lerp returns this regardless of target', () {
       final b = a.copyWith();
