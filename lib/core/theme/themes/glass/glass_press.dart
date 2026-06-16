@@ -25,44 +25,40 @@ class GlassPress extends StatefulWidget {
 
 class _GlassPressState extends State<GlassPress>
     with SingleTickerProviderStateMixin {
-  AnimationController? _controller;
+  // Created once in initState and kept for the State's lifetime. A
+  // SingleTickerProvider permits one ticker ever, so we must NOT
+  // dispose+recreate this when animate toggles (that threw "multiple tickers").
+  // It is built in initState rather than lazily: in reduced mode build() never
+  // touches it, and a lazy `late` field would otherwise first-initialize inside
+  // dispose() — an unsafe TickerMode ancestor lookup on a deactivated element
+  // (the resize crash). When animate is false it just sits idle at 0.
+  late final AnimationController _controller;
   late Animation<double> _scale;
 
   @override
   void initState() {
     super.initState();
-    if (widget.animate) {
-      _controller = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 120),
-      );
-      _scale = Tween<double>(begin: 1, end: widget.scaleDown).animate(
-        CurvedAnimation(parent: _controller!, curve: Curves.easeOut),
-      );
-    }
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _scale = _buildScale();
   }
+
+  Animation<double> _buildScale() => Tween<double>(
+    begin: 1,
+    end: widget.scaleDown,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
   @override
   void didUpdateWidget(GlassPress old) {
     super.didUpdateWidget(old);
-    if (old.animate == widget.animate) return;
-    if (widget.animate) {
-      _controller = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 120),
-      );
-      _scale = Tween<double>(begin: 1, end: widget.scaleDown).animate(
-        CurvedAnimation(parent: _controller!, curve: Curves.easeOut),
-      );
-    } else {
-      _controller?.dispose();
-      _controller = null;
-    }
+    if (old.scaleDown != widget.scaleDown) _scale = _buildScale();
   }
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -75,15 +71,14 @@ class _GlassPressState extends State<GlassPress>
         child: widget.child,
       );
     }
-    final controller = _controller!;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => controller.forward(),
+      onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
-        unawaited(controller.reverse());
+        unawaited(_controller.reverse());
         widget.onTap?.call();
       },
-      onTapCancel: controller.reverse,
+      onTapCancel: _controller.reverse,
       child: ScaleTransition(scale: _scale, child: widget.child),
     );
   }

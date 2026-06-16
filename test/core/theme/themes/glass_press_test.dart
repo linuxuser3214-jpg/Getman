@@ -33,4 +33,35 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'a reduced-mode press survives mount + dispose (the resize crash)',
+    (tester) async {
+      // In reduced mode build() never touches the controller, so a lazily
+      // `late`-initialized controller would first-initialize inside dispose()
+      // — an unsafe TickerMode ancestor lookup on a deactivated element. The
+      // controller must be built in initState so dispose just disposes it.
+      await tester.pumpWidget(host(animate: false));
+      await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(GlassPress), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'survives a full->reduced->full round trip (the real toggle path)',
+    (tester) async {
+      // The app boots at animate:true (reduceEffects defaults false). Toggling
+      // the setting twice is true -> false -> true. A SingleTickerProvider only
+      // allows one ticker for the State's lifetime, so recreating the
+      // controller on the second flip used to throw "multiple tickers".
+      await tester.pumpWidget(host(animate: true));
+      await tester.pumpWidget(host(animate: false));
+      await tester.pumpWidget(host(animate: true));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(GlassPress), findsOneWidget);
+    },
+  );
 }

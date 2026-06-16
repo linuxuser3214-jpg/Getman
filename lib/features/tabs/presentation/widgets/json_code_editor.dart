@@ -74,6 +74,16 @@ class JsonCodeEditor extends StatelessWidget {
     return ColoredBox(
       color: theme.colorScheme.surface,
       child: CodeEditor(
+        // A stable global key tied to the (retained) controller. When a theme
+        // switch toggles the glass `frost` wrapper around this editor, the
+        // element type at the panel slot changes, which would otherwise tear
+        // down and remount this CodeEditor. Because the controller outlives the
+        // rebuild, the remounted editor's initState notifies it while the
+        // just-deactivated old editor is still subscribed, and re_editor then
+        // touches a deactivated element (unsafe ancestor / renderObject lookup)
+        // -> crash. Keying by the controller makes Flutter REPARENT the single
+        // editor element instead, preserving its state across the toggle.
+        key: GlobalObjectKey(controller),
         controller: controller,
         readOnly: readOnly,
         wordWrap: wordWrap,

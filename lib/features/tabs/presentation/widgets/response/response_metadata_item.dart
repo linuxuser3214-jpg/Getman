@@ -20,6 +20,13 @@ class ResponseMetadataItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final baseColor = color ?? theme.primaryColor;
+    final isDark = theme.brightness == Brightness.dark;
+    final lightOn = context.appPalette.onColor(baseColor);
+    // Deliberate contrast on a variable-colored status badge (CLAUDE.md §4.8
+    // exception): STATUS/TIME/SIZE text is always white in dark mode for every
+    // theme; light mode keeps the higher-contrast on-color.
+    // ignore: avoid_hardcoded_brand_colors
+    final textColor = isDark ? Colors.white : lightOn;
 
     return TweenAnimationBuilder<Color?>(
       key: ValueKey(value),
@@ -52,7 +59,7 @@ class ResponseMetadataItem extends StatelessWidget {
           Text(
             '$label: ',
             style: TextStyle(
-              color: context.appPalette.onColor(baseColor),
+              color: textColor,
               fontSize: layout.fontSizeSmall,
               fontWeight: context.appTypography.titleWeight,
             ),
@@ -60,7 +67,7 @@ class ResponseMetadataItem extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: context.appPalette.onColor(baseColor),
+              color: textColor,
               fontWeight: context.appTypography.displayWeight,
               fontSize: layout.fontSizeNormal,
             ),

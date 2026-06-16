@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_decorations.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
@@ -146,6 +147,10 @@ ThemeData rpgTheme(
     useMaterial3: true,
     brightness: brightness,
     primaryColor: gold,
+    switchTheme: accentSwitchTheme(
+      thumbWhenOn: isDark ? emerald : RpgPalette.emeraldDeep,
+      trackWhenOn: gold,
+    ),
     scaffoldBackgroundColor: background,
     canvasColor: surface,
     cardColor: surface,

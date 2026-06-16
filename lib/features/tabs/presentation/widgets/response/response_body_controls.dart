@@ -288,8 +288,9 @@ class ResponseBodyControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    // Wrap (not Row) so the icons reflow onto a second line rather than
+    // overflowing when the response pane is dragged very narrow.
+    return Wrap(
       children: [
         _copyButton(context),
         _saveButton(context),

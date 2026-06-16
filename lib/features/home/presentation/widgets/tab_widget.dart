@@ -182,6 +182,16 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
                           ? tab.displayTitle
                           : '${tab.displayTitle}\n${tab.config.url}',
                       child: AnimatedContainer(
+                        // Re-key per theme so a theme switch REPLACES this
+                        // container instead of tweening into the new shape.
+                        // Flat themes use an asymmetric border + no radius;
+                        // glass uses a uniform border + radius. A mid-tween
+                        // frame between the two families would carry a
+                        // non-uniform border AND a borderRadius, which
+                        // Border.paint rejects. The builder ref changes exactly
+                        // when the shape family does, so hover/active/brightness
+                        // changes within a theme still animate.
+                        key: ValueKey(context.appDecoration.tabShape),
                         duration: const Duration(milliseconds: 200),
                         height: layout.tabBarHeight,
                         constraints: BoxConstraints(

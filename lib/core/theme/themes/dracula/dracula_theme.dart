@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_decorations.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_palette.dart';
@@ -149,6 +150,10 @@ ThemeData draculaTheme(
     useMaterial3: true,
     brightness: brightness,
     primaryColor: currentPrimary,
+    switchTheme: accentSwitchTheme(
+      thumbWhenOn: currentSecondary,
+      trackWhenOn: currentPrimary,
+    ),
     scaffoldBackgroundColor: background,
     canvasColor: surface,
     dividerColor: border,

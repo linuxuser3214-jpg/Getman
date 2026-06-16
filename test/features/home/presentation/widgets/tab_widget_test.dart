@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/theme/themes/glass/glass_theme.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
@@ -158,6 +159,72 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'switching between a flat and a rounded theme does not crash the tab '
+    'chrome (no borderRadius-on-non-uniform-border lerp)',
+    (tester) async {
+      final tab = _linkedTab();
+      when(() => tabsRepo.getTabs()).thenAnswer((_) async => [tab]);
+      final tabsBloc = TabsBloc(
+        repository: tabsRepo,
+        sendRequestUseCase: sendUseCase,
+      )..add(const LoadTabs());
+      await tabsBloc.stream.firstWhere(
+        (s) => !s.isLoading && s.tabs.isNotEmpty,
+      );
+      final collectionsBloc = CollectionsBloc(
+        getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+        saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+        saveDebounce: const Duration(milliseconds: 5),
+      )..add(const ReplaceCollections([]));
+      await collectionsBloc.stream.first;
+      addTearDown(tabsBloc.close);
+      addTearDown(collectionsBloc.close);
+
+      Widget appWith(ThemeData theme) => MaterialApp(
+        theme: theme,
+        // Snap the theme so the tabShape flips immediately; this isolates the
+        // AnimatedContainer's own decoration tween (the crash source) from
+        // MaterialApp's implicit AnimatedTheme transition.
+        themeAnimationDuration: Duration.zero,
+        home: Scaffold(
+          body: MultiBlocProvider(
+            providers: [
+              BlocProvider.value(value: tabsBloc),
+              BlocProvider.value(value: collectionsBloc),
+            ],
+            child: RepositoryProvider<TabDirtyChecker>.value(
+              value: const TabDirtyChecker(),
+              child: Center(
+                child: TabWidget(
+                  tabId: tab.tabId,
+                  index: 0,
+                  isActive: true,
+                  onTap: () {},
+                  onClose: () async => true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Brutalist: an asymmetric (non-uniform) tab border and no radius.
+      await tester.pumpWidget(appWith(brutalistTheme(Brightness.light)));
+      await tester.pumpAndSettle();
+
+      // Glass: a uniform border WITH a top radius. The AnimatedContainer must
+      // not tween between the two shape families — a mid-tween frame would
+      // carry a non-uniform border AND a borderRadius, which Border.paint
+      // rejects ("A borderRadius can only be given on borders with uniform
+      // colors").
+      await tester.pumpWidget(appWith(glassTheme(Brightness.light)));
+      await tester.pump(const Duration(milliseconds: 100)); // mid-tween frame
+
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('omits the URL line when the tab has no URL', (tester) async {
     await pumpTab(tester, _emptyTab());

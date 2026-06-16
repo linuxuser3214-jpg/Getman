@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_decorations.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_fade.dart';
@@ -114,6 +115,7 @@ ThemeData editorialTheme(
     useMaterial3: true,
     brightness: brightness,
     primaryColor: accent,
+    switchTheme: accentSwitchTheme(thumbWhenOn: inkSoft, trackWhenOn: accent),
     scaffoldBackgroundColor: paper,
     canvasColor: paper,
     cardColor: paper,

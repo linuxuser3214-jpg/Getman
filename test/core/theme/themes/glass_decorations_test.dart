@@ -39,19 +39,20 @@ void main() {
     );
   });
 
-  testWidgets('GlassWallpaper survives an animate flip without crashing', (
+  testWidgets('GlassWallpaper survives a full->reduced->full round trip', (
     tester,
   ) async {
     Widget host({required bool animate}) => MaterialApp(
       theme: glassTheme(Brightness.dark),
       home: GlassWallpaper(animate: animate, child: const SizedBox()),
     );
+    // The real toggle path: boots animated, then the setting flips twice.
+    await tester.pumpWidget(host(animate: true));
     await tester.pumpWidget(host(animate: false));
-    await tester.pumpWidget(host(animate: true)); // creates the controller
+    await tester.pumpWidget(host(animate: true));
     await tester.pump();
     expect(tester.takeException(), isNull);
-    // End on the static variant so didUpdateWidget disposes the controller
-    // (avoids a pending-timer error at teardown).
+    // End stopped so no repeating timer is pending at teardown.
     await tester.pumpWidget(host(animate: false));
     await tester.pump();
     expect(tester.takeException(), isNull);

@@ -75,7 +75,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final layout = context.appLayout;
 
     return BlocBuilder<SettingsBloc, SettingsState>(
@@ -124,8 +123,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   ),
                   SizedBox(height: layout.tabSpacing),
                   SwitchListTile(
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
                     title: Text(
                       'SAVE RESPONSE',
                       style: TextStyle(
@@ -139,8 +136,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     ),
                   ),
                   SwitchListTile(
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
                     secondary: Icon(Icons.data_object, size: layout.iconSize),
                     title: Text(
                       'ALWAYS PRETTIFY LARGE RESPONSES',
@@ -161,8 +156,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   ),
                   const Divider(),
                   SwitchListTile(
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
                     secondary: Icon(
                       settings.isDarkMode ? Icons.dark_mode : Icons.light_mode,
                       size: layout.iconSize,
@@ -212,8 +205,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     ),
                   ),
                   SwitchListTile(
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
                     secondary: Icon(Icons.view_compact, size: layout.iconSize),
                     title: Text(
                       'COMPACT MODE',
@@ -229,8 +220,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   ),
                   SwitchListTile(
                     key: const ValueKey('reduce_effects_switch'),
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
                     secondary: Icon(Icons.auto_awesome, size: layout.iconSize),
                     title: Text(
                       'REDUCE VISUAL EFFECTS',
@@ -269,8 +258,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     UpdateReceiveTimeout.new,
                   ),
                   SwitchListTile(
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
                     secondary: Icon(Icons.alt_route, size: layout.iconSize),
                     title: Text(
                       'FOLLOW REDIRECTS',
@@ -292,8 +279,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       UpdateMaxRedirects.new,
                     ),
                   SwitchListTile(
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
                     secondary: Icon(Icons.lock_outline, size: layout.iconSize),
                     title: Text(
                       'VERIFY SSL',

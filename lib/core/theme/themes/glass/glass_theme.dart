@@ -95,6 +95,7 @@ ThemeData glassTheme(
   final decoration = AppDecoration(
     panelBox: glassPanelBox,
     tabShape: glassTabShape,
+    brandedTabIndicator: glassBrandedTabIndicator,
     wrapInteractive: ({required child, onTap, scaleDown}) => GlassPress(
       animate: !reduceEffects,
       onTap: onTap,
@@ -147,11 +148,46 @@ ThemeData glassTheme(
       labelColor: onAccent,
       unselectedLabelColor: textSoft,
       indicatorSize: TabBarIndicatorSize.tab,
+      // Specular gradient lozenge (matches BrandedTabBar's glass indicator) so
+      // any bare TabBar stays consistent with the panel tab strips. Top-rounded
+      // only — the indicator sits flush on the tab content below it.
       indicator: BoxDecoration(
-        color: accent,
-        borderRadius: BorderRadius.circular(shape.buttonRadius),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(shape.buttonRadius),
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color.alphaBlend(Colors.white.withValues(alpha: 0.32), accent),
+            accent.withValues(alpha: 0.94),
+            Color.alphaBlend(Colors.black.withValues(alpha: 0.10), accent),
+          ],
+          stops: const [0, 0.5, 1],
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: isDark ? 0.30 : 0.55),
+          width: layout.borderThin,
+        ),
       ),
       labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+    ),
+    // Explicit switch styling: an always-visible white thumb, an accent track
+    // when on and a translucent hairline-outlined track when off. Without this
+    // the M3 default produced a near-invisible thumb on the glass surface.
+    switchTheme: SwitchThemeData(
+      thumbColor: const WidgetStatePropertyAll(onAccent),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return accent;
+        return isDark
+            ? Colors.white.withValues(alpha: 0.20)
+            : Colors.black.withValues(alpha: 0.20);
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return Colors.transparent;
+        return border;
+      }),
+      trackOutlineWidth: WidgetStatePropertyAll(layout.borderThin),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(

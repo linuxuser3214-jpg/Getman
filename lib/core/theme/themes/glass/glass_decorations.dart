@@ -64,8 +64,51 @@ Widget glassFrost(
   );
 }
 
-/// Rounded translucent tab pill. Active = accent fill; hover = faint accent
-/// tint; inactive = transparent (the wallpaper shows behind it).
+/// The selected-tab "glass lozenge": a vertical specular gradient (a bright
+/// near-white highlight at the top fading into the accent), a hairline
+/// highlight border, and a soft accent glow. This is what makes a selected tab
+/// read as a raised piece of glass rather than a flat accent billboard. White
+/// labels stay legible because the gradient body is the near-opaque accent.
+BoxDecoration glassSelectedTabBox(
+  BuildContext context, {
+  required BorderRadius borderRadius,
+}) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  final accent = theme.primaryColor;
+  return BoxDecoration(
+    borderRadius: borderRadius,
+    gradient: LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        // Specular highlight: accent lightened toward white at the top edge.
+        Color.alphaBlend(Colors.white.withValues(alpha: 0.32), accent),
+        accent.withValues(alpha: 0.94),
+        // Slight darken at the foot gives the lozenge volume.
+        Color.alphaBlend(Colors.black.withValues(alpha: 0.10), accent),
+      ],
+      stops: const [0, 0.5, 1],
+    ),
+    border: Border.all(
+      color: Colors.white.withValues(alpha: isDark ? 0.30 : 0.55),
+      width: context.appLayout.borderThin,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: accent.withValues(alpha: isDark ? 0.45 : 0.35),
+        blurRadius: 12,
+        offset: const Offset(0, 4),
+      ),
+    ],
+  );
+}
+
+/// Rounded glass tab for the open-request tab strip. Active = the glass
+/// lozenge; hover = a faint frosted-white tint with a hairline edge; inactive =
+/// transparent (the wallpaper shows behind it). Only the TOP corners round:
+/// the tab sits flush on the panel below it, so a rounded bottom would read as
+/// a floating chip rather than a tab.
 BoxDecoration glassTabShape(
   BuildContext context, {
   required bool active,
@@ -73,22 +116,34 @@ BoxDecoration glassTabShape(
   required bool isFirst,
 }) {
   // isFirst is unused: pill tabs have no left-edge rule (kept for API parity).
-  final theme = Theme.of(context);
   final shape = context.appShape;
-  final accent = theme.primaryColor;
-  final Color background;
-  if (active) {
-    background = accent;
-  } else if (hovered) {
-    background = accent.withValues(alpha: 0.14);
-  } else {
-    background = Colors.transparent;
-  }
-  return BoxDecoration(
-    color: background,
-    borderRadius: BorderRadius.circular(shape.buttonRadius),
+  final radius = BorderRadius.vertical(
+    top: Radius.circular(shape.buttonRadius),
   );
+  if (active) return glassSelectedTabBox(context, borderRadius: radius);
+  if (hovered) {
+    return BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.12),
+      borderRadius: radius,
+      border: Border.all(
+        color: Colors.white.withValues(alpha: 0.18),
+        width: context.appLayout.borderThin,
+      ),
+    );
+  }
+  return BoxDecoration(borderRadius: radius);
 }
+
+/// BrandedTabBar selected-tab indicator for glass — the same glass lozenge,
+/// top-rounded only so the active PARAMS/HEADERS/BODY segment lifts off the
+/// translucent panel as a tab (flush bottom) instead of a floating blue bar.
+Decoration glassBrandedTabIndicator(BuildContext context) =>
+    glassSelectedTabBox(
+      context,
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(context.appShape.buttonRadius),
+      ),
+    );
 
 /// Full-effects wallpaper: animated drifting mesh gradient.
 Widget glassScaffoldBackground(BuildContext context, {required Widget child}) =>
@@ -115,18 +170,24 @@ class GlassWallpaper extends StatefulWidget {
 
 class _GlassWallpaperState extends State<GlassWallpaper>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  AnimationController? _controller;
+  // Created once in initState for the State's lifetime (a SingleTickerProvider
+  // permits one ticker ever — disposing + recreating on an animate toggle threw
+  // "multiple tickers"). Built in initState, not lazily, so dispose() never
+  // first-initializes it via an unsafe ancestor lookup on a deactivated
+  // element. We start/stop it instead of recreating. Stopped, it never
+  // notifies, so the painter paints exactly one static frame at zero cost.
+  late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 40),
+    );
     if (widget.animate) {
       WidgetsBinding.instance.addObserver(this);
-      _controller = AnimationController(
-        vsync: this,
-        duration: const Duration(seconds: 40),
-      );
-      unawaited(_controller!.repeat());
+      unawaited(_controller.repeat());
     }
   }
 
@@ -136,33 +197,27 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     if (old.animate == widget.animate) return;
     if (widget.animate) {
       WidgetsBinding.instance.addObserver(this);
-      _controller = AnimationController(
-        vsync: this,
-        duration: const Duration(seconds: 40),
-      );
-      unawaited(_controller!.repeat());
+      unawaited(_controller.repeat());
     } else {
       WidgetsBinding.instance.removeObserver(this);
-      _controller?.dispose();
-      _controller = null;
+      _controller.stop();
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final c = _controller;
-    if (c == null) return;
+    if (!widget.animate) return;
     if (state == AppLifecycleState.resumed) {
-      if (!c.isAnimating) unawaited(c.repeat());
+      if (!_controller.isAnimating) unawaited(_controller.repeat());
     } else {
-      c.stop();
+      _controller.stop();
     }
   }
 
   @override
   void dispose() {
     if (widget.animate) WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -175,9 +230,9 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     final blobs = isDark
         ? GlassPalette.wallpaperBlobsDark
         : GlassPalette.wallpaperBlobsLight;
-    // A stopped animation for the static case never notifies, so the painter
-    // paints exactly once; the live controller drives repaints when animated.
-    final t = _controller ?? const AlwaysStoppedAnimation<double>(0);
+    // Stopped (reduced mode) the controller never notifies -> one static frame;
+    // running it drives the drift. Either way it's a valid repaint listenable.
+    final t = _controller;
     return Stack(
       children: [
         Positioned.fill(

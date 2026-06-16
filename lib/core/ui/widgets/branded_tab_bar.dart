@@ -36,26 +36,36 @@ class BrandedTabBar extends StatelessWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
     final layout = context.appLayout;
 
+    // Themes can override the selected-tab indicator (glass does, for a
+    // translucent gradient lozenge); everyone else keeps the signature solid
+    // filled look with a thick top/left/right border.
+    final indicator =
+        context.appDecoration.brandedTabIndicator?.call(context) ??
+        BoxDecoration(
+          color: theme.primaryColor,
+          border: Border(
+            top: BorderSide(
+              color: theme.dividerColor,
+              width: layout.borderThick,
+            ),
+            left: BorderSide(
+              color: theme.dividerColor,
+              width: layout.borderThick,
+            ),
+            right: BorderSide(
+              color: theme.dividerColor,
+              width: layout.borderThick,
+            ),
+          ),
+        );
+
     return TabBar(
       controller: controller,
       dividerColor: Colors.transparent,
       isScrollable: isScrollable,
       padding: padding,
       labelPadding: labelPadding,
-      indicator: BoxDecoration(
-        color: theme.primaryColor,
-        border: Border(
-          top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-          left: BorderSide(
-            color: theme.dividerColor,
-            width: layout.borderThick,
-          ),
-          right: BorderSide(
-            color: theme.dividerColor,
-            width: layout.borderThick,
-          ),
-        ),
-      ),
+      indicator: indicator,
       labelColor: theme.colorScheme.onPrimary,
       unselectedLabelColor: theme.colorScheme.onSurface,
       labelStyle: TextStyle(

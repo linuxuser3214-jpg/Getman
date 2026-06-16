@@ -53,6 +53,7 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
     required this.wrapInteractive,
     required this.scaffoldBackground,
     this.frost = _identityFrost,
+    this.brandedTabIndicator,
   });
   final PanelBoxBuilder panelBox;
   final TabShapeBuilder tabShape;
@@ -63,6 +64,12 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
   /// Identity for every theme except Liquid Glass.
   final FrostWrapper frost;
 
+  /// Optional override for `BrandedTabBar`'s selected-tab indicator. When null
+  /// (every theme except Liquid Glass) BrandedTabBar keeps its signature solid
+  /// filled look. Glass supplies a translucent gradient-frosted lozenge so the
+  /// active tab reads as glass rather than a flat accent billboard.
+  final Decoration Function(BuildContext context)? brandedTabIndicator;
+
   @override
   AppDecoration copyWith({
     PanelBoxBuilder? panelBox,
@@ -70,6 +77,7 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
     InteractiveWrapper? wrapInteractive,
     ScaffoldBackgroundWrapper? scaffoldBackground,
     FrostWrapper? frost,
+    Decoration Function(BuildContext context)? brandedTabIndicator,
   }) {
     return AppDecoration(
       panelBox: panelBox ?? this.panelBox,
@@ -77,6 +85,7 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
       wrapInteractive: wrapInteractive ?? this.wrapInteractive,
       scaffoldBackground: scaffoldBackground ?? this.scaffoldBackground,
       frost: frost ?? this.frost,
+      brandedTabIndicator: brandedTabIndicator ?? this.brandedTabIndicator,
     );
   }
 
