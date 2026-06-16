@@ -227,6 +227,27 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       UpdateCompactMode(isCompactMode: val),
                     ),
                   ),
+                  SwitchListTile(
+                    key: const ValueKey('reduce_effects_switch'),
+                    activeThumbColor: theme.colorScheme.secondary,
+                    activeTrackColor: theme.primaryColor,
+                    secondary: Icon(Icons.auto_awesome, size: layout.iconSize),
+                    title: Text(
+                      'REDUCE VISUAL EFFECTS',
+                      style: TextStyle(
+                        fontSize: layout.fontSizeNormal,
+                        fontWeight: context.appTypography.titleWeight,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Disables backdrop blur & animations for performance',
+                      style: TextStyle(fontSize: layout.fontSizeSmall),
+                    ),
+                    value: settings.reduceVisualEffects,
+                    onChanged: (val) => context.read<SettingsBloc>().add(
+                      UpdateReduceVisualEffects(value: val),
+                    ),
+                  ),
                   const Divider(),
                   _sectionHeader(context, 'NETWORK'),
                   _timeoutTile(
