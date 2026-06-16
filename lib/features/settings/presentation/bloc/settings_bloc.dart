@@ -26,6 +26,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       (e, emit) =>
           _apply(emit, (s) => s.copyWith(isCompactMode: e.isCompactMode)),
     );
+    on<UpdateReduceVisualEffects>(
+      (e, emit) =>
+          _apply(emit, (s) => s.copyWith(reduceVisualEffects: e.value)),
+    );
     on<UpdateVerticalLayout>(
       (e, emit) =>
           _apply(emit, (s) => s.copyWith(isVerticalLayout: e.isVerticalLayout)),

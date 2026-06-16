@@ -24,6 +24,7 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
           : fields[17] as bool,
       isDarkMode: fields[2] == null ? false : fields[2] as bool,
       isCompactMode: fields[3] == null ? false : fields[3] as bool,
+      reduceVisualEffects: fields[22] == null ? false : fields[22] as bool,
       isVerticalLayout: fields[4] == null ? false : fields[4] as bool,
       splitRatio: fields[5] == null ? 0.5 : (fields[5] as num).toDouble(),
       sideMenuWidth: fields[6] == null ? 300.0 : (fields[6] as num).toDouble(),
@@ -49,7 +50,7 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(22)
+      ..writeByte(23)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -93,7 +94,9 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(20)
       ..write(obj.clientKeyPath)
       ..writeByte(21)
-      ..write(obj.clientCertPassphrase);
+      ..write(obj.clientCertPassphrase)
+      ..writeByte(22)
+      ..write(obj.reduceVisualEffects);
   }
 
   @override

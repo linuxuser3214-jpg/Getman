@@ -11,6 +11,7 @@ class SettingsEntity extends Equatable {
     this.alwaysPrettifyLargeResponses = false,
     this.isDarkMode = false,
     this.isCompactMode = false,
+    this.reduceVisualEffects = false,
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
@@ -39,6 +40,10 @@ class SettingsEntity extends Equatable {
   final bool alwaysPrettifyLargeResponses;
   final bool isDarkMode;
   final bool isCompactMode;
+
+  /// When `true`, themes drop expensive effects (backdrop blur, animated
+  /// backgrounds) for performance. Default `false` = full effects everywhere.
+  final bool reduceVisualEffects;
   final bool isVerticalLayout;
   final double splitRatio;
   final double sideMenuWidth;
@@ -80,6 +85,7 @@ class SettingsEntity extends Equatable {
     bool? alwaysPrettifyLargeResponses,
     bool? isDarkMode,
     bool? isCompactMode,
+    bool? reduceVisualEffects,
     bool? isVerticalLayout,
     double? splitRatio,
     double? sideMenuWidth,
@@ -106,6 +112,7 @@ class SettingsEntity extends Equatable {
           alwaysPrettifyLargeResponses ?? this.alwaysPrettifyLargeResponses,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       isCompactMode: isCompactMode ?? this.isCompactMode,
+      reduceVisualEffects: reduceVisualEffects ?? this.reduceVisualEffects,
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
       splitRatio: splitRatio ?? this.splitRatio,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
@@ -161,6 +168,7 @@ class SettingsEntity extends Equatable {
     alwaysPrettifyLargeResponses,
     isDarkMode,
     isCompactMode,
+    reduceVisualEffects,
     isVerticalLayout,
     splitRatio,
     sideMenuWidth,
