@@ -18,6 +18,7 @@ import 'package:getman/features/collections/domain/entities/saved_example_entity
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:getman/features/collections/presentation/widgets/collection_node_menu.dart';
 import 'package:getman/features/collections/presentation/widgets/node_action_sheet.dart';
 import 'package:getman/features/collections/presentation/widgets/spec_import_dialog.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
@@ -503,7 +504,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                           ),
                         ),
                       ),
-                      _NodeContextMenu(node: node),
+                      CollectionNodeMenu(node: node),
                     ],
                   ),
                 ),
@@ -605,7 +606,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                             ),
                           ),
                         ),
-                      _NodeContextMenu(node: node),
+                      CollectionNodeMenu(node: node),
                     ],
                   ),
                 ),
@@ -643,190 +644,6 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
       ),
       childWhenDragging: Opacity(opacity: 0.5, child: content),
       child: content,
-    );
-  }
-}
-
-class _NodeContextMenu extends StatelessWidget {
-  const _NodeContextMenu({required this.node});
-  final CollectionNodeEntity node;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-
-    return PopupMenuButton<String>(
-      key: ValueKey('node_menu_${node.id}'),
-      icon: Icon(
-        Icons.more_vert,
-        size: layout.iconSize,
-        color: theme.colorScheme.onSurface,
-      ),
-      color: theme.colorScheme.surface,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-        side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-      ),
-      onSelected: (val) {
-        switch (val) {
-          case 'rename':
-            _showRenameDialog(context);
-          case 'describe':
-            _showDescriptionDialog(context);
-          case 'delete':
-            unawaited(
-              ConfirmDialog.show(
-                context,
-                title: node.isFolder ? 'Delete folder?' : 'Delete request?',
-                message: node.isFolder
-                    ? 'Deletes "${node.name}" and everything inside it. '
-                          'This cannot be undone.'
-                    : 'Deletes "${node.name}". This cannot be undone.',
-                onConfirm: () {
-                  context.read<CollectionsBloc>().add(DeleteNode(node.id));
-                  showAppSnackBar(context, 'Deleted "${node.name}"');
-                },
-              ),
-            );
-          case 'favorite':
-            context.read<CollectionsBloc>().add(ToggleFavorite(node.id));
-            showAppSnackBar(
-              context,
-              node.isFavorite ? 'Removed from favorites' : 'Added to favorites',
-            );
-          case 'add_subfolder':
-            _showAddSubfolderDialog(context);
-          case 'export':
-            unawaited(_exportNode(context));
-        }
-      },
-      itemBuilder: (context) => [
-        if (node.isFolder && node.config == null)
-          PopupMenuItem(
-            value: 'favorite',
-            child: Text(
-              node.isFavorite ? 'UNFAVORITE' : 'FAVORITE',
-              style: TextStyle(
-                fontSize: layout.fontSizeSmall,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        PopupMenuItem(
-          value: 'rename',
-          child: Text(
-            'RENAME',
-            style: TextStyle(
-              fontSize: layout.fontSizeSmall,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'describe',
-          child: Text(
-            'EDIT DESCRIPTION',
-            style: TextStyle(
-              fontSize: layout.fontSizeSmall,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        if (node.isFolder)
-          PopupMenuItem(
-            value: 'add_subfolder',
-            child: Text(
-              'ADD SUBFOLDER',
-              style: TextStyle(
-                fontSize: layout.fontSizeSmall,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        PopupMenuItem(
-          value: 'export',
-          child: Text(
-            'EXPORT TO POSTMAN',
-            style: TextStyle(
-              fontSize: layout.fontSizeSmall,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          child: Text(
-            'DELETE',
-            style: TextStyle(
-              fontSize: layout.fontSizeSmall,
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.error,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showRenameDialog(BuildContext context) {
-    final bloc = context.read<CollectionsBloc>();
-    final messenger = ScaffoldMessenger.of(context);
-    unawaited(
-      NamePromptDialog.show(
-        context,
-        title: 'RENAME',
-        initialText: node.name,
-        onConfirm: (name) {
-          bloc.add(RenameNode(node.id, name));
-          showAppSnackBarVia(messenger, 'Renamed to "$name"');
-        },
-      ),
-    );
-  }
-
-  void _showDescriptionDialog(BuildContext context) {
-    final bloc = context.read<CollectionsBloc>();
-    final messenger = ScaffoldMessenger.of(context);
-    unawaited(
-      NamePromptDialog.show(
-        context,
-        title: 'DESCRIPTION',
-        initialText: node.description ?? '',
-        hintText: 'Notes for this ${node.isFolder ? 'folder' : 'request'}',
-        allowEmpty: true,
-        multiline: true,
-        onConfirm: (text) {
-          bloc.add(UpdateNodeDescription(node.id, text.trim()));
-          showAppSnackBarVia(messenger, 'Description updated');
-        },
-      ),
-    );
-  }
-
-  void _showAddSubfolderDialog(BuildContext context) {
-    final bloc = context.read<CollectionsBloc>();
-    final messenger = ScaffoldMessenger.of(context);
-    unawaited(
-      NamePromptDialog.show(
-        context,
-        title: 'ADD SUBFOLDER',
-        confirmLabel: 'ADD',
-        onConfirm: (name) {
-          bloc.add(AddFolder(name, parentId: node.id));
-          showAppSnackBarVia(messenger, 'Folder "$name" created');
-        },
-      ),
-    );
-  }
-
-  Future<void> _exportNode(BuildContext context) {
-    return saveJsonFileWithFeedback(
-      context,
-      jsonString: PostmanCollectionMapper.toJson(node),
-      fileName: '${slugFilename(node.name)}.postman_collection.json',
-      dialogTitle: 'EXPORT COLLECTION',
     );
   }
 }
