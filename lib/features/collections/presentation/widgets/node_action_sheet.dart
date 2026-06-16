@@ -292,26 +292,31 @@ class _MoveToSheet {
                   thickness: layout.borderThick,
                 ),
                 Expanded(
-                  child: ListView(
-                    children: [
-                      _Action(
-                        icon: Icons.home_outlined,
-                        label: 'ROOT (TOP LEVEL)',
-                        onTap: () {
-                          bloc.add(MoveNode(source.id, null));
-                          Navigator.of(sheetContext).pop();
-                        },
-                      ),
-                      for (final f in folders)
-                        _Action(
-                          icon: Icons.folder,
-                          label: '${'  ' * f.depth}${f.node.name}',
+                  // Lazy build: a deep collection can flatten to many folders,
+                  // and only the visible window needs constructing.
+                  child: ListView.builder(
+                    itemCount: folders.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return _Action(
+                          icon: Icons.home_outlined,
+                          label: 'ROOT (TOP LEVEL)',
                           onTap: () {
-                            bloc.add(MoveNode(source.id, f.node.id));
+                            bloc.add(MoveNode(source.id, null));
                             Navigator.of(sheetContext).pop();
                           },
-                        ),
-                    ],
+                        );
+                      }
+                      final f = folders[index - 1];
+                      return _Action(
+                        icon: Icons.folder,
+                        label: '${'  ' * f.depth}${f.node.name}',
+                        onTap: () {
+                          bloc.add(MoveNode(source.id, f.node.id));
+                          Navigator.of(sheetContext).pop();
+                        },
+                      );
+                    },
                   ),
                 ),
               ],

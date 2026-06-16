@@ -168,16 +168,17 @@ class ResponseDiffView extends StatelessWidget {
       );
     }
 
+    // Diff bodies can run to thousands of lines (capped at 512 KB by
+    // `tooLarge`). Build lazily so only the visible window is constructed —
+    // Flutter best practice "be lazy" for lists where most children are
+    // offscreen. ListView stretches children cross-axis by default, matching
+    // the previous Column's CrossAxisAlignment.stretch.
     return ColoredBox(
       color: palette.codeBackground,
-      child: SingleChildScrollView(
+      child: ListView.builder(
         padding: EdgeInsets.all(layout.pagePadding / 2),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final line in model.bodyLines) _line(context, line),
-          ],
-        ),
+        itemCount: model.bodyLines.length,
+        itemBuilder: (context, index) => _line(context, model.bodyLines[index]),
       ),
     );
   }
