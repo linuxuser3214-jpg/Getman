@@ -85,6 +85,10 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
     variableResolved: EditorialPalette.statusAccentSuccess,
     variableUnresolved: EditorialPalette.statusAccentError,
     selectorActive: EditorialPalette.accent,
+    diffAddedForeground: EditorialPalette.statusSuccess,
+    diffAddedBackground: EditorialPalette.statusSuccess.withValues(alpha: 0.12),
+    diffRemovedForeground: EditorialPalette.statusError,
+    diffRemovedBackground: EditorialPalette.statusError.withValues(alpha: 0.12),
   );
 
   final decoration = AppDecoration(

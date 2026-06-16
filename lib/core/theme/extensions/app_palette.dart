@@ -14,6 +14,10 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.variableResolved,
     required this.variableUnresolved,
     required this.selectorActive,
+    required this.diffAddedBackground,
+    required this.diffAddedForeground,
+    required this.diffRemovedBackground,
+    required this.diffRemovedForeground,
   });
   final Map<String, Color> methodColors;
   final Color methodFallback;
@@ -32,6 +36,18 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// Pair with [Color]-derived contrast text via
   /// `ThemeData.estimateBrightnessForColor`.
   final Color selectorActive;
+
+  /// Subtle tint behind a line that is present only on the diff target (added).
+  final Color diffAddedBackground;
+
+  /// Foreground for an added line's text + its `+` gutter glyph.
+  final Color diffAddedForeground;
+
+  /// Subtle tint behind a line removed from the current response.
+  final Color diffRemovedBackground;
+
+  /// Foreground for a removed line's text + its `-` gutter glyph.
+  final Color diffRemovedForeground;
 
   Color methodColor(String method) =>
       methodColors[method.toUpperCase()] ?? methodFallback;
@@ -78,6 +94,10 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? variableResolved,
     Color? variableUnresolved,
     Color? selectorActive,
+    Color? diffAddedBackground,
+    Color? diffAddedForeground,
+    Color? diffRemovedBackground,
+    Color? diffRemovedForeground,
   }) {
     return AppPalette(
       methodColors: methodColors ?? this.methodColors,
@@ -92,6 +112,12 @@ class AppPalette extends ThemeExtension<AppPalette> {
       variableResolved: variableResolved ?? this.variableResolved,
       variableUnresolved: variableUnresolved ?? this.variableUnresolved,
       selectorActive: selectorActive ?? this.selectorActive,
+      diffAddedBackground: diffAddedBackground ?? this.diffAddedBackground,
+      diffAddedForeground: diffAddedForeground ?? this.diffAddedForeground,
+      diffRemovedBackground:
+          diffRemovedBackground ?? this.diffRemovedBackground,
+      diffRemovedForeground:
+          diffRemovedForeground ?? this.diffRemovedForeground,
     );
   }
 
@@ -131,6 +157,26 @@ class AppPalette extends ThemeExtension<AppPalette> {
         t,
       )!,
       selectorActive: Color.lerp(selectorActive, other.selectorActive, t)!,
+      diffAddedBackground: Color.lerp(
+        diffAddedBackground,
+        other.diffAddedBackground,
+        t,
+      )!,
+      diffAddedForeground: Color.lerp(
+        diffAddedForeground,
+        other.diffAddedForeground,
+        t,
+      )!,
+      diffRemovedBackground: Color.lerp(
+        diffRemovedBackground,
+        other.diffRemovedBackground,
+        t,
+      )!,
+      diffRemovedForeground: Color.lerp(
+        diffRemovedForeground,
+        other.diffRemovedForeground,
+        t,
+      )!,
     );
   }
 }
