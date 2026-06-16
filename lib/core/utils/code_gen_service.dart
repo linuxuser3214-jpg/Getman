@@ -4,7 +4,7 @@ import 'package:getman/core/domain/auth_application.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
-import 'package:getman/core/utils/header_utils.dart';
+import 'package:getman/core/utils/body_type_utils.dart';
 
 /// Target language for generated request code.
 enum CodeGenTarget {
@@ -69,27 +69,7 @@ class CodeGenService {
     }
 
     // Mirror the send pipeline's content-type handling for structured bodies.
-    switch (config.bodyType) {
-      case BodyType.urlencoded:
-        HeaderUtils.setHeader(
-          headers,
-          'Content-Type',
-          'application/x-www-form-urlencoded',
-        );
-      case BodyType.multipart:
-        HeaderUtils.removeHeader(headers, 'content-type');
-      case BodyType.binary:
-        if (!HeaderUtils.hasCustomContentType(headers)) {
-          HeaderUtils.setHeader(
-            headers,
-            'Content-Type',
-            'application/octet-stream',
-          );
-        }
-      case BodyType.none:
-      case BodyType.raw:
-        break;
-    }
+    BodyTypeUtils.applyContentType(headers, config.bodyType);
 
     return _Effective(
       method: config.method,

@@ -5,8 +5,8 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/network/network_service.dart' show NetworkService;
+import 'package:getman/core/utils/body_type_utils.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
-import 'package:getman/core/utils/header_utils.dart';
 import 'package:getman/core/utils/io/file_reader.dart';
 import 'package:getman/core/utils/path_utils.dart';
 
@@ -71,20 +71,14 @@ class RequestSerializer {
       case BodyType.raw:
         return config.body.isEmpty ? null : r(config.body);
       case BodyType.urlencoded:
-        HeaderUtils.setHeader(
-          headers,
-          'Content-Type',
-          'application/x-www-form-urlencoded',
-        );
+        BodyTypeUtils.applyContentType(headers, BodyType.urlencoded);
         return <String, String>{
           for (final f in config.formFields)
             if (!f.isFile && f.name.isNotEmpty) r(f.name): r(f.value),
         };
       case BodyType.multipart:
-        HeaderUtils.removeHeader(
-          headers,
-          'content-type',
-        ); // Dio adds it with the boundary.
+        // Dio adds it with the boundary.
+        BodyTypeUtils.applyContentType(headers, BodyType.multipart);
         final form = FormData();
         for (final f in config.formFields) {
           if (f.name.isEmpty) continue;
@@ -110,13 +104,7 @@ class RequestSerializer {
       case BodyType.binary:
         final path = config.bodyFilePath;
         if (path == null || path.isEmpty) return null;
-        if (!HeaderUtils.hasCustomContentType(headers)) {
-          HeaderUtils.setHeader(
-            headers,
-            'Content-Type',
-            'application/octet-stream',
-          );
-        }
+        BodyTypeUtils.applyContentType(headers, BodyType.binary);
         return _readBytes(path);
     }
   }
