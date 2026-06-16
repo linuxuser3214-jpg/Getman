@@ -7,6 +7,7 @@ import 'package:getman/features/chaining/domain/entities/request_rules_entity.da
 import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_event.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_state.dart';
+import 'package:getman/features/chaining/presentation/widgets/rule_card.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:uuid/uuid.dart';
@@ -242,7 +243,7 @@ class _ExtractionRuleRowState extends State<_ExtractionRuleRow> {
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
-    return _RuleCard(
+    return RuleCard(
       enabled: _enabled,
       onToggle: (v) {
         setState(() => _enabled = v);
@@ -382,7 +383,7 @@ class _AssertionRowState extends State<_AssertionRow> {
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
-    return _RuleCard(
+    return RuleCard(
       enabled: _enabled,
       onToggle: (v) {
         setState(() => _enabled = v);
@@ -471,70 +472,6 @@ class _AssertionRowState extends State<_AssertionRow> {
         contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12),
       ),
       onChanged: (_) => _emit(),
-    );
-  }
-}
-
-/// Shared card chrome for a rule/assertion row: enable toggle + delete.
-class _RuleCard extends StatelessWidget {
-  const _RuleCard({
-    required this.enabled,
-    required this.onToggle,
-    required this.onDelete,
-    required this.children,
-  });
-  final bool enabled;
-  final ValueChanged<bool> onToggle;
-  final VoidCallback onDelete;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-    return Container(
-      margin: EdgeInsets.only(bottom: layout.isCompact ? 8 : 12),
-      padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: children,
-                ),
-              ),
-              SizedBox(width: layout.tabSpacing),
-              Column(
-                children: [
-                  Switch(
-                    value: enabled,
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
-                    onChanged: onToggle,
-                  ),
-                  context.appDecoration.wrapInteractive(
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.delete_outline,
-                        color: theme.colorScheme.error,
-                        size: layout.iconSize,
-                      ),
-                      onPressed: onDelete,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
