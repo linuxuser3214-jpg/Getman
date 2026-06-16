@@ -8,20 +8,18 @@ Each item: what's missing · why it isn't done yet · a suggested approach.
 
 ---
 
-## 1. Command palette (drafted, unregistered)
+## 1. Command palette (DONE — registered)
 
-- **State:** `flows/command_palette_test.dart` exists but is **not** registered
-  in `all_flows_test.dart` (so it doesn't run in the suite).
-- **Why:** the palette only opens via the Cmd/Ctrl+K shortcut. Simulating the
-  combo (`sendKeyDownEvent(metaLeft)` + `keyK`, even with `platform: 'macos'`)
-  did not open the palette and surfaced a `No MaterialLocalizations found`
-  assertion from a key-message handler rebuild above `MaterialApp`.
-- **Suggested:** either (a) add a `@visibleForTesting` way to dispatch
-  `CommandPaletteIntent` / open `CommandPalette.show` without the raw key event,
-  or (b) get the modifier-key simulation working under
-  `IntegrationTestWidgetsFlutterBinding`. Then re-register the flow. The
-  filter + result-tap assertions (`palette_search_field`, `palette_result_0`)
-  are already written.
+- **State:** `flows/command_palette_test.dart` is now registered in
+  `all_flows_test.dart` and runs in the suite.
+- **Resolution:** the `No MaterialLocalizations found` assertion was *not* a
+  key-simulation problem — it was a real bug. `CommandPaletteIntent` /
+  `SwitchEnvironmentIntent` were wired in the root `Actions` in `main.dart`,
+  *above* `MaterialApp`, so their `showDialog` call ran with a context that had
+  no `MaterialLocalizations`/`Navigator` ancestor. Moving both actions into
+  `MainScreen`'s `Actions` (below `MaterialApp` + the router's `Navigator`)
+  fixed it; the Cmd/Ctrl+K combo now opens the palette under
+  `IntegrationTestWidgetsFlutterBinding`.
 
 ## 2. Saved examples (M10)
 

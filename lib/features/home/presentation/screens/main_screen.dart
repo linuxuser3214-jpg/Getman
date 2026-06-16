@@ -11,9 +11,11 @@ import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/features/chaining/presentation/widgets/chaining_write_back_listener.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/command_palette/presentation/widgets/command_palette.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/widgets/environment_selector.dart';
+import 'package:getman/features/environments/presentation/widgets/quick_env_switcher.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/add_tab_button.dart';
 import 'package:getman/features/home/presentation/widgets/empty_tabs_placeholder.dart';
@@ -200,6 +202,22 @@ class _MainScreenState extends State<MainScreen> {
 
             return Actions(
               actions: <Type, Action<Intent>>{
+                // Dialog-opening shortcuts live here (not at the root Actions
+                // in main.dart): showDialog needs a context below MaterialApp +
+                // the router's Navigator, both of which MainScreen sits under.
+                CommandPaletteIntent: CallbackAction<CommandPaletteIntent>(
+                  onInvoke: (_) {
+                    unawaited(CommandPalette.show(context));
+                    return null;
+                  },
+                ),
+                SwitchEnvironmentIntent:
+                    CallbackAction<SwitchEnvironmentIntent>(
+                      onInvoke: (_) {
+                        unawaited(QuickEnvSwitcher.show(context));
+                        return null;
+                      },
+                    ),
                 CloseTabIntent: CallbackAction<CloseTabIntent>(
                   onInvoke: (_) {
                     if (activeIndex < 0 || activeIndex >= tabs.length) {

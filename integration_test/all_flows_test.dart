@@ -4,6 +4,7 @@ import 'flows/auth_test.dart' as auth;
 import 'flows/chaining_rules_test.dart' as chaining_rules;
 import 'flows/code_gen_test.dart' as code_gen;
 import 'flows/collections_test.dart' as collections;
+import 'flows/command_palette_test.dart' as command_palette;
 import 'flows/cookies_test.dart' as cookies;
 import 'flows/environments_test.dart' as environments;
 import 'flows/history_test.dart' as history;
@@ -51,4 +52,5 @@ void main() {
   code_gen.main();
   settings.main();
   response_views.main();
+  command_palette.main();
 }
