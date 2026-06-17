@@ -75,6 +75,16 @@ class UpdateNodeDescription extends CollectionsEvent {
   List<Object?> get props => [id, description];
 }
 
+/// Sets the collection-scoped variables (and their secret flags) on a folder.
+class UpdateNodeVariables extends CollectionsEvent {
+  const UpdateNodeVariables(this.id, this.variables, this.secretKeys);
+  final String id;
+  final Map<String, String> variables;
+  final Set<String> secretKeys;
+  @override
+  List<Object?> get props => [id, variables, secretKeys];
+}
+
 class ToggleFavorite extends CollectionsEvent {
   const ToggleFavorite(this.id);
   final String id;

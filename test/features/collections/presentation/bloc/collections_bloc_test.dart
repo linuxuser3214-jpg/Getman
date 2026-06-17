@@ -1,3 +1,4 @@
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
@@ -7,6 +8,7 @@ import 'package:getman/features/collections/domain/repositories/collections_repo
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
@@ -299,6 +301,35 @@ void main() {
         isNotNull,
       );
     });
+  });
+
+  group('UpdateNodeVariables', () {
+    blocTest<CollectionsBloc, CollectionsState>(
+      'sets variables + secretKeys on the target folder',
+      build: build,
+      seed: () => CollectionsState(
+        collections: [folder('f1', 'API')],
+      ),
+      act: (bloc) => bloc.add(
+        const UpdateNodeVariables('f1', {'base': 'x'}, {'base'}),
+      ),
+      expect: () => [
+        isA<CollectionsState>().having(
+          (s) => CollectionsTreeHelper.findNode(s.collections, 'f1')!.variables,
+          'variables',
+          {'base': 'x'},
+        ),
+      ],
+    );
+
+    blocTest<CollectionsBloc, CollectionsState>(
+      'is a no-op for an unknown id',
+      build: build,
+      seed: () => CollectionsState(collections: [folder('f1', 'API')]),
+      act: (bloc) =>
+          bloc.add(const UpdateNodeVariables('ghost', {'a': 'b'}, {})),
+      expect: () => const <CollectionsState>[],
+    );
   });
 
   group('persistence', () {
