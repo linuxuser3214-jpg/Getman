@@ -25,6 +25,7 @@ import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart';
 import 'package:getman/features/tabs/presentation/widgets/url_bar.dart';
 import 'package:re_editor/re_editor.dart';
+import 'package:uuid/uuid.dart';
 
 const double _splitMin = 0.1;
 const double _splitMax = 0.9;
@@ -290,10 +291,18 @@ class _RequestViewState extends State<RequestView> {
         initialText: 'NEW REQUEST',
         hintText: 'REQUEST NAME',
         onConfirm: (name) {
+          // Generate the node id at the call site so the open tab can link to
+          // the new node immediately (otherwise it stays unlinked: shows dirty,
+          // the Save button never flips to "Update", and re-saving duplicates).
+          final nodeId = const Uuid().v4();
           collectionsBloc.add(
-            SaveRequestToCollection(name, tab.config.copyWith()),
+            SaveRequestToCollection(name, tab.config.copyWith(), id: nodeId),
           );
-          tabsBloc.add(UpdateTab(tab.copyWith(collectionName: name)));
+          tabsBloc.add(
+            UpdateTab(
+              tab.copyWith(collectionName: name, collectionNodeId: nodeId),
+            ),
+          );
         },
       ),
     );

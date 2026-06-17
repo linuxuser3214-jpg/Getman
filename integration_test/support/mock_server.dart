@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -18,8 +19,9 @@ class RecordedRequest {
 }
 
 /// Signature for a custom response writer. Write to `request.response` only —
-/// the server closes it. Throwing is fine; it surfaces as a 500-style failure.
-typedef MockResponder = void Function(HttpRequest request);
+/// the server closes it. May be async (e.g. to delay before responding, for
+/// timeout/cancel flows). Throwing is fine; it surfaces as a 500-style failure.
+typedef MockResponder = FutureOr<void> Function(HttpRequest request);
 
 /// A hermetic localhost HTTP server for E2E flows.
 ///
@@ -52,16 +54,19 @@ class MockServer {
   String url(String path) => '$baseUrl$path';
 
   /// Starts a server. By default it replies `status` with `json` as the body.
-  /// Pass [responder] for full control over the response.
+  /// Pass [responder] for full control over the response, or [delay] to hold
+  /// the default response open (for cancel-in-flight / timeout flows).
   static Future<MockServer> start({
     int status = 200,
     Object? json,
     MockResponder? responder,
+    Duration? delay,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final effective =
         responder ??
-        (HttpRequest request) {
+        (HttpRequest request) async {
+          if (delay != null) await Future<void>.delayed(delay);
           request.response
             ..statusCode = status
             ..headers.contentType = ContentType.json
@@ -83,9 +88,17 @@ class MockServer {
       ),
     );
     try {
-      _responder(request);
+      await _responder(request);
+    } on Object {
+      // The client may have gone away mid-response (cancel / timeout flows);
+      // a server-side write error there is expected — don't let it escape into
+      // the test's zone as an unhandled async error.
     } finally {
-      await request.response.close();
+      try {
+        await request.response.close();
+      } on Object {
+        // Connection already closed by the client — ignore.
+      }
     }
   }
 

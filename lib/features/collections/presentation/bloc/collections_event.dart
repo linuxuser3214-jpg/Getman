@@ -22,12 +22,25 @@ class AddFolder extends CollectionsEvent {
 }
 
 class SaveRequestToCollection extends CollectionsEvent {
-  const SaveRequestToCollection(this.name, this.config, {this.parentId});
+  const SaveRequestToCollection(
+    this.name,
+    this.config, {
+    this.parentId,
+    this.id,
+  });
   final String name;
   final HttpRequestConfigEntity config;
   final String? parentId;
+
+  /// Optional pre-generated node id. When supplied (by the save dialog) the
+  /// caller can link the open tab to the new node immediately by setting the
+  /// tab's `collectionNodeId` to the same value — otherwise the id is generated
+  /// inside the bloc and is unknowable at the call site (mirrors how
+  /// `AddEnvironment` carries a caller-built entity).
+  final String? id;
+
   @override
-  List<Object?> get props => [name, config, parentId];
+  List<Object?> get props => [name, config, parentId, id];
 }
 
 class UpdateNodeRequest extends CollectionsEvent {

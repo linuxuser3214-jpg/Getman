@@ -102,6 +102,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     trailing: SizedBox(
                       width: 80,
                       child: TextField(
+                        key: const ValueKey('history_limit_field'),
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           contentPadding: EdgeInsets.symmetric(
@@ -256,6 +257,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     'RECEIVE TIMEOUT (ms)',
                     _receiveTimeoutController,
                     UpdateReceiveTimeout.new,
+                    fieldKey: const ValueKey('receive_timeout_field'),
                   ),
                   SwitchListTile(
                     secondary: Icon(Icons.alt_route, size: layout.iconSize),
@@ -414,8 +416,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
     BuildContext context,
     String label,
     TextEditingController controller,
-    SettingsEvent Function(int ms) event,
-  ) {
+    SettingsEvent Function(int ms) event, {
+    Key? fieldKey,
+  }) {
     final layout = context.appLayout;
     return ListTile(
       title: Text(
@@ -428,6 +431,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       trailing: SizedBox(
         width: 90,
         child: TextField(
+          key: fieldKey,
           keyboardType: TextInputType.number,
           controller: controller,
           decoration: InputDecoration(

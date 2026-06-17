@@ -138,7 +138,7 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     Emitter<CollectionsState> emit,
   ) {
     final newNode = CollectionNodeEntity(
-      id: _uuid.v4(),
+      id: event.id ?? _uuid.v4(),
       name: event.name,
       isFolder: false,
       config: event.config,

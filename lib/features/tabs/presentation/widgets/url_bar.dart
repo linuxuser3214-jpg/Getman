@@ -240,8 +240,21 @@ class _UrlBarState extends State<UrlBar> {
                                   size: iconSize,
                                 ),
                                 tooltip: 'Generate code',
-                                onPressed: () =>
-                                    CodeExportDialog.show(context, tab.config),
+                                // Read the CURRENT config at press time: this
+                                // BlocBuilder's buildWhen excludes config.url
+                                // (the editor must not rebuild per keystroke),
+                                // so `tab` here goes stale after a URL edit.
+                                // Mirrors the RealtimeButton fix.
+                                onPressed: () => CodeExportDialog.show(
+                                  context,
+                                  context
+                                          .read<TabsBloc>()
+                                          .state
+                                          .tabs
+                                          .byId(widget.tabId)
+                                          ?.config ??
+                                      tab.config,
+                                ),
                               ),
                             ),
                             SizedBox(width: smallGap),
@@ -340,8 +353,16 @@ class _UrlBarState extends State<UrlBar> {
                               iconSize: iconSize,
                               isSaved: tab.collectionNodeId != null,
                               isVerticalLayout: settings.isVerticalLayout,
-                              onGenerateCode: () =>
-                                  CodeExportDialog.show(context, tab.config),
+                              onGenerateCode: () => CodeExportDialog.show(
+                                context,
+                                context
+                                        .read<TabsBloc>()
+                                        .state
+                                        .tabs
+                                        .byId(widget.tabId)
+                                        ?.config ??
+                                    tab.config,
+                              ),
                               onSave: widget.onSave,
                               onToggleLayout: () =>
                                   context.read<SettingsBloc>().add(
