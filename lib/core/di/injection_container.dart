@@ -49,6 +49,7 @@ import 'package:getman/features/settings/domain/usecases/settings_usecases.dart'
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
+import 'package:getman/features/tabs/data/models/panel_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/data/models/stored_response_model.dart';
 import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart';
@@ -85,6 +86,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       ..registerAdapter(HttpRequestConfigAdapter())
       ..registerAdapter(HttpRequestTabModelAdapter())
       ..registerAdapter(StoredResponseModelAdapter())
+      ..registerAdapter(PanelModelAdapter())
       ..registerAdapter(CollectionNodeAdapter())
       ..registerAdapter(SavedExampleModelAdapter())
       ..registerAdapter(EnvironmentModelAdapter())
@@ -112,6 +114,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     Hive.openBox<CollectionNode>(HiveBoxes.collections),
     Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
     Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules),
+    Hive.openBox<PanelModel>(HiveBoxes.panels),
   ]);
   final settingsBox = boxes[0] as Box<SettingsModel>;
   final environmentsBox = boxes[1] as Box<EnvironmentModel>;
