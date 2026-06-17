@@ -85,7 +85,7 @@ class _PanelSelectorState extends State<PanelSelector> {
     _openMenu(context);
   }
 
-  void _openMenu(BuildContext context) {
+  void _openMenu(BuildContext context, {String? droppedTabId}) {
     final overlay = Overlay.of(context);
     final overlayBox = overlay.context.findRenderObject() as RenderBox?;
     final buttonBox = context.findRenderObject() as RenderBox?;
@@ -117,6 +117,7 @@ class _PanelSelectorState extends State<PanelSelector> {
         tabsBloc: tabsBloc,
         appTheme: Theme.of(context),
         onDismiss: _removeMenu,
+        droppedTabId: droppedTabId,
       ),
     );
     overlay.insert(_menuEntry!);
@@ -146,10 +147,9 @@ class _PanelSelectorState extends State<PanelSelector> {
         return _SelectorButton(
           activeName: active.name,
           onTap: () => _handleTap(context, active),
-          // Drag-onto-selector (move tab into this panel's list) lands in
-          // Task 9, which adds the Draggable<String> source on tabs. The
-          // target opens the panel menu so the user can drop into a row.
-          onTabDropped: (_) => _toggleMenu(context),
+          // When a tab is dropped onto the selector, open the panel menu in
+          // "move" mode so the user can pick a target panel.
+          onTabDropped: (tabId) => _openMenu(context, droppedTabId: tabId),
         );
       },
     );
@@ -254,6 +254,7 @@ class _PanelMenu extends StatelessWidget {
     required this.tabsBloc,
     required this.appTheme,
     required this.onDismiss,
+    this.droppedTabId,
   });
 
   final double left;
@@ -262,6 +263,10 @@ class _PanelMenu extends StatelessWidget {
   final TabsBloc tabsBloc;
   final ThemeData appTheme;
   final VoidCallback onDismiss;
+
+  /// When non-null, every panel row tapping dispatches [MoveTabToPanel] instead
+  /// of [SetActivePanel], and the add-footer dispatches [MoveTabToNewPanel].
+  final String? droppedTabId;
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +289,10 @@ class _PanelMenu extends StatelessWidget {
               left: left,
               top: top,
               width: width,
-              child: _PanelMenuCard(onDismiss: onDismiss),
+              child: _PanelMenuCard(
+                onDismiss: onDismiss,
+                droppedTabId: droppedTabId,
+              ),
             ),
           ],
         ),
@@ -294,9 +302,10 @@ class _PanelMenu extends StatelessWidget {
 }
 
 class _PanelMenuCard extends StatelessWidget {
-  const _PanelMenuCard({required this.onDismiss});
+  const _PanelMenuCard({required this.onDismiss, this.droppedTabId});
 
   final VoidCallback onDismiss;
+  final String? droppedTabId;
 
   @override
   Widget build(BuildContext context) {
@@ -339,6 +348,7 @@ class _PanelMenuCard extends StatelessWidget {
                         isActive: panel.id == state.activePanelId,
                         canClose: canClose,
                         onDismiss: onDismiss,
+                        droppedTabId: droppedTabId,
                       );
                     },
                   );
@@ -346,7 +356,10 @@ class _PanelMenuCard extends StatelessWidget {
               ),
             ),
             Divider(height: layout.borderThin, color: theme.dividerColor),
-            _AddPanelFooter(onDismiss: onDismiss),
+            _AddPanelFooter(
+              onDismiss: onDismiss,
+              droppedTabId: droppedTabId,
+            ),
           ],
         ),
       ),
@@ -364,6 +377,7 @@ class _PanelRow extends StatelessWidget {
     required this.isActive,
     required this.canClose,
     required this.onDismiss,
+    this.droppedTabId,
     super.key,
   });
 
@@ -372,6 +386,10 @@ class _PanelRow extends StatelessWidget {
   final bool isActive;
   final bool canClose;
   final VoidCallback onDismiss;
+
+  /// When non-null, tapping this row dispatches [MoveTabToPanel] instead of
+  /// [SetActivePanel].
+  final String? droppedTabId;
 
   void _rename(BuildContext context) {
     final bloc = context.read<TabsBloc>();
@@ -403,7 +421,13 @@ class _PanelRow extends StatelessWidget {
 
     return InkWell(
       onTap: () {
-        context.read<TabsBloc>().add(SetActivePanel(panel.id));
+        final bloc = context.read<TabsBloc>();
+        final tabId = droppedTabId;
+        if (tabId != null) {
+          bloc.add(MoveTabToPanel(tabId, panel.id));
+        } else {
+          bloc.add(SetActivePanel(panel.id));
+        }
         onDismiss();
       },
       child: Padding(
@@ -485,9 +509,13 @@ class _PanelRow extends StatelessWidget {
 }
 
 class _AddPanelFooter extends StatelessWidget {
-  const _AddPanelFooter({required this.onDismiss});
+  const _AddPanelFooter({required this.onDismiss, this.droppedTabId});
 
   final VoidCallback onDismiss;
+
+  /// When non-null, tapping dispatches [MoveTabToNewPanel] instead of
+  /// [AddPanel].
+  final String? droppedTabId;
 
   @override
   Widget build(BuildContext context) {
@@ -497,7 +525,13 @@ class _AddPanelFooter extends StatelessWidget {
     return InkWell(
       key: const ValueKey('panel_add_button'),
       onTap: () {
-        context.read<TabsBloc>().add(const AddPanel());
+        final bloc = context.read<TabsBloc>();
+        final tabId = droppedTabId;
+        if (tabId != null) {
+          bloc.add(MoveTabToNewPanel(tabId));
+        } else {
+          bloc.add(const AddPanel());
+        }
         onDismiss();
       },
       child: Padding(

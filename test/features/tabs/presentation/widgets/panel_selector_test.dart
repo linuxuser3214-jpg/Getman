@@ -115,4 +115,122 @@ void main() {
 
     verify(() => bloc.add(const RenamePanel('p1', 'Renamed'))).called(1);
   });
+
+  testWidgets(
+    'dropping a tab onto selector opens menu; tapping a panel row dispatches '
+    'MoveTabToPanel',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<TabsBloc>.value(
+              value: bloc,
+              child: const Row(
+                children: [
+                  LongPressDraggable<String>(
+                    key: ValueKey('drag_source'),
+                    data: 't1',
+                    feedback: Material(child: Text('t1')),
+                    child: SizedBox(
+                      width: 100,
+                      height: 50,
+                      child: ColoredBox(
+                        color: Colors.blue,
+                        child: Text('drag me'),
+                      ),
+                    ),
+                  ),
+                  PanelSelector(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Long-press to start drag, move to selector, release.
+      final sourceCenter = tester.getCenter(
+        find.byKey(const ValueKey('drag_source')),
+      );
+      final targetCenter = tester.getCenter(
+        find.byKey(const ValueKey('panel_selector_button')),
+      );
+      final gesture = await tester.startGesture(sourceCenter);
+      await tester.pump(const Duration(milliseconds: 600));
+      await gesture.moveTo(targetCenter);
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // Panel menu should now be open in "move" mode.
+      // Tap the 'Work' panel row (id: _workPanelId = 'p2').
+      await tester.tap(
+        find.byKey(const ValueKey('panel_row_$_workPanelId')),
+      );
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(const MoveTabToPanel('t1', _workPanelId)),
+      ).called(1);
+    },
+  );
+
+  testWidgets(
+    'dropping a tab onto selector and tapping add-footer dispatches '
+    'MoveTabToNewPanel',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<TabsBloc>.value(
+              value: bloc,
+              child: const Row(
+                children: [
+                  LongPressDraggable<String>(
+                    key: ValueKey('drag_source2'),
+                    data: 't1',
+                    feedback: Material(child: Text('t1')),
+                    child: SizedBox(
+                      width: 100,
+                      height: 50,
+                      child: ColoredBox(
+                        color: Colors.green,
+                        child: Text('drag me'),
+                      ),
+                    ),
+                  ),
+                  PanelSelector(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final sourceCenter = tester.getCenter(
+        find.byKey(const ValueKey('drag_source2')),
+      );
+      final targetCenter = tester.getCenter(
+        find.byKey(const ValueKey('panel_selector_button')),
+      );
+      final gesture = await tester.startGesture(sourceCenter);
+      await tester.pump(const Duration(milliseconds: 600));
+      await gesture.moveTo(targetCenter);
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // Tap the "New panel" footer — should dispatch MoveTabToNewPanel.
+      await tester.tap(find.byKey(const ValueKey('panel_add_button')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(const MoveTabToNewPanel('t1')),
+      ).called(1);
+    },
+  );
 }
