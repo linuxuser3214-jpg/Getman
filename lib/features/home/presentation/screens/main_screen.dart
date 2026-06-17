@@ -30,6 +30,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/panel_selector.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -522,6 +523,10 @@ class _MainScreenState extends State<MainScreen> {
                   ),
           ),
           const AddTabButton(),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
+            child: const PanelSelector(),
+          ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
             child: const EnvironmentSelector(),
