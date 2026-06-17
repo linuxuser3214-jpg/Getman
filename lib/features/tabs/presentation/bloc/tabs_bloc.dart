@@ -53,6 +53,8 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     on<RenamePanel>(_onRenamePanel);
     on<SetActivePanel>(_onSetActivePanel);
     on<ReorderPanels>(_onReorderPanels);
+    on<MoveTabToPanel>(_onMoveTabToPanel);
+    on<MoveTabToNewPanel>(_onMoveTabToNewPanel);
   }
   final TabsRepository _repository;
   final SendRequestUseCase _sendRequestUseCase;
@@ -756,6 +758,71 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final item = panels.removeAt(event.oldIndex);
     panels.insert(newIndex, item);
     emit(_derive(panels, state.activePanelId));
+    await _persistPanelMeta();
+  }
+
+  /// Removes [tabId] from its owning panel, fixing the panel's active tab and
+  /// auto-seeding a blank if it empties. Returns (updatedSource, movedTab) or
+  /// null if the tab isn't found. Persistence of the source is the
+  /// caller's job.
+  ({PanelEntity source, HttpRequestTabEntity tab})? _detachTab(String tabId) {
+    final source = state.panels.firstWhereOrNull(
+      (p) => p.tabs.any((t) => t.tabId == tabId),
+    );
+    if (source == null) return null;
+    final removedIdx = source.tabs.indexWhere((t) => t.tabId == tabId);
+    final tab = source.tabs[removedIdx];
+    final remaining = [...source.tabs]..removeAt(removedIdx);
+    var updated = source.copyWith(tabs: remaining);
+    if (source.activeTabId == tabId && remaining.isNotEmpty) {
+      updated = updated.copyWith(
+        activeTabId: remaining[removedIdx.clamp(0, remaining.length - 1)].tabId,
+      );
+    }
+    updated = _ensureNonEmpty(updated);
+    return (source: updated, tab: tab);
+  }
+
+  Future<void> _onMoveTabToPanel(
+    MoveTabToPanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    final target = state.panels.byId(event.targetPanelId);
+    if (target == null) return;
+    final owner = state.panels.firstWhereOrNull(
+      (p) => p.tabs.any((t) => t.tabId == event.tabId),
+    );
+    if (owner == null || owner.id == target.id) return;
+
+    final detached = _detachTab(event.tabId);
+    if (detached == null) return;
+    final updatedTarget = target.copyWith(
+      tabs: [...target.tabs, detached.tab],
+    );
+
+    var panels = _replacePanel(state.panels, detached.source);
+    panels = _replacePanel(panels, updatedTarget);
+    emit(_derive(panels, state.activePanelId)); // stay on current panel
+    await _persistPanel(detached.source);
+    await _persistPanel(updatedTarget);
+  }
+
+  Future<void> _onMoveTabToNewPanel(
+    MoveTabToNewPanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    final detached = _detachTab(event.tabId);
+    if (detached == null) return;
+    final newPanel = PanelEntity(
+      id: _uuid.v4(),
+      name: event.name ?? _nextPanelName(),
+      tabs: [detached.tab],
+      activeTabId: detached.tab.tabId,
+    );
+    final panels = [..._replacePanel(state.panels, detached.source), newPanel];
+    emit(_derive(panels, state.activePanelId)); // stay on current panel
+    await _persistPanel(detached.source);
+    await _persistPanel(newPanel);
     await _persistPanelMeta();
   }
 }

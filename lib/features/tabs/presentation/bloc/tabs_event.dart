@@ -179,3 +179,19 @@ class ReorderPanels extends TabsEvent {
   @override
   List<Object?> get props => [oldIndex, newIndex];
 }
+
+class MoveTabToPanel extends TabsEvent {
+  const MoveTabToPanel(this.tabId, this.targetPanelId);
+  final String tabId;
+  final String targetPanelId;
+  @override
+  List<Object?> get props => [tabId, targetPanelId];
+}
+
+class MoveTabToNewPanel extends TabsEvent {
+  const MoveTabToNewPanel(this.tabId, {this.name});
+  final String tabId;
+  final String? name;
+  @override
+  List<Object?> get props => [tabId, name];
+}

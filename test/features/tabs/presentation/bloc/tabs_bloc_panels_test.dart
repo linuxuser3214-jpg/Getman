@@ -260,6 +260,95 @@ void main() {
     },
   );
 
+  // ---------------------------------------------------------------------------
+  // Task 6: Move-tab-between-panels events
+  // ---------------------------------------------------------------------------
+
+  group('MoveTabToPanel', () {
+    test(
+      'moves a tab to the target and stays on the current panel',
+      () async {
+        final bloc = await buildLoadedBloc();
+        addTearDown(bloc.close);
+
+        final p1 = bloc.state.panels.single.id;
+
+        // Panel 1: add a second tab.
+        bloc.add(const AddTab());
+        await bloc.stream.firstWhere((s) => s.panels.first.tabs.length == 2);
+
+        // Create Panel 2 — it becomes active.
+        bloc.add(const AddPanel());
+        await bloc.stream.firstWhere((s) => s.panels.length == 2);
+        final p2 = bloc.state.panels[1].id;
+
+        // Switch back to Panel 1.
+        bloc.add(SetActivePanel(p1));
+        await bloc.stream.firstWhere((s) => s.activePanelId == p1);
+
+        // Move Panel 1's last tab to Panel 2.
+        final movingId = bloc.state.panels.byId(p1)!.tabs.last.tabId;
+        bloc.add(MoveTabToPanel(movingId, p2));
+        await bloc.stream.firstWhere(
+          (s) => s.panels.byId(p2)!.tabs.length == 2,
+        );
+
+        expect(bloc.state.activePanelId, bloc.state.panels.first.id);
+        expect(bloc.state.panels[1].tabs.length, 2);
+      },
+    );
+
+    test(
+      'moving the last tab out of a panel auto-seeds a blank tab',
+      () async {
+        final bloc = await buildLoadedBloc();
+        addTearDown(bloc.close);
+
+        // Create Panel 2 — it becomes active with one tab.
+        bloc.add(const AddPanel());
+        await bloc.stream.firstWhere((s) => s.panels.length == 2);
+        final p2 = bloc.state.panels.last.id;
+        final p1 = bloc.state.panels.first.id;
+        final onlyTab = bloc.state.panels.last.tabs.single.tabId;
+
+        // Move Panel 2's only tab to Panel 1 — empties Panel 2 → auto-seed.
+        bloc.add(MoveTabToPanel(onlyTab, p1));
+        // Wait until the source panel has been re-seeded (1 tab again).
+        await bloc.stream.firstWhere(
+          (s) => s.panels.byId(p2)!.tabs.length == 1,
+        );
+
+        expect(bloc.state.panels.byId(p2)!.tabs.length, 1);
+      },
+    );
+  });
+
+  group('MoveTabToNewPanel', () {
+    test(
+      'creates a panel containing only the moved tab',
+      () async {
+        final bloc = await buildLoadedBloc();
+        addTearDown(bloc.close);
+
+        final p1 = bloc.state.panels.single.id;
+
+        // Panel 1: add a second tab.
+        bloc.add(const AddTab());
+        await bloc.stream.firstWhere((s) => s.panels.first.tabs.length == 2);
+        final moving = bloc.state.panels.single.tabs.last.tabId;
+
+        // Move that tab to a brand new panel.
+        bloc.add(MoveTabToNewPanel(moving));
+        await bloc.stream.firstWhere((s) => s.panels.length == 2);
+
+        expect(bloc.state.panels.length, 2);
+        expect(bloc.state.panels.last.tabs.length, 1);
+        expect(bloc.state.panels.last.tabs.single.tabId, isNotEmpty);
+        expect(bloc.state.activePanelId, p1); // stayed put
+      },
+    );
+  });
+
   group('empty-panels guard (pre-LoadTabs)', () {
     // All active-panel-scoped handlers must no-op — not throw — when
     // dispatched before LoadTabs fills state.panels (initial TabsState is
