@@ -21,15 +21,22 @@ enum CodeGenTarget {
   final String label;
 }
 
-/// Generates copy-pasteable request snippets from a request config. Output is a
-/// *template*: `{{env vars}}` are left verbatim (never resolved) so the user
-/// can paste and substitute. Reflects auth (bearer/basic/api-key) and the
-/// chosen body type. Pure — depends only on core/domain.
+/// Generates copy-pasteable request snippets from a request config. The
+/// generated code mirrors what an actual SEND would put on the wire: pass a
+/// `resolve` backed by the active environment (+ collection) variables so the
+/// recipient — who has no access to the user's environment — gets a runnable
+/// snippet with concrete values. The default identity resolver leaves
+/// `{{env vars}}` verbatim. Reflects auth (bearer/basic/api-key) and the chosen
+/// body type. Pure — depends only on core/domain.
 class CodeGenService {
   CodeGenService._();
 
-  static String generate(HttpRequestConfigEntity config, CodeGenTarget target) {
-    final eff = _effective(config);
+  static String generate(
+    HttpRequestConfigEntity config,
+    CodeGenTarget target, {
+    String Function(String value) resolve = _identity,
+  }) {
+    final eff = _effective(config, resolve);
     switch (target) {
       case CodeGenTarget.curl:
         return _curl(eff);
@@ -46,18 +53,25 @@ class CodeGenService {
     }
   }
 
-  // ---- effective request (auth applied, content-type adjusted) ----
+  // ---- effective request (vars resolved, auth applied, content-type) ----
 
-  static _Effective _effective(HttpRequestConfigEntity config) {
-    final headers = Map<String, String>.of(config.headers);
-    var url = config.url;
+  static _Effective _effective(
+    HttpRequestConfigEntity config,
+    String Function(String value) resolve,
+  ) {
+    // Resolve header VALUES (not keys) — same scope as the send path
+    // (TabsRepositoryImpl.sendRequest / RequestSerializer).
+    final headers = <String, String>{
+      for (final e in config.headers.entries) e.key: resolve(e.value),
+    };
+    var url = resolve(config.url);
 
-    // Code-gen emits a template: pass the identity resolver so `{{vars}}` stay
-    // verbatim. Same auth decision as the send path (auth_application.dart).
+    // Same auth decision as the send path (auth_application.dart); credential
+    // values flow through the same resolver.
     final auth = resolveAuthApplication(
       auth: config.authConfig,
       currentHeaders: headers,
-      resolve: (value) => value,
+      resolve: resolve,
     );
     headers.addAll(auth.headers);
     final apiKeyQuery = auth.queryParam;
@@ -71,16 +85,25 @@ class CodeGenService {
     // Mirror the send pipeline's content-type handling for structured bodies.
     BodyTypeUtils.applyContentType(headers, config.bodyType);
 
+    // Resolve form-field names + values (binary file paths stay local).
+    final formFields = [
+      for (final f in config.formFields)
+        f.copyWith(name: resolve(f.name), value: resolve(f.value)),
+    ];
+
     return _Effective(
       method: config.method,
       url: url,
       headers: headers,
       bodyType: config.bodyType,
-      rawBody: config.body,
-      formFields: config.formFields,
+      rawBody: resolve(config.body),
+      formFields: formFields,
       binaryPath: config.bodyFilePath,
     );
   }
+
+  /// Default resolver: pass `{{vars}}` through verbatim (template output).
+  static String _identity(String value) => value;
 
   // ---- cURL ----
 

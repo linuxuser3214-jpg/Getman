@@ -8,20 +8,33 @@ import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/core/utils/code_gen_service.dart';
+import 'package:getman/core/utils/environment_resolver.dart';
 
 /// "Generate code" dialog: pick a target language and copy a request snippet.
-/// The snippet keeps `{{env vars}}` verbatim (it's a template).
+/// The snippet contains RESOLVED values — the recipient has no access to the
+/// user's environment, so [vars] (the same map the SEND button builds) is
+/// substituted into URL / header values / auth / body, producing a runnable
+/// snippet. Unknown variables are left verbatim.
 class CodeExportDialog extends StatefulWidget {
-  const CodeExportDialog({required this.config, super.key});
+  const CodeExportDialog({
+    required this.config,
+    this.vars = const {},
+    super.key,
+  });
   final HttpRequestConfigEntity config;
+
+  /// Active environment (+ collection) variables, exactly as the SEND path
+  /// constructs them. Substituted at generate time so the output is runnable.
+  final Map<String, String> vars;
 
   static Future<void> show(
     BuildContext context,
-    HttpRequestConfigEntity config,
-  ) {
+    HttpRequestConfigEntity config, {
+    Map<String, String> vars = const {},
+  }) {
     return showResponsiveDialog(
       context,
-      builder: (_) => CodeExportDialog(config: config),
+      builder: (_) => CodeExportDialog(config: config, vars: vars),
     );
   }
 
@@ -36,7 +49,11 @@ class _CodeExportDialogState extends State<CodeExportDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    final code = CodeGenService.generate(widget.config, _target);
+    final code = CodeGenService.generate(
+      widget.config,
+      _target,
+      resolve: (value) => EnvironmentResolver.resolve(value, widget.vars),
+    );
 
     return ResponsiveDialogScaffold(
       title: const Text('GENERATE CODE'),

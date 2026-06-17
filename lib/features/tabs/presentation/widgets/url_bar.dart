@@ -275,6 +275,7 @@ class _UrlBarState extends State<UrlBar> {
                                           .byId(widget.tabId)
                                           ?.config ??
                                       tab.config,
+                                  vars: _activeVariables(context),
                                 ),
                               ),
                             ),
@@ -383,6 +384,7 @@ class _UrlBarState extends State<UrlBar> {
                                         .byId(widget.tabId)
                                         ?.config ??
                                     tab.config,
+                                vars: _activeVariables(context),
                               ),
                               onSave: widget.onSave,
                               onToggleLayout: () =>
