@@ -12,6 +12,7 @@ import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/widgets/collection_variables_dialog.dart';
 
 /// Touch-first replacement for the three-dot context menu. Opened via long-
 /// press on a collection node when `BuildContext.isPhone` is true. Exposes
@@ -156,6 +157,15 @@ class _SheetBody extends StatelessWidget {
                         bloc.add(AddFolder(name, parentId: node.id)),
                   ),
                 );
+              },
+            ),
+          if (node.isFolder)
+            _Action(
+              icon: Icons.data_object,
+              label: 'VARIABLES',
+              onTap: () {
+                Navigator.of(context).pop();
+                unawaited(CollectionVariablesDialog.show(context, node));
               },
             ),
           _Action(

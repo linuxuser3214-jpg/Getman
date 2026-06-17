@@ -80,6 +80,58 @@ class CollectionsTreeHelper {
     (node) => node.copyWith(description: description),
   );
 
+  /// Sets the collection-scoped [variables] + [secretKeys] on the node with
+  /// [id]. No-op if the id is missing.
+  static List<CollectionNodeEntity> setVariablesInTree(
+    List<CollectionNodeEntity> nodes,
+    String id,
+    Map<String, String> variables,
+    Set<String> secretKeys,
+  ) => _updateNodeById(
+    nodes,
+    id,
+    (node) => node.copyWith(variables: variables, secretKeys: secretKeys),
+  );
+
+  /// Merges the variables of every node on the path from a root down to
+  /// [leafId] (root first, deepest last) — the deepest layer wins on name
+  /// clashes, and the layer that supplies the winning value decides whether the
+  /// name is secret. Returns empty maps if [leafId] is not found.
+  static ({Map<String, String> variables, Set<String> secretKeys})
+  collectVariables(List<CollectionNodeEntity> nodes, String leafId) {
+    final path = _pathTo(nodes, leafId);
+    if (path == null) {
+      return (variables: const {}, secretKeys: const {});
+    }
+    final variables = <String, String>{};
+    final secretKeys = <String>{};
+    for (final node in path) {
+      node.variables.forEach((key, value) {
+        variables[key] = value;
+        if (node.secretKeys.contains(key)) {
+          secretKeys.add(key);
+        } else {
+          secretKeys.remove(key);
+        }
+      });
+    }
+    return (variables: variables, secretKeys: secretKeys);
+  }
+
+  /// The chain of nodes from a root down to and including the node with [id],
+  /// or null if not found.
+  static List<CollectionNodeEntity>? _pathTo(
+    List<CollectionNodeEntity> nodes,
+    String id,
+  ) {
+    for (final node in nodes) {
+      if (node.id == id) return [node];
+      final sub = _pathTo(node.children, id);
+      if (sub != null) return [node, ...sub];
+    }
+    return null;
+  }
+
   /// Append [example] to the node's saved examples (newest last). No-op if the
   /// id is missing.
   static List<CollectionNodeEntity> addExampleToNode(

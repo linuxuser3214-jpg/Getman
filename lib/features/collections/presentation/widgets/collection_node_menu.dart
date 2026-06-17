@@ -11,6 +11,7 @@ import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/widgets/collection_variables_dialog.dart';
 
 /// The trailing more-actions menu on a collection node row
 /// (rename / describe / delete / favorite / add-subfolder / export).
@@ -42,6 +43,8 @@ class CollectionNodeMenu extends StatelessWidget {
             _showRenameDialog(context);
           case 'describe':
             _showDescriptionDialog(context);
+          case 'variables':
+            unawaited(CollectionVariablesDialog.show(context, node));
           case 'delete':
             unawaited(
               ConfirmDialog.show(
@@ -101,6 +104,17 @@ class CollectionNodeMenu extends StatelessWidget {
             ),
           ),
         ),
+        if (node.isFolder)
+          PopupMenuItem(
+            value: 'variables',
+            child: Text(
+              'VARIABLES',
+              style: TextStyle(
+                fontSize: layout.fontSizeSmall,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         if (node.isFolder)
           PopupMenuItem(
             value: 'add_subfolder',

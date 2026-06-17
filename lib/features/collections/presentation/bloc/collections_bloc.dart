@@ -26,6 +26,7 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     on<DeleteNode>(_onDeleteNode);
     on<RenameNode>(_onRenameNode);
     on<UpdateNodeDescription>(_onUpdateNodeDescription);
+    on<UpdateNodeVariables>(_onUpdateNodeVariables);
     on<ToggleFavorite>(_onToggleFavorite);
     on<SaveExampleToNode>(_onSaveExampleToNode);
     on<DeleteExample>(_onDeleteExample);
@@ -194,6 +195,24 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
         state.collections,
         event.id,
         event.description,
+      ),
+    );
+  }
+
+  Future<void> _onUpdateNodeVariables(
+    UpdateNodeVariables event,
+    Emitter<CollectionsState> emit,
+  ) {
+    if (CollectionsTreeHelper.findNode(state.collections, event.id) == null) {
+      return Future.value();
+    }
+    return _commit(
+      emit,
+      CollectionsTreeHelper.setVariablesInTree(
+        state.collections,
+        event.id,
+        event.variables,
+        event.secretKeys,
       ),
     );
   }
