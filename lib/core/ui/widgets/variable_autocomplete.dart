@@ -100,6 +100,7 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
   }
 
   void _onControllerChanged() {
+    if (!mounted) return;
     final text = widget.controller.text;
     if (text != _lastText) {
       _dismissed = false;
@@ -244,7 +245,9 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
   }
 
   Widget _buildMenu(BuildContext context) {
-    final width = _link.leaderSize?.width ?? 280.0;
+    final width =
+        _link.leaderSize?.width ??
+        280.0; // fallback until the target's size is known
     return CompositedTransformFollower(
       link: _link,
       showWhenUnlinked: false,

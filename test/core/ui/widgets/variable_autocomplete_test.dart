@@ -124,4 +124,81 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('baseUrl'), findsOneWidget);
   });
+
+  testWidgets('Tab accepts the first suggestion, same as Enter', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tester.enterText(find.byType(TextField), '{{');
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    expect(controller.text, '{{baseUrl}}');
+  });
+
+  testWidgets('secret variable value is masked with bullets', (tester) async {
+    final secretController = TextEditingController();
+    final secretFocusNode = FocusNode();
+    addTearDown(() {
+      secretController.dispose();
+      secretFocusNode.dispose();
+    });
+
+    final secretSuggestion = [
+      const VariableSuggestion(
+        name: 'apiKey',
+        classification: ResolvedVariable(
+          name: 'apiKey',
+          kind: VariableValueKind.secret,
+          value: 'shh',
+          environmentName: 'Dev',
+        ),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: VariableAutocomplete(
+            controller: secretController,
+            focusNode: secretFocusNode,
+            suggestionsFor: (_) => secretSuggestion,
+            child: TextField(
+              controller: secretController,
+              focusNode: secretFocusNode,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), '{{');
+    await tester.pumpAndSettle();
+    expect(find.text('••••'), findsOneWidget);
+    expect(find.text('shh'), findsNothing);
+  });
+
+  testWidgets('Esc latch: stays closed on caret move, reopens on text change', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tester.enterText(find.byType(TextField), '{{');
+    await tester.pumpAndSettle();
+    expect(find.text('baseUrl'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('baseUrl'), findsNothing);
+
+    // Half A: caret move with no text change — latch holds, menu stays closed.
+    controller.selection = const TextSelection.collapsed(offset: 1);
+    await tester.pump();
+    expect(find.text('baseUrl'), findsNothing);
+
+    // Half B: text change clears the latch — menu reopens and filters on 'b'.
+    await tester.enterText(find.byType(TextField), '{{b');
+    await tester.pumpAndSettle();
+    expect(find.text('baseUrl'), findsOneWidget);
+  });
 }
