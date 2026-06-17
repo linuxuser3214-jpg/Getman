@@ -272,6 +272,8 @@ class _UrlBarState extends State<UrlBar> {
                               controller: _urlController,
                               focusNode: _urlFocusNode,
                               suggestionsFor: _urlSuggestions,
+                              onAccepted: (value) =>
+                                  _handleUrlChanged(context, tab, value),
                               child: TextField(
                                 key: const ValueKey('url_field'),
                                 controller: _urlController,

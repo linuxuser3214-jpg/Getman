@@ -179,6 +179,53 @@ void main() {
     expect(find.text('shh'), findsNothing);
   });
 
+  testWidgets(
+    'onAccepted fires with full text after Enter; not when menu merely opens',
+    (tester) async {
+      String? accepted;
+      var acceptedCount = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: VariableAutocomplete(
+              controller: controller,
+              focusNode: focusNode,
+              suggestionsFor: _suggest,
+              onAccepted: (value) {
+                accepted = value;
+                acceptedCount++;
+              },
+              child: TextField(controller: controller, focusNode: focusNode),
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), '{{');
+      await tester.pumpAndSettle();
+
+      // Menu is open — onAccepted must NOT have been called yet.
+      expect(
+        acceptedCount,
+        0,
+        reason: 'opening the menu must not fire onAccepted',
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, '{{baseUrl}}');
+      expect(
+        acceptedCount,
+        1,
+        reason: 'Enter must fire onAccepted exactly once',
+      );
+      expect(accepted, '{{baseUrl}}');
+    },
+  );
+
   testWidgets('Esc latch: stays closed on caret move, reopens on text change', (
     tester,
   ) async {

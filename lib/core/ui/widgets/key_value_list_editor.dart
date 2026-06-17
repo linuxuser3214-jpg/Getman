@@ -355,6 +355,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
             controller: widget.valController,
             focusNode: _valueFocusNode,
             suggestionsFor: widget.valueSuggestionsFor!,
+            onAccepted: widget.onValChanged,
             child: valueField,
           );
     final secretButton = widget.showSecretToggle

@@ -50,18 +50,25 @@ class _GatedAction extends Action<Intent> {
 /// Wraps a [TextField] ([child]) with a `{{variable}}` autocomplete menu.
 /// Typing `{{` (or Cmd/Ctrl+Space) opens a keyboard-navigable overlay built
 /// from [suggestionsFor]; accepting inserts `name}}`.
+///
+/// [onAccepted] is called with the controller's full text after a suggestion
+/// is accepted (keyboard or tap). Use it to notify listeners that would
+/// otherwise only see programmatic controller mutations via
+/// [TextField.onChanged].
 class VariableAutocomplete extends StatefulWidget {
   const VariableAutocomplete({
     required this.controller,
     required this.focusNode,
     required this.suggestionsFor,
     required this.child,
+    this.onAccepted,
     super.key,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final VariableSuggestionsProvider suggestionsFor;
+  final ValueChanged<String>? onAccepted;
   final Widget child;
 
   @override
@@ -165,6 +172,7 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
       text: '$before$insert$after',
       selection: TextSelection.collapsed(offset: caret),
     );
+    widget.onAccepted?.call(widget.controller.text);
   }
 
   void _dismiss() {
