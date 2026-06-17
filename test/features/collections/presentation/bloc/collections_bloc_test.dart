@@ -64,6 +64,46 @@ void main() {
       );
     });
 
+    test('SaveRequestToCollection honors a caller-supplied node id', () async {
+      // The save dialog pre-generates the node id so the open tab can link to
+      // it immediately (otherwise the tab stays unlinked → dirty forever +
+      // re-save duplicates). The bloc must use that id, not generate its own.
+      final bloc = build();
+      addTearDown(bloc.close);
+
+      bloc.add(
+        const SaveRequestToCollection(
+          'Login',
+          HttpRequestConfigEntity(id: 'cfg-1'),
+          id: 'node-fixed-id',
+        ),
+      );
+      await bloc.stream.first;
+
+      final node = bloc.state.collections.singleWhere((n) => n.name == 'Login');
+      expect(node.id, 'node-fixed-id');
+      expect(node.isFolder, isFalse);
+    });
+
+    test('SaveRequestToCollection still generates an id when none given', () {
+      final bloc = build();
+      addTearDown(bloc.close);
+
+      bloc.add(
+        const SaveRequestToCollection(
+          'Anon',
+          HttpRequestConfigEntity(id: 'cfg-2'),
+        ),
+      );
+
+      return expectLater(
+        bloc.stream.first.then(
+          (_) => bloc.state.collections.singleWhere((n) => n.name == 'Anon').id,
+        ),
+        completion(isNotEmpty),
+      );
+    });
+
     test(
       'UpdateNodeDescription sets and then clears a node description',
       () async {

@@ -101,7 +101,13 @@ Future<void> _pump(
   required String tabId,
   required CodeLineEditingController controller,
   SettingsEntity settings = const SettingsEntity(),
+  double? width,
 }) async {
+  final section = ResponseSection(
+    tabId: tabId,
+    responseController: controller,
+    showMetadata: false,
+  );
   await tester.pumpWidget(
     MaterialApp(
       theme: brutalistTheme(Brightness.light),
@@ -115,11 +121,16 @@ Future<void> _pump(
             ),
             BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
           ],
-          child: ResponseSection(
-            tabId: tabId,
-            responseController: controller,
-            showMetadata: false,
-          ),
+          // A narrow [width] reproduces the squeezed-toolbar overflow: the
+          // PRETTY/RAW toggle (left) and the copy/save/compare cluster (right)
+          // share one row, and a narrow pane forces the toggle below its
+          // intrinsic width.
+          child: width == null
+              ? section
+              : Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(width: width, child: section),
+                ),
         ),
       ),
     ),
@@ -538,4 +549,64 @@ void main() {
     expect(find.textContaining('FAIL · status = 201'), findsOneWidget);
     expect(find.textContaining('{{tok}} = abc'), findsOneWidget);
   });
+
+  // -------------------------------------------------------------------------
+  // Test 9: a narrow response pane must not overflow the BODY toolbar
+  // (the PRETTY/RAW toggle + copy/save/compare cluster share one row).
+  // -------------------------------------------------------------------------
+  testWidgets(
+    'narrow response pane does not overflow the PRETTY/RAW toggle',
+    (tester) async {
+      const tabId = 'tab9';
+      // A small (sub-threshold) body keeps the BODY tab in small mode, where
+      // the PRETTY/RAW toggle row lives.
+      final tab = _tabWithBody(tabId, '{"a":1}');
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+      final controller = CodeLineEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(
+        tester,
+        bloc: bloc,
+        tabId: tabId,
+        controller: controller,
+        width: 240,
+      );
+
+      // The toggle is present...
+      expect(find.byKey(const ValueKey('body_toggle_PRETTY')), findsOneWidget);
+      expect(find.byKey(const ValueKey('body_toggle_RAW')), findsOneWidget);
+      // ...and nothing in the squeezed toolbar overflowed.
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // Test 9b: dragging the splitter past the point where the toggle and the
+  // action cluster collide must reflow (toggle/cluster onto separate lines,
+  // segments/icons onto separate lines) rather than throw a RenderFlex
+  // overflow. 80px is narrower than the toggle's own intrinsic width.
+  testWidgets(
+    'extremely narrow response pane reflows the BODY toolbar without overflow',
+    (tester) async {
+      const tabId = 'tab9b';
+      final tab = _tabWithBody(tabId, '{"a":1}');
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+      final controller = CodeLineEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(
+        tester,
+        bloc: bloc,
+        tabId: tabId,
+        controller: controller,
+        width: 80,
+      );
+
+      expect(find.byKey(const ValueKey('body_toggle_PRETTY')), findsOneWidget);
+      expect(find.byKey(const ValueKey('body_toggle_RAW')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

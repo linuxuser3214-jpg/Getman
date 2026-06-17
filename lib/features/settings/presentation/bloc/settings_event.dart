@@ -21,6 +21,13 @@ class UpdateCompactMode extends SettingsEvent {
   List<Object?> get props => [isCompactMode];
 }
 
+class UpdateReduceVisualEffects extends SettingsEvent {
+  const UpdateReduceVisualEffects({required this.value});
+  final bool value;
+  @override
+  List<Object?> get props => [value];
+}
+
 class UpdateVerticalLayout extends SettingsEvent {
   const UpdateVerticalLayout({required this.isVerticalLayout});
   final bool isVerticalLayout;

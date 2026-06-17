@@ -1,111 +1,71 @@
 # E2E coverage backlog
 
-Flows not yet covered by the macOS `patrol_finders` suite (`run_macos.sh`), in
-the same evidence-first format as `docs/BACKLOG.md`. The current suite does
-**broad happy-path** coverage of each feature; this is the "deep later" list.
-
-Each item: what's missing · why it isn't done yet · a suggested approach.
+Flows covered by the macOS `patrol_finders` suite (`run_macos.sh`). The 2026-06-16
+"break-everything" pass took the suite from broad happy-path (~23 cases) to deep
+dirty/edge-path coverage (~95 cases). What remains is genuinely blocked
+(native dialogs) or low-value.
 
 ---
 
-## 1. Command palette (DONE — registered)
+## Covered (deep)
 
-- **State:** `flows/command_palette_test.dart` is now registered in
-  `all_flows_test.dart` and runs in the suite.
-- **Resolution:** the `No MaterialLocalizations found` assertion was *not* a
-  key-simulation problem — it was a real bug. `CommandPaletteIntent` /
-  `SwitchEnvironmentIntent` were wired in the root `Actions` in `main.dart`,
-  *above* `MaterialApp`, so their `showDialog` call ran with a context that had
-  no `MaterialLocalizations`/`Navigator` ancestor. Moving both actions into
-  `MainScreen`'s `Actions` (below `MaterialApp` + the router's `Navigator`)
-  fixed it; the Cmd/Ctrl+K combo now opens the palette under
-  `IntegrationTestWidgetsFlutterBinding`.
+- **Command palette** — `command_palette_test` + `command_palette_deep_test`
+  (open via shortcut, filter, run; jump to a saved request / environment;
+  arrow-key navigation).
+- **Saved examples (M10)** — `saved_examples_test` (capture from the response
+  pane, inline sub-row, open as an unlinked tab, rename, delete).
+- **Drag-and-drop tree reorder** — `collections_deep_test` (re-parent a folder
+  by drag) + `extras_test` (reorder tabs by drag).
+- **Code-export reflects edits** — `code_export_edits_test` (edited URL +
+  method + headers + a second target). Found & fixed the stale-config bug
+  (url_bar captured `tab.config` at build time; now reads fresh at press time).
+- **Environments — secrets & active-env deletion** — `environments_deep_test`
+  (mark secret + reveal, delete the active env → "No Environment", dynamic
+  vars, Cmd+E quick switcher, multi-env base-URL switch).
+- **Tab management beyond open/close** — `tab_management_test` (duplicate /
+  close-others / close-to-the-right / copy-URL / dirty `*`), `tab_shortcuts_test`
+  (Cmd+N/W, Cmd+1–9, Ctrl+Tab, Cmd+Enter/S/L), `extras_test` (drag reorder).
+  Found & fixed: saving a new request never linked the tab (dirty forever,
+  duplicate-on-resave, save-as-example never enabled).
+- **Responsive layout** — `responsive_test` (resize across every breakpoint and
+  back, drawer nav, unified phone panel send, resize with a dialog open).
+- **Error & edge states** — `error_states_test` (404/500, cancel in-flight,
+  connection failure, malformed JSON, 204) + `settings_network_test`
+  (history-limit trim, receive-timeout abort).
+- **Themes** — `theme_stress_test` (every theme in light + dark, compact, rapid
+  glass↔flat switching, the LIQUID GLASS reduce-effects toggle-twice guard).
+- **Chaining (deep)** — `chaining_deep_test` (JSONPath / header / contains
+  assertions, mixed pass-count, extraction write-back into the active env).
+- **Realtime (deep)** — `realtime_deep_test` (server-initiated WS broadcast,
+  multiple WS messages, multi-event SSE).
+- **Body types** — `body_types_test` (switch every type, urlencoded send,
+  beautify button) + `request_config_deep_test` (bulk param/header editing).
+- **Auth** — `auth_deep_test` (Basic, API-key in header + query).
+- **History (deep)** — `history_deep_test` (search filter, re-send as a tab).
+- **Response views (deep)** — `response_views_deep_test` (empty placeholder,
+  copy, empty cookies, compare/diff).
 
-## 2. Saved examples (M10)
+---
 
-- **Missing:** capture a response as a saved example under a collection node,
-  see it as an inline sub-row, open it as an unlinked tab.
-- **Why:** needs the tab to be linked to a node first (the keyed
-  `save_as_example_button` only shows when `collectionNodeId != null` **and** a
-  response exists). Multi-step; deferred for time.
-- **Suggested:** save the request to a node → send → tap
-  `save_as_example_button` → enter a name → `SAVE` → expand the node → assert the
-  example row → tap it → assert a new (unlinked) tab opened. Anchors exist;
-  example rows are keyed `'<nodeId>/<exampleId>'`.
+## Still not automated
 
-## 3. Native file-dialog flows
-
+### 1. Native file-dialog flows
 - **Missing:** collection/environment import & export, binary & multipart-**file**
   body, response **Save to file**.
 - **Why:** `patrol_finders` can't drive native macOS file pickers (Patrol native
   automation is unsupported on macOS desktop).
-- **Suggested:** refactor the picker calls behind an injectable seam so tests can
-  feed a path without the OS dialog, or run these flows on a mobile simulator
-  with Patrol native.
+- **Suggested:** put the picker behind an injectable seam so tests feed a path,
+  or run these on a mobile simulator with Patrol native.
 
-## 4. Drag-and-drop tree reorder
+### 2. Settings — mTLS / proxy / redirects / verify-SSL end-to-end
+- **Missing:** client-certificate (mTLS), proxy routing, follow-redirects +
+  max-redirects, verify-SSL toggle — all need a server that actually exercises
+  the setting (TLS, redirect chains, a proxy).
+- **Done already:** history-limit trim and receive-timeout are covered.
 
-- **Missing:** reordering / re-parenting collection nodes via drag.
-- **Why:** `Draggable<String>` / `DragTarget<String>` gestures weren't attempted.
-- **Suggested:** `$.tester.drag` / `timedDrag` between node rows (nodes are keyed
-  by id), then assert the new order in the tree.
-
-## 5. Code-export reflects edits (and the underlying stale-config bug)
-
-- **State:** `flows/code_gen_test.dart` asserts the cURL snippet for the **seeded**
-  request only.
-- **Why:** the inline "Generate code" button passes `tab.config` captured at
-  url_bar build time; `url_bar`'s `buildWhen` excludes `config.url`, so editing
-  the URL then generating code uses the **stale** URL. (Same class of bug fixed
-  for `RealtimeButton` this session — it now reads fresh config at press time.)
-- **Suggested:** make `CodeExportDialog.show(...)` read the tab's current config
-  at press time (mirror the `RealtimeButton` fix), then extend the flow to set
-  method + a custom URL and assert they appear in the snippet, and cover the
-  other targets (JS fetch / Node axios / Python / Go / Java).
-
-## 6. Environments — secrets & active-env deletion
-
-- **Missing:** marking a variable secret (lock + reveal obscuring) and deleting
-  the **active** environment (must fall back to "No Environment").
-- **Why:** the create + substitute happy-path is covered; these two are the
-  "deep later" slice.
-- **Suggested:** in the env editor toggle the row lock (anchored by the variable
-  row), assert the value obscures; for deletion, delete the active env from the
-  list tile (confirm), reopen the selector, assert "No Environment".
-
-## 7. Settings — network / redirect / mTLS / limits
-
-- **Missing:** history-limit trimming, prettify-large-response rendering,
-  connect/send/receive timeouts, follow-redirects + max-redirects, verify-SSL,
-  proxy, client certificate (mTLS).
-- **Why:** the theme-switch + dark-mode toggles are covered; the rest need
-  observable end-to-end effects (and mTLS/proxy need a server that exercises
-  them).
-- **Suggested:** drive each keyed field, then assert behavior against a mock
-  server configured to require/observe the setting.
-
-## 8. Tab management — beyond open/close
-
-- **Missing:** duplicate tab, close-others, close-to-the-right, reorder tabs,
-  Cmd+1–9 jump, Ctrl+Tab next/prev, dirty-indicator (`*`) assertions.
-- **Suggested:** the right-click tab context menu + keyboard shortcuts; gate the
-  shortcut ones on item 1's key-simulation fix.
-
-## 9. Responsive layout
-
-- **Missing:** flows that assert the layout adapts across breakpoints — phone
-  (≤700: unified single tab-strip), tablet (≤900: drawer side menu), desktop.
-- **Now possible:** `bootGetman` resizes the real window at native scale, and
-  `resizeWindow($, size)` (in `support/app_harness.dart`) can resize mid-flow,
-  so responsive breakpoints fire for real (no devicePixelRatio faking).
-- **Suggested:** boot at / resize to a phone width and assert the unified panel
-  (`RESPONSE` tab present, drawer-based side menu) vs. desktop split-pane;
-  cover the `useTabSwitcher` (≤500) chip + switcher sheet.
-
-## 10. Error & edge states
-
-- **Missing:** request timeout, non-2xx rendering, malformed-JSON body, request
-  cancel mid-flight (`cancel` key exists), history dedup specifics, every theme
-  in light + dark + compact.
-- **Suggested:** mock-server responders for each error shape; assert the status
-  band / error UI.
+### 3. JSON editor internals (re_editor)
+- **Missing:** typing into the body/response code editor, the find panel,
+  fold/unfold interactions.
+- **Why:** `re_editor` doesn't expose a standard `EditableText`, so
+  `patrol_finders.enterText` can't drive it. Body is set via cURL-paste in tests
+  instead; the fold gutter is asserted in `json_fold_test`.

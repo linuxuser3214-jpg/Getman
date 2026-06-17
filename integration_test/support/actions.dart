@@ -1,4 +1,8 @@
+import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/material.dart' show Icons;
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart' show Finder, find;
 import 'package:patrol_finders/patrol_finders.dart';
 
 /// Reusable interactions for driving Getman in E2E flows. These wrap the stable
@@ -28,17 +32,34 @@ Future<void> slowMo(PatrolTester $) async {
 }
 
 /// Types [url] into the active tab's URL field, replacing whatever was there
-/// (e.g. the first-run seed URL).
+/// (e.g. the first-run seed URL). Scoped to the on-screen field: inactive tabs
+/// keep their own (Offstage, non-hit-testable) `url_field` in the tree.
 Future<void> enterUrl(PatrolTester $, String url) async {
-  await $(const ValueKey('url_field')).enterText(url);
+  await $(find.byKey(const ValueKey('url_field')).hitTestable()).enterText(url);
   await slowMo($);
+}
+
+/// Reads the URL text of the currently-active tab (the only on-screen,
+/// hit-testable `url_field`).
+String activeUrl(PatrolTester $) {
+  final field = $.tester.widget<EditableText>(
+    find
+        .descendant(
+          of: find.byKey(const ValueKey('url_field')).hitTestable(),
+          matching: find.byType(EditableText),
+        )
+        .hitTestable(),
+  );
+  return field.controller.text;
 }
 
 /// Taps SEND **without settling** — the response-pending view shows a
 /// continuously-animating shimmer, so settling here would never complete. The
 /// caller must wait for the response (e.g. `await waitForStatus($, 200)`).
 Future<void> tapSend(PatrolTester $) async {
-  await $(const ValueKey('send')).tap(settlePolicy: SettlePolicy.noSettle);
+  await $(
+    find.byKey(const ValueKey('send')).hitTestable(),
+  ).tap(settlePolicy: SettlePolicy.noSettle);
   await slowMo($);
 }
 
@@ -146,14 +167,141 @@ Future<void> enterPromptText(PatrolTester $, String text) async {
   await slowMo($);
 }
 
-/// Opens the Settings dialog from the side-menu header.
+/// Pumps a bounded number of real-time frames WITHOUT requiring a settle. Safe
+/// under themes that animate forever (RPG starfield, glass shimmer) where
+/// `pumpAndSettle` never returns. Use after a `noSettle` tap to let a dialog /
+/// menu / theme transition land.
+Future<void> pumpFrames(
+  PatrolTester $, {
+  int frames = 12,
+  int ms = 40,
+}) async {
+  for (var i = 0; i < frames; i++) {
+    await $.tester.pump(Duration(milliseconds: ms));
+  }
+}
+
+/// Opens the Settings dialog from the side-menu header. Animation-safe (the
+/// active theme may animate continuously, so we can't `pumpAndSettle`).
 Future<void> openSettings(PatrolTester $) async {
-  await $(const ValueKey('settings_button')).tap();
+  await $(
+    const ValueKey('settings_button'),
+  ).tap(settlePolicy: SettlePolicy.noSettle);
+  await pumpFrames($);
   await slowMo($);
 }
 
 /// Opens the active-environment selector popup menu.
 Future<void> openEnvironmentSelector(PatrolTester $) async {
   await $(const ValueKey('environment_selector')).tap();
+  await slowMo($);
+}
+
+// ---------------------------------------------------------------------------
+// Tab strip helpers (identity-agnostic — tabs are keyed by dynamic uuid)
+// ---------------------------------------------------------------------------
+
+/// Finder for every open request tab's root widget (keyed `tab_<id>`), in
+/// strip order. Excludes the per-tab close button (`tab_close_<id>`) and the
+/// hover tooltip card (`tab_tooltip_<id>`).
+Finder allTabs() => find.byWidgetPredicate((w) {
+  final k = w.key;
+  return k is ValueKey<String> &&
+      k.value.startsWith('tab_') &&
+      !k.value.startsWith('tab_close_') &&
+      !k.value.startsWith('tab_tooltip_');
+});
+
+/// Number of open request tabs (counts per-tab close buttons, one per tab).
+int tabCount(PatrolTester $) {
+  final finder = find.byWidgetPredicate((w) {
+    final k = w.key;
+    return k is ValueKey<String> && k.value.startsWith('tab_close_');
+  });
+  return $.tester.widgetList(finder).length;
+}
+
+/// Right-clicks (secondary tap) the tab at [index] to open its context menu
+/// (CLOSE / CLOSE OTHERS / CLOSE TO THE RIGHT / DUPLICATE / COPY URL).
+Future<void> openTabMenu(PatrolTester $, int index) async {
+  await $.tester.tap(allTabs().at(index), buttons: kSecondaryButton);
+  await $.pumpAndSettle();
+  await slowMo($);
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+/// Sends a keyboard shortcut with optional modifiers (macOS key events). Pass
+/// `settle: false` for combos that kick off a never-settling animation (e.g.
+/// Cmd+Enter starts the response shimmer) — then wait via [waitForStatus].
+Future<void> sendShortcut(
+  PatrolTester $,
+  LogicalKeyboardKey key, {
+  bool meta = false,
+  bool control = false,
+  bool shift = false,
+  bool settle = true,
+}) async {
+  final mods = <LogicalKeyboardKey>[
+    if (meta) LogicalKeyboardKey.metaLeft,
+    if (control) LogicalKeyboardKey.controlLeft,
+    if (shift) LogicalKeyboardKey.shiftLeft,
+  ];
+  for (final m in mods) {
+    await $.tester.sendKeyDownEvent(m, platform: 'macos');
+  }
+  await $.tester.sendKeyEvent(key, platform: 'macos');
+  for (final m in mods.reversed) {
+    await $.tester.sendKeyUpEvent(m, platform: 'macos');
+  }
+  if (settle) {
+    await $.pumpAndSettle();
+  } else {
+    await $.tester.pump();
+  }
+  await slowMo($);
+}
+
+// ---------------------------------------------------------------------------
+// Settings / theming
+// ---------------------------------------------------------------------------
+
+/// Opens Settings, selects the theme whose dropdown label is [displayName]
+/// (e.g. `EDITORIAL`, `LIQUID GLASS`), then closes the dialog. Animation-safe:
+/// uses `noSettle` taps + bounded pumps because RPG/glass animate forever.
+/// Never pass the currently-active theme — the open dropdown shows it twice
+/// (button label + menu item), making the finder ambiguous.
+Future<void> setTheme(PatrolTester $, String displayName) async {
+  await openSettings($);
+  await $(
+    const ValueKey('theme_dropdown'),
+  ).tap(settlePolicy: SettlePolicy.noSettle);
+  await pumpFrames($);
+  await $(displayName).tap(settlePolicy: SettlePolicy.noSettle);
+  await pumpFrames($);
+  await $('CLOSE').tap(settlePolicy: SettlePolicy.noSettle);
+  await pumpFrames($);
+  await slowMo($);
+}
+
+/// Opens Settings, taps the row whose label is [label] (e.g. `DARK MODE`,
+/// `COMPACT MODE`, `REDUCE VISUAL EFFECTS`), then closes the dialog.
+/// Animation-safe (see [setTheme]).
+Future<void> toggleSettingRow(PatrolTester $, String label) async {
+  await openSettings($);
+  await $(label).tap(settlePolicy: SettlePolicy.noSettle);
+  await pumpFrames($);
+  await $('CLOSE').tap(settlePolicy: SettlePolicy.noSettle);
+  await pumpFrames($);
+  await slowMo($);
+}
+
+/// Opens the side-menu drawer (drawer-nav layouts ≤ 900 px wide) via the menu
+/// button in the tab bar.
+Future<void> openDrawer(PatrolTester $) async {
+  await $(find.byIcon(Icons.menu)).tap();
+  await $.pumpAndSettle();
   await slowMo($);
 }

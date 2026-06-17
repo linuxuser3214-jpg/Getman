@@ -30,7 +30,7 @@ class UrlOverflowMenu extends StatelessWidget {
     return PopupMenuButton<_OverflowAction>(
       tooltip: 'More actions',
       position: PopupMenuPosition.under,
-      color: theme.scaffoldBackgroundColor,
+      color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(context.appShape.panelRadius),
         side: BorderSide(color: theme.dividerColor, width: layout.borderThick),

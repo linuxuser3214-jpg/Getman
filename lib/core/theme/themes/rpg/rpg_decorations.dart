@@ -94,6 +94,37 @@ Widget rpgScaffoldBackground(BuildContext context, {required Widget child}) {
   return _RpgAnimatedBackground(child: child);
 }
 
+/// Reduced-effects RPG background: the radial vignette only, no animated
+/// starfield (no controller, no per-frame paint).
+Widget rpgStaticScaffoldBackground(
+  BuildContext context, {
+  required Widget child,
+}) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  return Stack(
+    children: [
+      Positioned.fill(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              radius: 1.2,
+              colors: [
+                theme.scaffoldBackgroundColor,
+                if (isDark)
+                  Colors.black.withValues(alpha: 0.6)
+                else
+                  RpgPalette.goldDeep.withValues(alpha: 0.08),
+              ],
+            ),
+          ),
+        ),
+      ),
+      RepaintBoundary(child: child),
+    ],
+  );
+}
+
 /// Slowly drifting starfield + radial vignette behind the app.
 ///
 /// Uses a single long-looping controller to keep cost near zero — particle

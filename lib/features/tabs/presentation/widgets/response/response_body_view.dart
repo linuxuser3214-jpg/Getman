@@ -175,11 +175,20 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
+        // PRETTY/RAW toggle (left) + the copy/save/compare cluster (right).
+        // A Wrap keeps them side by side while the pane is wide enough, and
+        // drops the cluster onto a second line the moment the two would
+        // collide — so dragging the splitter narrow degrades gracefully
+        // instead of throwing a RenderFlex overflow. spaceBetween pins the
+        // toggle left and the cluster right on the one-line layout; both
+        // children also reflow internally (see _PrettyRawToggle and
+        // ResponseBodyControls) so neither overflows in an extremely narrow
+        // pane.
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Expanded(
-              child: _PrettyRawToggle(raw: _raw, onChanged: _setRaw),
-            ),
+            _PrettyRawToggle(raw: _raw, onChanged: _setRaw),
             ResponseBodyControls(
               tabId: widget.tabId,
               getCopyableText: _copyableText,
@@ -266,10 +275,14 @@ class _PrettyRawToggle extends StatelessWidget {
         horizontal: layout.pagePadding,
         vertical: layout.isCompact ? 4 : 6,
       ),
-      child: Row(
+      // Wrap (not Row) so PRETTY/RAW reflow onto a second line in an
+      // extremely narrow pane instead of overflowing their fixed-width
+      // segments.
+      child: Wrap(
+        spacing: layout.tabSpacing,
+        runSpacing: layout.tabSpacing,
         children: [
           _seg(context, 'PRETTY', !raw, () => onChanged(false)),
-          SizedBox(width: layout.tabSpacing),
           _seg(context, 'RAW', raw, () => onChanged(true)),
         ],
       ),

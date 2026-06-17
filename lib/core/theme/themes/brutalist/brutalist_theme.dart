@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_bounce.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_decorations.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
+ThemeData brutalistTheme(
+  Brightness brightness, {
+  bool isCompact = false,
+  bool reduceEffects = false,
+}) {
   final isDark = brightness == Brightness.dark;
   final background = isDark
       ? BrutalistPalette.backgroundDark
@@ -101,6 +106,10 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
     useMaterial3: true,
     brightness: brightness,
     primaryColor: currentPrimary,
+    switchTheme: accentSwitchTheme(
+      thumbWhenOn: currentSecondary,
+      trackWhenOn: currentPrimary,
+    ),
     scaffoldBackgroundColor: background,
     canvasColor: surface,
     dividerColor: border,

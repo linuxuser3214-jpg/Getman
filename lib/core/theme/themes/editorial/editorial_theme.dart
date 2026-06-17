@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_decorations.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_fade.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_palette.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
+ThemeData editorialTheme(
+  Brightness brightness, {
+  bool isCompact = false,
+  bool reduceEffects = false,
+}) {
   final isDark = brightness == Brightness.dark;
   final paper = isDark
       ? EditorialPalette.paperDark
@@ -110,6 +115,7 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
     useMaterial3: true,
     brightness: brightness,
     primaryColor: accent,
+    switchTheme: accentSwitchTheme(thumbWhenOn: inkSoft, trackWhenOn: accent),
     scaffoldBackgroundColor: paper,
     canvasColor: paper,
     cardColor: paper,

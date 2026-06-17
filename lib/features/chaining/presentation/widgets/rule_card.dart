@@ -42,8 +42,6 @@ class RuleCard extends StatelessWidget {
                 children: [
                   Switch(
                     value: enabled,
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
                     onChanged: onToggle,
                   ),
                   context.appDecoration.wrapInteractive(

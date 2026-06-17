@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_decorations.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
@@ -7,7 +8,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// Arcane Quest — an RPG-flavoured theme with sparkle-on-tap, animated
 /// starfield background, glowing gold panels, and carved-stone typography.
-ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
+ThemeData rpgTheme(
+  Brightness brightness, {
+  bool isCompact = false,
+  bool reduceEffects = false,
+}) {
   final isDark = brightness == Brightness.dark;
   final background = isDark
       ? RpgPalette.backgroundDark
@@ -120,9 +125,15 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
   final decoration = AppDecoration(
     panelBox: rpgPanelBox,
     tabShape: rpgTabShape,
-    wrapInteractive: ({required child, onTap, scaleDown}) =>
-        RpgSparkle(onTap: onTap, scaleDown: scaleDown ?? 0.96, child: child),
-    scaffoldBackground: rpgScaffoldBackground,
+    wrapInteractive: ({required child, onTap, scaleDown}) => RpgSparkle(
+      onTap: onTap,
+      scaleDown: scaleDown ?? 0.96,
+      sparkle: !reduceEffects,
+      child: child,
+    ),
+    scaffoldBackground: reduceEffects
+        ? rpgStaticScaffoldBackground
+        : rpgScaffoldBackground,
   );
 
   final cinzelUppercase = TextStyle(
@@ -136,6 +147,10 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     useMaterial3: true,
     brightness: brightness,
     primaryColor: gold,
+    switchTheme: accentSwitchTheme(
+      thumbWhenOn: isDark ? emerald : RpgPalette.emeraldDeep,
+      trackWhenOn: gold,
+    ),
     scaffoldBackgroundColor: background,
     canvasColor: surface,
     cardColor: surface,

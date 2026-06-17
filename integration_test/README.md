@@ -131,7 +131,27 @@ integration_test/
     code_gen_test.dart              # "Generate code" → cURL snippet
     settings_test.dart              # switch theme + toggle dark mode
     response_views_test.dart        # metadata + pretty/raw toggle + headers tab
-    command_palette_test.dart       # (drafted, NOT registered — see BACKLOG.md)
+    command_palette_test.dart       # Cmd+K palette: open / filter / run
+    # --- deep dirty/edge-path flows (2026-06-16 break-everything pass) ---
+    code_export_edits_test.dart     # generate-code reflects live URL/method/headers
+    tab_management_test.dart        # duplicate / close-others / close-right / dirty *
+    tab_shortcuts_test.dart         # Cmd+N/W, Cmd+1-9, Ctrl+Tab, Cmd+Enter/S/L
+    responsive_test.dart            # resize across every breakpoint and back
+    theme_stress_test.dart          # every theme × light/dark/compact + reduce-effects
+    error_states_test.dart          # 4xx/5xx, cancel, connection fail, bad JSON, 204
+    environments_deep_test.dart     # secrets, delete-active, dynamic vars, quick switch
+    collections_deep_test.dart      # rename / favorite / description / nested / drag-drop
+    saved_examples_test.dart        # capture / open-unlinked / rename / delete (M10)
+    body_types_test.dart            # switch types, urlencoded send, beautify
+    request_config_deep_test.dart   # bulk-edit params + headers
+    chaining_deep_test.dart         # JSONPath/header/contains + extraction write-back
+    realtime_deep_test.dart         # WS broadcast, multi-message, multi-event SSE
+    history_deep_test.dart          # search filter + re-send as tab
+    command_palette_deep_test.dart  # jump to request/env + arrow-key nav
+    response_views_deep_test.dart   # empty placeholder, copy, empty cookies, diff
+    auth_deep_test.dart             # Basic + API-key (header & query)
+    settings_network_test.dart      # history-limit trim + receive-timeout abort
+    extras_test.dart                # drag-reorder tabs + clear cookie jar
 ```
 
 Stable test anchors live as intentional `ValueKey`s in `lib/` (e.g.

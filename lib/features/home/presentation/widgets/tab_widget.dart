@@ -182,6 +182,16 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
                           ? tab.displayTitle
                           : '${tab.displayTitle}\n${tab.config.url}',
                       child: AnimatedContainer(
+                        // Re-key per theme so a theme switch REPLACES this
+                        // container instead of tweening into the new shape.
+                        // Flat themes use an asymmetric border + no radius;
+                        // glass uses a uniform border + radius. A mid-tween
+                        // frame between the two families would carry a
+                        // non-uniform border AND a borderRadius, which
+                        // Border.paint rejects. The builder ref changes exactly
+                        // when the shape family does, so hover/active/brightness
+                        // changes within a theme still animate.
+                        key: ValueKey(context.appDecoration.tabShape),
                         duration: const Duration(milliseconds: 200),
                         height: layout.tabBarHeight,
                         constraints: BoxConstraints(
@@ -284,7 +294,7 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
           position.dx + 1,
           position.dy + 1,
         ),
-        color: theme.scaffoldBackgroundColor,
+        color: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(context.appShape.panelRadius),
           side: BorderSide(
@@ -369,38 +379,42 @@ class _TabTooltipCard extends StatelessWidget {
 
     return Material(
       type: MaterialType.transparency,
-      child: Container(
-        key: ValueKey('tab_tooltip_${tab.tabId}'),
-        constraints: const BoxConstraints(maxWidth: _tabTooltipMaxWidth),
-        padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
-        decoration: context.appDecoration.panelBox(context),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              tab.displayTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: layout.fontSizeNormal,
-                fontWeight: typography.titleWeight,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            if (url.isNotEmpty) ...[
-              SizedBox(height: layout.tabSpacing),
+      child: context.appDecoration.frost(
+        context,
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+        child: Container(
+          key: ValueKey('tab_tooltip_${tab.tabId}'),
+          constraints: const BoxConstraints(maxWidth: _tabTooltipMaxWidth),
+          padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
+          decoration: context.appDecoration.panelBox(context),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                url,
-                maxLines: 2,
+                tab.displayTitle,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: layout.fontSizeSmall,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: typography.titleWeight,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
+              if (url.isNotEmpty) ...[
+                SizedBox(height: layout.tabSpacing),
+                Text(
+                  url,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: layout.fontSizeSmall,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

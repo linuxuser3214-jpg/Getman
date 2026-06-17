@@ -53,6 +53,7 @@ class _HistoryListState extends State<HistoryList> {
             Padding(
               padding: const EdgeInsets.all(8),
               child: TextField(
+                key: const ValueKey('history_search_field'),
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'SEARCH HISTORY...',

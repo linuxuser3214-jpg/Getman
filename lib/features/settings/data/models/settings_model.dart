@@ -14,6 +14,7 @@ class SettingsModel extends HiveObject {
     this.alwaysPrettifyLargeResponses = false,
     this.isDarkMode = false,
     this.isCompactMode = false,
+    this.reduceVisualEffects = false,
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
@@ -40,6 +41,7 @@ class SettingsModel extends HiveObject {
         json['alwaysPrettifyLargeResponses'] as bool? ?? false,
     isDarkMode: json['isDarkMode'] as bool? ?? false,
     isCompactMode: json['isCompactMode'] as bool? ?? false,
+    reduceVisualEffects: json['reduceVisualEffects'] as bool? ?? false,
     isVerticalLayout: json['isVerticalLayout'] as bool? ?? false,
     splitRatio: (json['splitRatio'] as num?)?.toDouble() ?? 0.5,
     sideMenuWidth: (json['sideMenuWidth'] as num?)?.toDouble() ?? 300.0,
@@ -65,6 +67,7 @@ class SettingsModel extends HiveObject {
     alwaysPrettifyLargeResponses: entity.alwaysPrettifyLargeResponses,
     isDarkMode: entity.isDarkMode,
     isCompactMode: entity.isCompactMode,
+    reduceVisualEffects: entity.reduceVisualEffects,
     isVerticalLayout: entity.isVerticalLayout,
     splitRatio: entity.splitRatio,
     sideMenuWidth: entity.sideMenuWidth,
@@ -149,12 +152,16 @@ class SettingsModel extends HiveObject {
   @HiveField(21)
   String? clientCertPassphrase;
 
+  @HiveField(22, defaultValue: false)
+  bool reduceVisualEffects;
+
   SettingsModel copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
     bool? alwaysPrettifyLargeResponses,
     bool? isDarkMode,
     bool? isCompactMode,
+    bool? reduceVisualEffects,
     bool? isVerticalLayout,
     double? splitRatio,
     double? sideMenuWidth,
@@ -181,6 +188,7 @@ class SettingsModel extends HiveObject {
           alwaysPrettifyLargeResponses ?? this.alwaysPrettifyLargeResponses,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       isCompactMode: isCompactMode ?? this.isCompactMode,
+      reduceVisualEffects: reduceVisualEffects ?? this.reduceVisualEffects,
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
       splitRatio: splitRatio ?? this.splitRatio,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
@@ -221,6 +229,7 @@ class SettingsModel extends HiveObject {
     'alwaysPrettifyLargeResponses': alwaysPrettifyLargeResponses,
     'isDarkMode': isDarkMode,
     'isCompactMode': isCompactMode,
+    'reduceVisualEffects': reduceVisualEffects,
     'isVerticalLayout': isVerticalLayout,
     'splitRatio': splitRatio,
     'sideMenuWidth': sideMenuWidth,
@@ -246,6 +255,7 @@ class SettingsModel extends HiveObject {
     alwaysPrettifyLargeResponses: alwaysPrettifyLargeResponses,
     isDarkMode: isDarkMode,
     isCompactMode: isCompactMode,
+    reduceVisualEffects: reduceVisualEffects,
     isVerticalLayout: isVerticalLayout,
     splitRatio: splitRatio,
     sideMenuWidth: sideMenuWidth,
