@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
-import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/panel_close_coordinator.dart';
 
 /// Max width of the active-panel label in the tab strip before it ellipsizes.
 /// Mirrors the environment selector's 120 cap so the two selectors line up; the
@@ -390,19 +390,10 @@ class _PanelRow extends StatelessWidget {
   }
 
   void _close(BuildContext context) {
-    final bloc = context.read<TabsBloc>();
-    // TODO(task-8): replace with closePanelWithSavePrompt
-    // Dismiss AFTER show so the overlay context is still mounted.
-    unawaited(
-      ConfirmDialog.show(
-        context,
-        title: 'CLOSE PANEL?',
-        message: 'Close "${panel.name}" and its ${panel.tabs.length} tabs?',
-        confirmLabel: 'CLOSE',
-        onConfirm: () => bloc.add(RemovePanel(panel.id)),
-      ),
-    );
+    // Dismiss the overlay first so the overlay context is unmounted before the
+    // save dialogs are shown (they need a stable Navigator context).
     onDismiss();
+    unawaited(closePanelWithSavePrompt(context, panel.id));
   }
 
   @override
