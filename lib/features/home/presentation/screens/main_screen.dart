@@ -303,6 +303,48 @@ class _MainScreenState extends State<MainScreen> {
                     return null;
                   },
                 ),
+                NewPanelIntent: CallbackAction<NewPanelIntent>(
+                  onInvoke: (_) {
+                    context.read<TabsBloc>().add(const AddPanel());
+                    return null;
+                  },
+                ),
+                NextPanelIntent: CallbackAction<NextPanelIntent>(
+                  onInvoke: (_) {
+                    final s = context.read<TabsBloc>().state;
+                    if (s.panels.length < 2) return null;
+                    final i = s.panels.indexWhere(
+                      (p) => p.id == s.activePanelId,
+                    );
+                    final next = s.panels[(i + 1) % s.panels.length];
+                    context.read<TabsBloc>().add(SetActivePanel(next.id));
+                    return null;
+                  },
+                ),
+                PrevPanelIntent: CallbackAction<PrevPanelIntent>(
+                  onInvoke: (_) {
+                    final s = context.read<TabsBloc>().state;
+                    if (s.panels.length < 2) return null;
+                    final i = s.panels.indexWhere(
+                      (p) => p.id == s.activePanelId,
+                    );
+                    final prev =
+                        s.panels[(i - 1 + s.panels.length) % s.panels.length];
+                    context.read<TabsBloc>().add(SetActivePanel(prev.id));
+                    return null;
+                  },
+                ),
+                JumpToPanelIntent: CallbackAction<JumpToPanelIntent>(
+                  onInvoke: (intent) {
+                    final s = context.read<TabsBloc>().state;
+                    if (intent.panelIndex < s.panels.length) {
+                      context.read<TabsBloc>().add(
+                        SetActivePanel(s.panels[intent.panelIndex].id),
+                      );
+                    }
+                    return null;
+                  },
+                ),
               },
               child: Focus(
                 focusNode: _mainFocusNode,

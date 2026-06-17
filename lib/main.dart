@@ -129,6 +129,36 @@ final Map<ShortcutActivator, Intent> appShortcuts = {
     SingleActivator(_tabDigitKeys[i], meta: true): JumpToTabIntent(i),
     SingleActivator(_tabDigitKeys[i], control: true): JumpToTabIntent(i),
   },
+  const SingleActivator(LogicalKeyboardKey.keyN, control: true, shift: true):
+      const NewPanelIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyN, meta: true, shift: true):
+      const NewPanelIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.bracketRight,
+    control: true,
+    shift: true,
+  ): const NextPanelIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.bracketRight,
+    meta: true,
+    shift: true,
+  ): const NextPanelIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.bracketLeft,
+    control: true,
+    shift: true,
+  ): const PrevPanelIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.bracketLeft,
+    meta: true,
+    shift: true,
+  ): const PrevPanelIntent(),
+  for (var i = 0; i < _tabDigitKeys.length; i++) ...{
+    SingleActivator(_tabDigitKeys[i], control: true, shift: true):
+        JumpToPanelIntent(i),
+    SingleActivator(_tabDigitKeys[i], meta: true, shift: true):
+        JumpToPanelIntent(i),
+  },
 };
 
 class MyApp extends StatelessWidget {

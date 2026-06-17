@@ -78,5 +78,67 @@ void main() {
         isA<SwitchEnvironmentIntent>(),
       );
     });
+
+    test('appShortcuts includes panel bindings', () {
+      bool hasBinding<T extends Intent>(
+        LogicalKeyboardKey key, {
+        bool control = false,
+        bool meta = false,
+        bool shift = false,
+      }) => appShortcuts.entries.any(
+        (e) =>
+            e.key is SingleActivator &&
+            (e.key as SingleActivator).trigger == key &&
+            (e.key as SingleActivator).control == control &&
+            (e.key as SingleActivator).meta == meta &&
+            (e.key as SingleActivator).shift == shift &&
+            e.value is T,
+      );
+
+      // Ctrl+Shift+N and Cmd+Shift+N → NewPanelIntent.
+      expect(
+        hasBinding<NewPanelIntent>(
+          LogicalKeyboardKey.keyN,
+          control: true,
+          shift: true,
+        ),
+        isTrue,
+        reason: 'Ctrl+Shift+N must be bound to NewPanelIntent',
+      );
+      expect(
+        hasBinding<NewPanelIntent>(
+          LogicalKeyboardKey.keyN,
+          meta: true,
+          shift: true,
+        ),
+        isTrue,
+        reason: 'Cmd+Shift+N must be bound to NewPanelIntent',
+      );
+      // Bracket bindings for next/prev panel.
+      expect(
+        hasBinding<NextPanelIntent>(
+          LogicalKeyboardKey.bracketRight,
+          control: true,
+          shift: true,
+        ),
+        isTrue,
+        reason: 'Ctrl+Shift+] must be bound to NextPanelIntent',
+      );
+      expect(
+        hasBinding<PrevPanelIntent>(
+          LogicalKeyboardKey.bracketLeft,
+          control: true,
+          shift: true,
+        ),
+        isTrue,
+        reason: 'Ctrl+Shift+[ must be bound to PrevPanelIntent',
+      );
+      // 9 JumpToPanelIntent entries per modifier = 18 total.
+      expect(
+        appShortcuts.values.whereType<JumpToPanelIntent>().length,
+        18,
+        reason: '9 control + 9 meta JumpToPanelIntent bindings expected',
+      );
+    });
   });
 }
