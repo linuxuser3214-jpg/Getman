@@ -19,6 +19,7 @@ import 'flows/extras_test.dart' as extras;
 import 'flows/history_deep_test.dart' as history_deep;
 import 'flows/history_test.dart' as history;
 import 'flows/json_fold_test.dart' as json_fold;
+import 'flows/panels_test.dart' as panels;
 import 'flows/realtime_deep_test.dart' as realtime_deep;
 import 'flows/realtime_sse_test.dart' as realtime_sse;
 import 'flows/realtime_ws_test.dart' as realtime_ws;
@@ -61,6 +62,7 @@ void main() {
   tabs.main();
   tab_management.main();
   tab_shortcuts.main();
+  panels.main();
   request_config.main();
   request_config_deep.main();
   body_types.main();

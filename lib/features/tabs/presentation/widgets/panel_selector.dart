@@ -408,10 +408,18 @@ class _PanelRow extends StatelessWidget {
   }
 
   void _close(BuildContext context) {
-    // Dismiss the overlay first so the overlay context is unmounted before the
-    // save dialogs are shown (they need a stable Navigator context).
+    // The overlay row's context is about to be unmounted by [onDismiss]; the
+    // close coordinator awaits across several dialogs and guards each step with
+    // `context.mounted`, so it must run against a context that OUTLIVES the
+    // overlay (otherwise the dirty-tab paths abort after the first await and
+    // the panel is never removed). Capture the root navigator's context — it
+    // sits below every bloc/`TabDirtyChecker` provider and stays mounted while
+    // the dialogs (pushed on that same root navigator) are open.
+    final stableContext = Navigator.of(context, rootNavigator: true).context;
+    final panelId = panel.id;
+    // Dismiss the overlay first so its barrier doesn't sit over the dialogs.
     onDismiss();
-    unawaited(closePanelWithSavePrompt(context, panel.id));
+    unawaited(closePanelWithSavePrompt(stableContext, panelId));
   }
 
   @override
