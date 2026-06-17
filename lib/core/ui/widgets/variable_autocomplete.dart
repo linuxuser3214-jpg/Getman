@@ -255,28 +255,34 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     final width =
         _link.leaderSize?.width ??
         280.0; // fallback until the target's size is known
-    return CompositedTransformFollower(
-      link: _link,
-      showWhenUnlinked: false,
-      targetAnchor: Alignment.bottomLeft,
-      offset: const Offset(0, 4),
-      child: Align(
-        alignment: Alignment.topLeft,
-        child: SizedBox(
-          width: width,
-          child: Material(
-            type: MaterialType.transparency,
-            child: Container(
-              // ~6 rows; viewport cap, mirrors inline constraints elsewhere.
-              constraints: const BoxConstraints(maxHeight: 240),
-              decoration: context.appDecoration.panelBox(context),
-              clipBehavior: Clip.antiAlias,
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: _suggestions.length,
-                itemBuilder: (context, i) =>
-                    _row(context, _suggestions[i], i, i == _selected),
+    // Group the dropdown with the field's tap region: without this, a
+    // pointer-down anywhere on the overlay counts as a tap-outside and
+    // unfocuses the field (desktop behavior), closing the menu before a row
+    // tap can land.
+    return TextFieldTapRegion(
+      child: CompositedTransformFollower(
+        link: _link,
+        showWhenUnlinked: false,
+        targetAnchor: Alignment.bottomLeft,
+        offset: const Offset(0, 4),
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: width,
+            child: Material(
+              type: MaterialType.transparency,
+              child: Container(
+                // ~6 rows; viewport cap, mirrors inline constraints elsewhere.
+                constraints: const BoxConstraints(maxHeight: 240),
+                decoration: context.appDecoration.panelBox(context),
+                clipBehavior: Clip.antiAlias,
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: _suggestions.length,
+                  itemBuilder: (context, i) =>
+                      _row(context, _suggestions[i], i, i == _selected),
+                ),
               ),
             ),
           ),
@@ -302,6 +308,9 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.6);
 
     return InkWell(
+      // Don't pull focus off the text field when a row is tapped — that would
+      // blur the field (closing the menu) and lose the caret after accepting.
+      canRequestFocus: false,
       onTap: () => _acceptAt(index),
       child: Container(
         color: selected

@@ -248,4 +248,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('baseUrl'), findsOneWidget);
   });
+
+  testWidgets('the open menu is wrapped in a TextFieldTapRegion so a tap '
+      'inside it is not treated as a tap-outside', (tester) async {
+    await pump(tester);
+    await tester.enterText(find.byType(TextField), '{{');
+    await tester.pumpAndSettle();
+    expect(find.text('baseUrl'), findsOneWidget);
+
+    // The overlay must be grouped with the field's tap region; otherwise a
+    // pointer-down anywhere on the dropdown unfocuses the field (desktop
+    // tap-outside behavior) and closes the menu before a row tap can land.
+    expect(
+      find.ancestor(
+        of: find.text('baseUrl'),
+        matching: find.byType(TextFieldTapRegion),
+      ),
+      findsOneWidget,
+    );
+  });
 }
