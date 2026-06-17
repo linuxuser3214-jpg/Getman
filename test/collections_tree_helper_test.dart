@@ -324,4 +324,66 @@ void main() {
       ]);
     });
   });
+
+  group('variables', () {
+    CollectionNodeEntity folderWithVars(
+      String id,
+      String name, {
+      Map<String, String> variables = const {},
+      Set<String> secretKeys = const {},
+      List<CollectionNodeEntity> children = const [],
+    }) => CollectionNodeEntity(
+      id: id,
+      name: name,
+      variables: variables,
+      secretKeys: secretKeys,
+      children: children,
+    );
+
+    test('setVariablesInTree replaces both maps on the target node', () {
+      final tree = [folderWithVars('f1', 'API')];
+      final next = CollectionsTreeHelper.setVariablesInTree(
+        tree,
+        'f1',
+        {'base': 'x'},
+        {'base'},
+      );
+      final node = CollectionsTreeHelper.findNode(next, 'f1')!;
+      expect(node.variables, {'base': 'x'});
+      expect(node.secretKeys, {'base'});
+      // input untouched (pure)
+      expect(tree.first.variables, isEmpty);
+    });
+
+    test('collectVariables merges ancestors, deepest folder wins', () {
+      const leaf = CollectionNodeEntity(id: 'L', name: 'req', isFolder: false);
+      final inner = folderWithVars(
+        'f2',
+        'inner',
+        variables: {'b': '20', 'c': '3'},
+        secretKeys: {'c'},
+        children: [leaf],
+      );
+      final outer = folderWithVars(
+        'f1',
+        'outer',
+        variables: {'a': '1', 'b': '2'},
+        secretKeys: {'b'},
+        children: [inner],
+      );
+
+      final r = CollectionsTreeHelper.collectVariables([outer], 'L');
+
+      expect(r.variables, {'a': '1', 'b': '20', 'c': '3'});
+      // b overridden by a non-secret deeper layer -> no longer secret;
+      // c secret.
+      expect(r.secretKeys, {'c'});
+    });
+
+    test('collectVariables returns empty maps for a missing id', () {
+      final r = CollectionsTreeHelper.collectVariables(const [], 'nope');
+      expect(r.variables, isEmpty);
+      expect(r.secretKeys, isEmpty);
+    });
+  });
 }
