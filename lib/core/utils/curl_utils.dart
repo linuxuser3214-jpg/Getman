@@ -1,20 +1,18 @@
 import 'dart:convert';
 
+import 'package:getman/core/domain/entities/auth_config.dart';
+import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/http_methods.dart';
 import 'package:getman/core/utils/code_gen_service.dart';
 
 class CurlUtils {
-  /// Common value-taking flags we don't model. Their argument is consumed and
-  /// discarded so it isn't mistaken for the URL (e.g. `-e <referer> <url>`).
+  /// Value-taking flags we don't model. Their argument is consumed and
+  /// discarded so it isn't mistaken for the URL (e.g. `-o <file> <url>`).
   static const _skipValueFlags = {
-    '-A',
-    '--user-agent',
-    '-e',
-    '--referer',
     '-o',
     '--output',
-    '-F',
-    '--form',
     '-x',
     '--proxy',
     '-m',
@@ -27,99 +25,373 @@ class CurlUtils {
     '--cacert',
     '-w',
     '--write-out',
+    '--retry',
+    '--limit-rate',
+    '--resolve',
+    '--cipher',
+    '--tlsv1',
   };
 
   static final RegExp _domainish = RegExp(r'^[\w.-]+\.[\w.-]+');
   static final RegExp _hostPort = RegExp(r'^[\w.-]+:\d+');
 
-  /// Parses a curl command into an [HttpRequestConfigEntity].
+  /// Parses a curl command into an [HttpRequestConfigEntity]. Returns null only
+  /// when [curl] clearly isn't a curl invocation or carries no URL. Never
+  /// throws — unknown flags are tolerated.
   static HttpRequestConfigEntity? parse(String curl, {required String id}) {
     // Tokenize first; the first token tells us whether this really is a curl
-    // invocation. (The previous double-check — startsWith + args[0] — was
-    // redundant; tokenization already handles leading whitespace.)
-    final args = _splitArguments(curl.trim());
+    // invocation. The tokenizer handles leading whitespace, shell quoting, and
+    // `\`-newline line continuations.
+    final args = _tokenize(curl);
     if (args.isEmpty || args[0].toLowerCase() != 'curl') {
       return null;
     }
 
-    var method = 'GET';
     var explicitMethod = false;
+    String? method;
     var url = '';
     final headers = <String, String>{};
-    var body = '';
+    final dataParts = <String>[];
+    var hasData = false; // any -d/--data* flag seen (drives POST inference)
+    // True if any data came via --data-urlencode: the user already chose the
+    // encoding, so keep it a raw body rather than re-splitting into form rows.
+    var urlencodeData = false;
     var forceGet = false;
+    var headRequest = false;
+    var uploadFile = false; // -T/--upload-file (PUT inference)
 
-    void addData(String data) {
-      // curl concatenates multiple -d flags with '&'.
-      body = body.isEmpty ? data : '$body&$data';
-      if (method == 'GET' && !explicitMethod) method = 'POST';
+    final formFields = <MultipartFieldEntity>[];
+    var hasForm = false;
+
+    String? bodyFilePath; // set by `--data-binary @file`
+    var auth = const <String, String>{};
+
+    void addData(String data, {bool verbatim = false}) {
+      hasData = true;
+      // A leading `@` is a file reference for the binary-ish data flags.
+      if (verbatim && data.startsWith('@')) {
+        bodyFilePath = data.substring(1);
+        return;
+      }
+      dataParts.add(data);
     }
 
     for (var i = 1; i < args.length; i++) {
-      final arg = args[i];
+      final raw = args[i];
 
-      if (arg == '-X' || arg == '--request') {
-        if (i + 1 < args.length) {
-          method = args[++i].toUpperCase();
+      // Split a long flag's inline value: `--header=X: y` ->
+      // (`--header`, `X: y`).
+      var flag = raw;
+      String? inlineValue;
+      if (raw.startsWith('--') && raw.contains('=')) {
+        final eq = raw.indexOf('=');
+        flag = raw.substring(0, eq);
+        inlineValue = raw.substring(eq + 1);
+      }
+
+      // Reads the value for a value-taking flag: the inline `=value` if
+      // present, else the next token. Returns null if neither exists.
+      String? takeValue() {
+        if (inlineValue != null) return inlineValue;
+        if (i + 1 < args.length) return args[++i];
+        return null;
+      }
+
+      if (flag == '-X' || flag == '--request') {
+        final v = takeValue();
+        if (v != null) {
+          method = v.toUpperCase();
           explicitMethod = true;
         }
-      } else if (arg == '-H' || arg == '--header') {
-        if (i + 1 < args.length) {
-          final headerStr = args[++i];
-          final colonIndex = headerStr.indexOf(':');
-          if (colonIndex != -1) {
-            final key = headerStr.substring(0, colonIndex).trim();
-            final value = headerStr.substring(colonIndex + 1).trim();
-            headers[key] = value;
-          }
+      } else if (flag == '-H' || flag == '--header') {
+        final v = takeValue();
+        if (v != null) _addHeader(headers, v);
+      } else if (flag == '-d' || flag == '--data' || flag == '--data-ascii') {
+        final v = takeValue();
+        if (v != null) addData(v);
+      } else if (flag == '--data-raw' || flag == '--data-binary') {
+        // Verbatim: not `&`-concatenated; `@file` is a binary file reference.
+        final v = takeValue();
+        if (v != null) addData(v, verbatim: true);
+      } else if (flag == '--data-urlencode') {
+        final v = takeValue();
+        if (v != null) {
+          urlencodeData = true;
+          addData(_urlEncodeData(v));
         }
-      } else if (arg == '-d' ||
-          arg == '--data' ||
-          arg == '--data-raw' ||
-          arg == '--data-binary' ||
-          arg == '--data-ascii') {
-        if (i + 1 < args.length) addData(args[++i]);
-      } else if (arg == '--data-urlencode') {
-        if (i + 1 < args.length) addData(_urlEncodeData(args[++i]));
-      } else if (arg == '-u' || arg == '--user') {
-        if (i + 1 < args.length && !_hasHeader(headers, 'authorization')) {
-          headers['Authorization'] =
-              'Basic ${base64.encode(utf8.encode(args[++i]))}';
+      } else if (flag == '-F' || flag == '--form') {
+        final v = takeValue();
+        if (v != null) {
+          hasForm = true;
+          final field = _parseFormField(v);
+          if (field != null) formFields.add(field);
         }
-      } else if (arg == '-b' || arg == '--cookie') {
-        if (i + 1 < args.length && !_hasHeader(headers, 'cookie')) {
-          headers['Cookie'] = args[++i];
+      } else if (flag == '-u' || flag == '--user') {
+        final v = takeValue();
+        if (v != null) auth = _basicAuthFromUserArg(v);
+      } else if (flag == '-A' || flag == '--user-agent') {
+        final v = takeValue();
+        if (v != null) headers.putIfAbsent('User-Agent', () => v);
+      } else if (flag == '-e' || flag == '--referer') {
+        final v = takeValue();
+        if (v != null) headers.putIfAbsent('Referer', () => v);
+      } else if (flag == '-b' || flag == '--cookie') {
+        final v = takeValue();
+        // curl treats `-b name=val` (containing `=`) as a cookie; a value with
+        // no `=` is a cookie *file*, which we can't read — fold both into the
+        // Cookie header anyway (best effort) only when it looks like a pair.
+        if (v != null && v.contains('=') && !_hasHeader(headers, 'cookie')) {
+          headers['Cookie'] = v;
         }
-      } else if (arg == '-G' || arg == '--get') {
+      } else if (flag == '-G' || flag == '--get') {
         forceGet = true;
-      } else if (arg == '--url') {
-        if (i + 1 < args.length) url = args[++i];
-      } else if (_skipValueFlags.contains(arg)) {
-        if (i + 1 < args.length) i++; // consume + discard the unmodeled value
-      } else if (!arg.startsWith('-') && url.isEmpty && _looksLikeUrl(arg)) {
-        url = arg;
+      } else if (flag == '-I' || flag == '--head') {
+        headRequest = true;
+      } else if (flag == '-T') {
+        // -T <file>: upload (PUT). Best effort: capture as a binary body.
+        final v = takeValue();
+        if (v != null) {
+          uploadFile = true;
+          bodyFilePath = v;
+        }
+      } else if (flag == '--upload-file') {
+        final v = takeValue();
+        if (v != null) {
+          uploadFile = true;
+          bodyFilePath = v;
+        }
+      } else if (flag == '--url') {
+        final v = takeValue();
+        if (v != null && url.isEmpty) url = v;
+      } else if (_skipValueFlags.contains(flag)) {
+        takeValue(); // consume + discard the unmodeled value
+      } else if (flag.startsWith('-')) {
+        // Unknown flag. If it carried an inline `=value`, it's fully consumed.
+        // Otherwise treat it as a boolean flag and ignore it (don't swallow the
+        // next token — it might be the URL).
+      } else if (url.isEmpty && _looksLikeUrl(raw)) {
+        url = raw;
       }
-      // Unknown boolean flags (e.g. --compressed, -s, -L) are ignored.
     }
 
-    // -G turns accumulated data into the query string and forces GET.
+    // ---- Method inference (when -X/--request was not given) ----
+    if (!explicitMethod) {
+      if (headRequest) {
+        method = 'HEAD';
+      } else if (forceGet) {
+        method = 'GET';
+      } else if (uploadFile) {
+        method = 'PUT';
+      } else if (hasData || hasForm) {
+        method = 'POST';
+      } else {
+        method = 'GET';
+      }
+    }
+    method ??= 'GET';
+    method = _clampMethod(method);
+
+    // ---- Body assembly ----
+    // curl concatenates plain -d/--data values with '&'.
+    var body = dataParts.join('&');
+
+    // -G turns accumulated data into the query string.
     if (forceGet && body.isNotEmpty) {
       final sep = url.contains('?') ? '&' : '?';
       url = '$url$sep$body';
       body = '';
-      method = 'GET';
+      dataParts.clear();
+      hasData = false;
     }
 
     if (url.isEmpty) return null;
+
+    // ---- Body type resolution ----
+    final bodyType = _resolveBodyType(
+      headers: headers,
+      body: body,
+      hasForm: hasForm,
+      bodyFilePath: bodyFilePath,
+      // --data-urlencode is an explicit pre-encoded value: keep it raw so the
+      // body editor shows it verbatim instead of re-splitting into form rows.
+      preferRaw: urlencodeData,
+    );
+
+    // For urlencoded bodies, surface the k=v pairs as form rows so the FORM
+    // editor shows them; keep `body` empty so the serializer reads formFields.
+    var resolvedBody = body;
+    var resolvedFields = formFields;
+    if (bodyType == BodyType.urlencoded && !hasForm) {
+      resolvedFields = _formFieldsFromUrlEncoded(body);
+      resolvedBody = '';
+    } else if (bodyType == BodyType.binary) {
+      resolvedBody = '';
+    }
 
     return HttpRequestConfigEntity(
       id: id,
       method: method,
       url: url,
       headers: headers,
-      body: body,
+      body: resolvedBody,
+      auth: auth,
+      bodyType: bodyType,
+      formFields: resolvedFields,
+      bodyFilePath: bodyFilePath,
     );
   }
+
+  /// Decides the [BodyType] from the available signals. JSON content (explicit
+  /// header or parseable body) and any other free-form payload land as `raw` so
+  /// they show in the editor; clear `k=v&k=v` pairs become `urlencoded`.
+  static BodyType _resolveBodyType({
+    required Map<String, String> headers,
+    required String body,
+    required bool hasForm,
+    required String? bodyFilePath,
+    required bool preferRaw,
+  }) {
+    if (hasForm) return BodyType.multipart;
+    if (bodyFilePath != null && body.isEmpty) return BodyType.binary;
+    if (body.isEmpty) return BodyType.none;
+
+    final contentType = _headerValue(headers, 'content-type')?.toLowerCase();
+    if (contentType != null) {
+      if (contentType.contains('application/json')) return BodyType.raw;
+      if (contentType.contains('application/x-www-form-urlencoded')) {
+        return BodyType.urlencoded;
+      }
+    }
+
+    if (preferRaw) return BodyType.raw;
+    if (_isJson(body)) return BodyType.raw;
+    if (_looksUrlEncoded(body)) return BodyType.urlencoded;
+    return BodyType.raw;
+  }
+
+  /// `a=1&b=2` -> two text form rows. Values are URL-decoded best-effort.
+  static List<MultipartFieldEntity> _formFieldsFromUrlEncoded(String body) {
+    final fields = <MultipartFieldEntity>[];
+    for (final pair in body.split('&')) {
+      if (pair.isEmpty) continue;
+      final eq = pair.indexOf('=');
+      final name = eq == -1 ? pair : pair.substring(0, eq);
+      final value = eq == -1 ? '' : pair.substring(eq + 1);
+      fields.add(
+        MultipartFieldEntity(
+          name: _tryDecodeComponent(name),
+          value: _tryDecodeComponent(value),
+        ),
+      );
+    }
+    return fields;
+  }
+
+  /// `name=value` / `name=@file` (and `@file;type=...` style hints, ignored
+  /// beyond the path) -> a multipart field row. Returns null if there's no `=`.
+  static MultipartFieldEntity? _parseFormField(String spec) {
+    final eq = spec.indexOf('=');
+    if (eq == -1) return null;
+    final name = spec.substring(0, eq);
+    final rest = spec.substring(eq + 1);
+    if (rest.startsWith('@') || rest.startsWith('<')) {
+      var path = rest.substring(1);
+      // Drop curl per-field hints like `;type=image/png` / `;filename=...`.
+      final semi = path.indexOf(';');
+      if (semi != -1) path = path.substring(0, semi);
+      return MultipartFieldEntity(name: name, isFile: true, filePath: path);
+    }
+    return MultipartFieldEntity(name: name, value: rest);
+  }
+
+  /// `-u user:pass` -> a structured basic-auth map. The serializer derives the
+  /// `Authorization` header at send time, so we never emit one here (matches
+  /// the OpenAPI importer + the send pipeline's auth handling).
+  static Map<String, String> _basicAuthFromUserArg(String userArg) {
+    final colon = userArg.indexOf(':');
+    final username = colon == -1 ? userArg : userArg.substring(0, colon);
+    final password = colon == -1 ? '' : userArg.substring(colon + 1);
+    return AuthConfig(
+      type: AuthType.basic,
+      username: username,
+      password: password,
+    ).toMap();
+  }
+
+  /// Splits a `Key: Value` header string on the first colon (trimming both).
+  static void _addHeader(Map<String, String> headers, String headerStr) {
+    final colonIndex = headerStr.indexOf(':');
+    if (colonIndex == -1) return;
+    final key = headerStr.substring(0, colonIndex).trim();
+    final value = headerStr.substring(colonIndex + 1).trim();
+    if (key.isEmpty) return;
+    headers[key] = value;
+  }
+
+  static String _clampMethod(String method) {
+    final upper = method.toUpperCase();
+    if (HttpMethods.all.contains(upper)) return upper;
+    // HEAD/OPTIONS aren't in HttpMethods.all but are valid curl verbs we infer;
+    // keep them verbatim rather than silently rewriting to GET.
+    if (upper == 'HEAD' || upper == 'OPTIONS') return upper;
+    return 'GET';
+  }
+
+  static bool _isJson(String body) {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) return false;
+    if (!(trimmed.startsWith('{') ||
+        trimmed.startsWith('[') ||
+        trimmed.startsWith('"'))) {
+      return false;
+    }
+    try {
+      jsonDecode(trimmed);
+      return true;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  /// True for bodies that look like `k=v&k=v` (no whitespace, has `=`).
+  static bool _looksUrlEncoded(String body) {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty || !trimmed.contains('=')) return false;
+    if (trimmed.contains('\n')) return false;
+    // Each `&`-segment must look like `key=...` (key non-empty, no spaces).
+    for (final seg in trimmed.split('&')) {
+      if (seg.isEmpty) return false;
+      final eq = seg.indexOf('=');
+      if (eq <= 0) return false;
+      if (seg.contains(' ')) return false;
+    }
+    return true;
+  }
+
+  static String _tryDecodeComponent(String s) {
+    // Uri.decodeComponent throws ArgumentError (an Error subtype) on malformed
+    // percent-escapes. Pre-validate instead of catching the Error: every `%`
+    // must be followed by two hex digits, else return the verbatim segment.
+    if (!_hasWellFormedPercentEscapes(s)) return s;
+    return Uri.decodeComponent(s);
+  }
+
+  static bool _hasWellFormedPercentEscapes(String s) {
+    for (var i = 0; i < s.length; i++) {
+      if (s.codeUnitAt(i) != 0x25) continue; // '%'
+      if (i + 2 >= s.length) return false;
+      if (!_isHexDigit(s.codeUnitAt(i + 1)) ||
+          !_isHexDigit(s.codeUnitAt(i + 2))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static bool _isHexDigit(int c) =>
+      (c >= 0x30 && c <= 0x39) || // 0-9
+      (c >= 0x41 && c <= 0x46) || // A-F
+      (c >= 0x61 && c <= 0x66); // a-f
 
   /// `name=value` -> `name=<encoded value>`; bare token -> fully encoded.
   static String _urlEncodeData(String data) {
@@ -130,9 +402,15 @@ class CurlUtils {
     return '$name=$value';
   }
 
-  static bool _hasHeader(Map<String, String> h, String name) {
+  static bool _hasHeader(Map<String, String> h, String name) =>
+      _headerValue(h, name) != null;
+
+  static String? _headerValue(Map<String, String> h, String name) {
     final l = name.toLowerCase();
-    return h.keys.any((k) => k.toLowerCase() == l);
+    for (final entry in h.entries) {
+      if (entry.key.toLowerCase() == l) return entry.value;
+    }
+    return null;
   }
 
   static bool _looksLikeUrl(String s) =>
@@ -142,32 +420,106 @@ class CurlUtils {
       _domainish.hasMatch(s) ||
       _hostPort.hasMatch(s);
 
-  static List<String> _splitArguments(String command) {
-    final args = <String>[];
-    // This regex matches:
-    // 1. Single quoted strings: '...'
-    // 2. Double quoted strings: "..."
-    // 3. Unquoted words: [^\s]+
-    final regex = RegExp(
-      "'([^']*)'|"
-      '"'
-      '([^"]*)'
-      '"'
-      r'|([^\s]+)',
-    );
+  /// Shell-style tokenizer. Handles:
+  /// - single quotes `'...'`: literal, may span newlines, no escapes inside;
+  /// - double quotes `"..."`: may span newlines, with `\` escapes (`\"`, `\\`,
+  ///   `\$`, `` \` ``); other escapes keep the backslash;
+  /// - unquoted `\<char>` escapes that char;
+  /// - a `\` immediately before a newline is a line continuation (both dropped);
+  /// - whitespace (incl. newlines) separates tokens outside quotes.
+  static List<String> _tokenize(String input) {
+    final tokens = <String>[];
+    final buffer = StringBuffer();
+    var hasToken = false; // distinguishes `''` (empty token) from no token
+    final chars = input.runes.toList();
 
-    final matches = regex.allMatches(command);
-    for (final match in matches) {
-      if (match.group(1) != null) {
-        args.add(match.group(1)!);
-      } else if (match.group(2) != null) {
-        args.add(match.group(2)!);
-      } else if (match.group(3) != null) {
-        args.add(match.group(3)!);
+    void flush() {
+      if (hasToken) {
+        tokens.add(buffer.toString());
+        buffer.clear();
+        hasToken = false;
       }
     }
-    return args;
+
+    var i = 0;
+    while (i < chars.length) {
+      final c = chars[i];
+
+      if (c == 0x27) {
+        // Single quote: copy verbatim until the closing quote.
+        hasToken = true;
+        i++;
+        while (i < chars.length && chars[i] != 0x27) {
+          buffer.writeCharCode(chars[i]);
+          i++;
+        }
+        i++; // skip closing quote (tolerate EOF)
+      } else if (c == 0x22) {
+        // Double quote: honor backslash escapes.
+        hasToken = true;
+        i++;
+        while (i < chars.length && chars[i] != 0x22) {
+          if (chars[i] == 0x5C && i + 1 < chars.length) {
+            final next = chars[i + 1];
+            if (next == 0x22 || next == 0x5C || next == 0x24 || next == 0x60) {
+              // \" \\ \$ \`  -> literal escaped char
+              buffer.writeCharCode(next);
+              i += 2;
+              continue;
+            }
+            if (next == 0x0A) {
+              // backslash-newline inside double quotes: line continuation
+              i += 2;
+              continue;
+            }
+            // Unknown escape: keep the backslash (shell behavior).
+            buffer.writeCharCode(0x5C);
+            i++;
+            continue;
+          }
+          buffer.writeCharCode(chars[i]);
+          i++;
+        }
+        i++; // skip closing quote (tolerate EOF)
+      } else if (c == 0x5C) {
+        // Backslash outside quotes.
+        if (i + 1 < chars.length) {
+          final next = chars[i + 1];
+          if (next == 0x0A) {
+            // Line continuation: drop `\` + newline.
+            i += 2;
+            continue;
+          }
+          if (next == 0x0D && i + 2 < chars.length && chars[i + 2] == 0x0A) {
+            // CRLF line continuation.
+            i += 3;
+            continue;
+          }
+          // Escape the next char (e.g. `\ ` -> space inside a token).
+          hasToken = true;
+          buffer.writeCharCode(next);
+          i += 2;
+          continue;
+        }
+        i++; // trailing backslash at EOF: drop it
+      } else if (_isWhitespace(c)) {
+        flush();
+        i++;
+      } else {
+        hasToken = true;
+        buffer.writeCharCode(c);
+        i++;
+      }
+    }
+    flush();
+    return tokens;
   }
+
+  static bool _isWhitespace(int c) =>
+      c == 0x20 || // space
+      c == 0x09 || // tab
+      c == 0x0A || // newline
+      c == 0x0D; // carriage return
 
   /// Generates a curl command from an [HttpRequestConfigEntity]. Delegates to
   /// [CodeGenService] so auth and body-type are reflected (single source of

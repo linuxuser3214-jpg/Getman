@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/auth_config.dart';
+import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/utils/curl_utils.dart';
 
 void main() {
@@ -51,13 +55,16 @@ void main() {
       expect(config!.url, 'example.com/api');
     });
 
-    test('-u becomes a Basic Authorization header', () {
+    test('-u becomes a structured basic-auth config', () {
       final config = CurlUtils.parse(
         'curl https://api.dev -u user:pass',
         id: 'a',
       );
-      // base64('user:pass') == 'dXNlcjpwYXNz'
-      expect(config!.headers['Authorization'], 'Basic dXNlcjpwYXNz');
+      expect(config!.authConfig.type, AuthType.basic);
+      expect(config.authConfig.username, 'user');
+      expect(config.authConfig.password, 'pass');
+      // No raw Authorization header is emitted — the serializer derives it.
+      expect(config.headers.containsKey('Authorization'), isFalse);
     });
 
     test('--data-urlencode encodes the value and upgrades to POST', () {
@@ -87,8 +94,227 @@ void main() {
           id: 'a',
         );
         expect(config!.url, 'https://api.dev/real');
+        expect(config.headers['Referer'], 'https://ref.example');
       },
     );
+
+    test(
+      'FLAGSHIP: multiline --location + headers + multiline JSON --data '
+      'infers POST and captures the body intact in the raw editor',
+      () {
+        const command = r'''
+curl --location 'http://test.com/dynamics/websocket-metric' \
+  --header 'async: true' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "filter": {
+        "account": "ACCOUNT",
+        "dateMin": "20/12/2025 00:00:00",
+        "dateMax": "03/01/2026 01:00:00",
+        "tags": [
+            "TAG"
+        ]
+    },
+    "searchAfter": "123",
+    "limit": 3
+}'
+''';
+
+        final config = CurlUtils.parse(command, id: 'flagship');
+        expect(config, isNotNull, reason: 'command must parse');
+
+        // (a) method inferred from --data with no -X.
+        expect(config!.method, 'POST');
+
+        // URL captured (quotes stripped).
+        expect(config.url, 'http://test.com/dynamics/websocket-metric');
+
+        // Both headers present.
+        expect(config.headers['async'], 'true');
+        expect(config.headers['Content-Type'], 'application/json');
+
+        // (b) The multiline single-quoted body is captured intact and lands in
+        // the raw editor (Content-Type is JSON -> bodyType raw).
+        expect(config.bodyType, BodyType.raw);
+        expect(config.body.contains('"account": "ACCOUNT"'), isTrue);
+        expect(config.body.contains('"limit": 3'), isTrue);
+        // The body is valid JSON and round-trips structurally.
+        final decoded = jsonDecode(config.body) as Map<String, dynamic>;
+        expect(decoded['limit'], 3);
+        expect((decoded['filter'] as Map)['account'], 'ACCOUNT');
+        expect(((decoded['filter'] as Map)['tags'] as List).first, 'TAG');
+      },
+    );
+
+    test('tokenizer handles backslash line continuations', () {
+      const command =
+          'curl -X POST https://api.dev/x \\\n'
+          "  -H 'A: 1' \\\n"
+          "  -d 'payload'";
+      final config = CurlUtils.parse(command, id: 'a');
+      expect(config!.method, 'POST');
+      expect(config.url, 'https://api.dev/x');
+      expect(config.headers['A'], '1');
+      expect(config.body, 'payload');
+    });
+
+    test('double-quoted values support escapes and span newlines', () {
+      final config = CurlUtils.parse(
+        r'curl https://api.dev -d "line\"quote"',
+        id: 'a',
+      );
+      expect(config!.body, 'line"quote');
+    });
+
+    test('single-quoted strings are literal (no escapes)', () {
+      final config = CurlUtils.parse(
+        r"curl https://api.dev -H 'X-Raw: a\nb'",
+        id: 'a',
+      );
+      expect(config!.headers['X-Raw'], r'a\nb');
+    });
+
+    test('JSON body without an explicit Content-Type is still raw', () {
+      final config = CurlUtils.parse(
+        'curl https://api.dev -d \'{"k":1}\'',
+        id: 'a',
+      );
+      expect(config!.bodyType, BodyType.raw);
+      expect(config.body, '{"k":1}');
+    });
+
+    test('k=v&k=v data with no JSON content-type becomes urlencoded', () {
+      final config = CurlUtils.parse(
+        "curl https://api.dev -d 'a=1&b=2'",
+        id: 'a',
+      );
+      expect(config!.bodyType, BodyType.urlencoded);
+      expect(config.formFields.length, 2);
+      expect(config.formFields[0].name, 'a');
+      expect(config.formFields[0].value, '1');
+      expect(config.formFields[1].name, 'b');
+      expect(config.formFields[1].value, '2');
+    });
+
+    test('explicit urlencoded content-type forces urlencoded body type', () {
+      final config = CurlUtils.parse(
+        'curl https://api.dev '
+        "-H 'Content-Type: application/x-www-form-urlencoded' "
+        "-d 'a=1&b=2'",
+        id: 'a',
+      );
+      expect(config!.bodyType, BodyType.urlencoded);
+      expect(config.formFields.map((f) => f.name).toList(), ['a', 'b']);
+    });
+
+    test('--data-binary @file becomes a binary body referencing the file', () {
+      final config = CurlUtils.parse(
+        'curl https://api.dev --data-binary @/tmp/payload.bin',
+        id: 'a',
+      );
+      expect(config!.method, 'POST');
+      expect(config.bodyType, BodyType.binary);
+      expect(config.bodyFilePath, '/tmp/payload.bin');
+      expect(config.body, isEmpty);
+    });
+
+    test('--data-raw is taken verbatim, not concatenated', () {
+      final config = CurlUtils.parse(
+        "curl https://api.dev --data-raw 'a=1&b=2'",
+        id: 'a',
+      );
+      // Treated as a urlencoded form (clear k=v pairs).
+      expect(config!.bodyType, BodyType.urlencoded);
+      expect(config.formFields.map((f) => f.name).toList(), ['a', 'b']);
+    });
+
+    test('-F populates multipart form fields (text + file)', () {
+      final config = CurlUtils.parse(
+        'curl https://api.dev '
+        "-F 'name=value' "
+        "-F 'avatar=@/tmp/a.png'",
+        id: 'a',
+      );
+      expect(config!.method, 'POST');
+      expect(config.bodyType, BodyType.multipart);
+      expect(config.formFields.length, 2);
+
+      final text = config.formFields[0];
+      expect(text.name, 'name');
+      expect(text.value, 'value');
+      expect(text.isFile, isFalse);
+
+      final file = config.formFields[1];
+      expect(file.name, 'avatar');
+      expect(file.isFile, isTrue);
+      expect(file.filePath, '/tmp/a.png');
+    });
+
+    test('-A / -e / -b fold into User-Agent / Referer / Cookie headers', () {
+      final config = CurlUtils.parse(
+        'curl https://api.dev '
+        "-A 'MyAgent/1.0' "
+        "-e 'https://ref.example' "
+        "-b 'session=abc'",
+        id: 'a',
+      );
+      expect(config!.headers['User-Agent'], 'MyAgent/1.0');
+      expect(config.headers['Referer'], 'https://ref.example');
+      expect(config.headers['Cookie'], 'session=abc');
+    });
+
+    test('-I / --head infers the HEAD method', () {
+      final config = CurlUtils.parse('curl -I https://api.dev', id: 'a');
+      expect(config!.method, 'HEAD');
+    });
+
+    test('ignores -L/-k/--compressed/-s and similar boolean flags', () {
+      final config = CurlUtils.parse(
+        'curl -L -k --compressed -s https://api.dev/x',
+        id: 'a',
+      );
+      expect(config, isNotNull);
+      expect(config!.url, 'https://api.dev/x');
+      expect(config.method, 'GET');
+    });
+
+    test('ignores value-taking flags like --max-time without crashing', () {
+      final config = CurlUtils.parse(
+        'curl --max-time 30 --connect-timeout 5 https://api.dev/x',
+        id: 'a',
+      );
+      expect(config!.url, 'https://api.dev/x');
+    });
+
+    test('long flag with =value form is tolerated', () {
+      final config = CurlUtils.parse(
+        "curl --request=POST --header='X: y' https://api.dev",
+        id: 'a',
+      );
+      expect(config!.method, 'POST');
+      expect(config.headers['X'], 'y');
+    });
+
+    test('an unknown long flag with =value does not become the URL', () {
+      final config = CurlUtils.parse(
+        'curl --some-unknown=thing https://api.dev/real',
+        id: 'a',
+      );
+      expect(config!.url, 'https://api.dev/real');
+    });
+
+    test('method is clamped to a supported method (HttpMethods.all)', () {
+      final config = CurlUtils.parse(
+        'curl -X PATCH https://api.dev',
+        id: 'a',
+      );
+      expect(config!.method, 'PATCH');
+    });
+
+    test('tolerates a leading "curl" with surrounding whitespace', () {
+      final config = CurlUtils.parse('   curl   https://api.dev   ', id: 'a');
+      expect(config!.url, 'https://api.dev');
+    });
   });
 
   group('CurlUtils.generate', () {

@@ -3,6 +3,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/code_gen_service.dart';
+import 'package:getman/core/utils/environment_resolver.dart';
 
 void main() {
   const bearerJson = HttpRequestConfigEntity(
@@ -13,6 +14,104 @@ void main() {
     body: '{"a":1}',
     auth: {'type': 'bearer', 'token': '{{token}}'},
   );
+
+  group('variable resolution (export = runnable, no placeholders)', () {
+    const templated = HttpRequestConfigEntity(
+      id: 'c',
+      method: 'POST',
+      url: 'https://{{base}}/login',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Token': 'Bearer {{token}}',
+      },
+      body: '{"key":"{{token}}"}',
+      auth: {'type': 'bearer', 'token': '{{token}}'},
+    );
+
+    String resolve(String value) => EnvironmentResolver.resolve(value, const {
+      'base': 'api.example.com',
+      'token': 'secret123',
+    });
+
+    test('cURL resolves URL, header value, auth and body', () {
+      final out = CodeGenService.generate(
+        templated,
+        CodeGenTarget.curl,
+        resolve: resolve,
+      );
+      expect(out, contains('https://api.example.com/login'));
+      expect(out, contains('X-Token: Bearer secret123'));
+      expect(out, contains('Authorization: Bearer secret123'));
+      expect(out, contains('"key":"secret123"'));
+      expect(out, isNot(contains('{{base}}')));
+      expect(out, isNot(contains('{{token}}')));
+    });
+
+    test('Python resolves URL, header value, auth and body', () {
+      final out = CodeGenService.generate(
+        templated,
+        CodeGenTarget.pythonRequests,
+        resolve: resolve,
+      );
+      expect(out, contains("url = 'https://api.example.com/login'"));
+      expect(out, contains("'X-Token': 'Bearer secret123'"));
+      expect(out, contains("'Authorization': 'Bearer secret123'"));
+      expect(out, contains('secret123'));
+      expect(out, isNot(contains('{{base}}')));
+      expect(out, isNot(contains('{{token}}')));
+    });
+
+    test('JS fetch resolves URL, header value, auth and body', () {
+      final out = CodeGenService.generate(
+        templated,
+        CodeGenTarget.jsFetch,
+        resolve: resolve,
+      );
+      expect(out, contains("fetch('https://api.example.com/login'"));
+      expect(out, contains("'X-Token': 'Bearer secret123'"));
+      expect(out, contains("'Authorization': 'Bearer secret123'"));
+      expect(out, isNot(contains('{{base}}')));
+      expect(out, isNot(contains('{{token}}')));
+    });
+
+    test('resolves urlencoded form-field values', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        method: 'POST',
+        url: 'https://api.dev/x',
+        bodyType: BodyType.urlencoded,
+        formFields: [MultipartFieldEntity(name: 'k', value: '{{token}}')],
+      );
+      final out = CodeGenService.generate(
+        config,
+        CodeGenTarget.curl,
+        resolve: resolve,
+      );
+      expect(out, contains("--data 'k=secret123'"));
+      expect(out, isNot(contains('{{token}}')));
+    });
+
+    test('unknown {{missing}} variables stay verbatim', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://{{missing}}/x',
+        headers: {'X-Note': '{{absent}}'},
+      );
+      final out = CodeGenService.generate(
+        config,
+        CodeGenTarget.curl,
+        resolve: resolve,
+      );
+      expect(out, contains('https://{{missing}}/x'));
+      expect(out, contains('X-Note: {{absent}}'));
+    });
+
+    test('without a resolver, placeholders stay verbatim (default)', () {
+      final out = CodeGenService.generate(templated, CodeGenTarget.curl);
+      expect(out, contains('https://{{base}}/login'));
+      expect(out, contains('Bearer {{token}}'));
+    });
+  });
 
   group('cURL', () {
     test('reflects bearer auth and the body', () {
