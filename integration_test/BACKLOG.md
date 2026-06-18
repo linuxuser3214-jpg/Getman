@@ -32,6 +32,8 @@ dirty/edge-path coverage (~95 cases). What remains is genuinely blocked
 - **Error & edge states** — `error_states_test` (404/500, cancel in-flight,
   connection failure, malformed JSON, 204) + `settings_network_test`
   (history-limit trim, receive-timeout abort).
+- **Settings tabs** — `settings_tabs_test` (four-tab dialog: navigate
+  GENERAL/APPEARANCE/NETWORK/WORKSPACE on desktop + switch tabs at phone width).
 - **Themes** — `theme_stress_test` (every theme in light + dark, compact, rapid
   glass↔flat switching, the LIQUID GLASS reduce-effects toggle-twice guard).
 - **Chaining (deep)** — `chaining_deep_test` (JSONPath / header / contains
