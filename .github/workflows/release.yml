@@ -34,7 +34,9 @@ jobs:
 
       - run: flutter config --enable-macos-desktop
       - run: flutter pub get
-      - run: flutter build macos --release
+      # Stamp the app version from the git tag (strip leading `v`) so the in-app
+      # updater compares against the tag, not whatever is in pubspec.yaml.
+      - run: flutter build macos --release --build-name="${VERSION#v}" --build-number="${{ github.run_number }}"
 
       - name: Package .dmg
         run: |
@@ -66,7 +68,14 @@ jobs:
 
       - run: flutter config --enable-windows-desktop
       - run: flutter pub get
-      - run: flutter build windows --release
+
+      # Stamp the app version from the git tag (strip leading `v`) so the in-app
+      # updater compares against the tag, not whatever is in pubspec.yaml.
+      - name: Build Windows
+        shell: pwsh
+        run: |
+          $ver = $env:VERSION -replace '^v',''
+          flutter build windows --release --build-name="$ver" --build-number="${{ github.run_number }}"
 
       - name: Build installer (Inno Setup)
         shell: pwsh
@@ -102,7 +111,9 @@ jobs:
 
       - run: flutter config --enable-linux-desktop
       - run: flutter pub get
-      - run: flutter build linux --release
+      # Stamp the app version from the git tag (strip leading `v`) so the in-app
+      # updater compares against the tag, not whatever is in pubspec.yaml.
+      - run: flutter build linux --release --build-name="${VERSION#v}" --build-number="${{ github.run_number }}"
 
       - name: Package AppImage
         run: |
