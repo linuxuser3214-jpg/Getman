@@ -6,9 +6,10 @@
 	     powerbox file grants depend on it. Disabling it relocates the app's
 	     storage (looks like data loss) and breaks file import/export + the
 	     workspace-sync security-scoped bookmarks for this unsigned, sideloaded
-	     app. The in-app updater works under the sandbox by downloading to
-	     ~/Downloads (files.downloads.read-write) and launching the .dmg via
-	     NSWorkspace (see MainFlutterWindow.swift), not by exec'ing `open`. -->
+	     app. The in-app updater works under the sandbox by downloading the
+	     installer into the app container (always writable, no shared-folder
+	     entitlement) and launching the .dmg via NSWorkspace (see
+	     MainFlutterWindow.swift), not by exec'ing `open`. -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.network.client</key>
@@ -16,8 +17,6 @@
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 	<key>com.apple.security.files.bookmarks.app-scope</key>
-	<true/>
-	<key>com.apple.security.files.downloads.read-write</key>
 	<true/>
 </dict>
 </plist>

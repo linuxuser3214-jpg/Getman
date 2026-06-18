@@ -132,7 +132,14 @@ class _UpdateGateState extends State<UpdateGate> {
 
   Future<File> _downloadLocation(String? version) async {
     final controller = context.read<UpdateController>();
-    final dir = await getDownloadsDirectory() ?? await getTemporaryDirectory();
+    // macOS runs under the App Sandbox, where ~/Downloads is off-limits
+    // without a shared-folder entitlement (and that entitlement isn't
+    // reliably present). The app's own support directory is always writable
+    // inside the container, and NSWorkspace can still open the .dmg from
+    // there. Other platforms aren't sandboxed, so keep using ~/Downloads.
+    final dir = Platform.isMacOS
+        ? await getApplicationSupportDirectory()
+        : (await getDownloadsDirectory() ?? await getTemporaryDirectory());
     final url = controller.cachedRelease?.assetUrl ?? '';
     final ext = url.contains('.') ? url.split('.').last : 'bin';
     final path = '${dir.path}${Platform.pathSeparator}getman-$version.$ext';
