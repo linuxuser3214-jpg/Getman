@@ -43,7 +43,7 @@ Future<void> _open(WidgetTester tester, SettingsBloc bloc) async {
 void main() {
   setUpAll(() => registerFallbackValue(const SettingsEntity()));
 
-  testWidgets('shows four tabs; GENERAL is the default pane', (tester) async {
+  testWidgets('shows five tabs; GENERAL is the default pane', (tester) async {
     final bloc = _bloc();
     addTearDown(bloc.close);
     await _open(tester, bloc);
@@ -62,6 +62,10 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('settingstab_tab_WORKSPACE')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settingstab_tab_SHORTCUTS')),
       findsOneWidget,
     );
 
@@ -87,5 +91,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('settingstab_tab_WORKSPACE')));
     await tester.pumpAndSettle();
     expect(find.text('CHOOSE FOLDER'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('settingstab_tab_SHORTCUTS')));
+    await tester.pumpAndSettle();
+    // Section headers + a representative shortcut row (platform-independent).
+    expect(find.text('REQUEST'), findsOneWidget);
+    expect(find.text('PANELS'), findsOneWidget);
+    expect(find.text('Send request'), findsOneWidget);
+    expect(find.text('Jump to panel 1–9'), findsOneWidget);
   });
 }
