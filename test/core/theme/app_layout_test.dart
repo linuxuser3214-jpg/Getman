@@ -41,5 +41,31 @@ void main() {
       final result = AppLayout.normal.lerp(null, 0.5);
       expect(result, AppLayout.normal);
     });
+
+    test('settings dialog sizes differ between normal and compact', () {
+      expect(AppLayout.normal.settingsDialogWidth, 600);
+      expect(AppLayout.normal.settingsDialogHeight, 520);
+      expect(AppLayout.compact.settingsDialogWidth, 480);
+      expect(AppLayout.compact.settingsDialogHeight, 440);
+    });
+
+    test('copyWith overrides the settings dialog sizes', () {
+      final l = AppLayout.normal.copyWith(
+        settingsDialogWidth: 700,
+        settingsDialogHeight: 600,
+      );
+      expect(l.settingsDialogWidth, 700);
+      expect(l.settingsDialogHeight, 600);
+      expect(l.dialogWidth, AppLayout.normal.dialogWidth);
+    });
+
+    test('lerp reaches the settings dialog sizes at t=1', () {
+      final lerped = AppLayout.compact.lerp(AppLayout.normal, 1);
+      expect(lerped.settingsDialogWidth, AppLayout.normal.settingsDialogWidth);
+      expect(
+        lerped.settingsDialogHeight,
+        AppLayout.normal.settingsDialogHeight,
+      );
+    });
   });
 }

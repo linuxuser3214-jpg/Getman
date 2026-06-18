@@ -37,6 +37,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
     required this.borderThick,
     required this.borderHeavy,
     required this.dialogWidth,
+    required this.settingsDialogWidth,
+    required this.settingsDialogHeight,
     required this.splitterGrabSize,
     required this.splitterLineSize,
     required this.foldGutterWidth,
@@ -77,6 +79,13 @@ class AppLayout extends ThemeExtension<AppLayout> {
   final double borderThick;
   final double borderHeavy;
   final double dialogWidth;
+
+  /// Width of the Settings dialog content in the centered (modal) layout.
+  final double settingsDialogWidth;
+
+  /// Soft target height of the Settings dialog content in the modal layout;
+  /// capped at 70% of the screen height by the dialog itself.
+  final double settingsDialogHeight;
   final double splitterGrabSize;
   final double splitterLineSize;
 
@@ -125,6 +134,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
     double? borderThick,
     double? borderHeavy,
     double? dialogWidth,
+    double? settingsDialogWidth,
+    double? settingsDialogHeight,
     double? splitterGrabSize,
     double? splitterLineSize,
     double? foldGutterWidth,
@@ -171,6 +182,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
       borderThick: borderThick ?? this.borderThick,
       borderHeavy: borderHeavy ?? this.borderHeavy,
       dialogWidth: dialogWidth ?? this.dialogWidth,
+      settingsDialogWidth: settingsDialogWidth ?? this.settingsDialogWidth,
+      settingsDialogHeight: settingsDialogHeight ?? this.settingsDialogHeight,
       splitterGrabSize: splitterGrabSize ?? this.splitterGrabSize,
       splitterLineSize: splitterLineSize ?? this.splitterLineSize,
       foldGutterWidth: foldGutterWidth ?? this.foldGutterWidth,
@@ -233,6 +246,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
       borderThick: l(borderThick, other.borderThick),
       borderHeavy: l(borderHeavy, other.borderHeavy),
       dialogWidth: l(dialogWidth, other.dialogWidth),
+      settingsDialogWidth: l(settingsDialogWidth, other.settingsDialogWidth),
+      settingsDialogHeight: l(settingsDialogHeight, other.settingsDialogHeight),
       splitterGrabSize: l(splitterGrabSize, other.splitterGrabSize),
       splitterLineSize: l(splitterLineSize, other.splitterLineSize),
       foldGutterWidth: l(foldGutterWidth, other.foldGutterWidth),
@@ -276,6 +291,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
     borderThick: 3,
     borderHeavy: 4,
     dialogWidth: 400,
+    settingsDialogWidth: 600,
+    settingsDialogHeight: 520,
     splitterGrabSize: 40,
     splitterLineSize: 3,
     foldGutterWidth: 20,
@@ -318,6 +335,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
     borderThick: 3,
     borderHeavy: 4,
     dialogWidth: 320,
+    settingsDialogWidth: 480,
+    settingsDialogHeight: 440,
     splitterGrabSize: 28,
     splitterLineSize: 2,
     foldGutterWidth: 16,
