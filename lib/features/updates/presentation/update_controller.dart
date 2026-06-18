@@ -1,0 +1,63 @@
+import 'package:flutter/foundation.dart';
+import 'package:getman/features/updates/domain/entities/release_info.dart';
+import 'package:getman/features/updates/domain/repositories/update_repository.dart';
+import 'package:getman/features/updates/presentation/update_phase.dart';
+
+/// Shared command bus between the (io-only) update gate, the themed update
+/// dialog, and the Settings "Check for updates" button. Holds the cached
+/// release + display version and the gate's action callbacks. Web-safe (no
+/// `updat`/`dart:io` import); exposed to the widget tree via `RepositoryProvider`.
+class UpdateController extends ChangeNotifier {
+  UpdateController(this._repository);
+
+  final UpdateRepository _repository;
+
+  String? currentVersion;
+  String? latestVersion;
+  String? changelog;
+  UpdatePhase phase = UpdatePhase.idle;
+  bool manualInFlight = false;
+  ReleaseInfo? cachedRelease;
+
+  // Set by the gate each build (captured from `updat`'s builder callbacks).
+  VoidCallback? triggerCheck;
+  Future<void> Function()? startUpdate;
+  VoidCallback? dismiss;
+
+  Future<ReleaseInfo?> fetchLatestRelease(UpdatePlatform platform) async =>
+      cachedRelease = await _repository.fetchLatestRelease(platform);
+
+  /// Triggered by the Settings button: forces a check whose result is always
+  /// surfaced (even "up to date") regardless of the auto-check toggle / skip.
+  void checkNow() {
+    manualInFlight = true;
+    triggerCheck?.call();
+  }
+
+  void setCurrentVersion(String version) {
+    if (currentVersion == version) return;
+    currentVersion = version;
+    notifyListeners();
+  }
+
+  void updateFromGate({
+    UpdatePhase? phase,
+    String? latestVersion,
+    String? changelog,
+  }) {
+    var changed = false;
+    if (phase != null && phase != this.phase) {
+      this.phase = phase;
+      changed = true;
+    }
+    if (latestVersion != this.latestVersion) {
+      this.latestVersion = latestVersion;
+      changed = true;
+    }
+    if (changelog != this.changelog) {
+      this.changelog = changelog;
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+}
