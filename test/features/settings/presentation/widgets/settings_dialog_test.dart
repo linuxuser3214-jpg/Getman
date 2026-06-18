@@ -6,9 +6,19 @@ import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/widgets/settings_dialog.dart';
+import 'package:getman/features/updates/domain/entities/release_info.dart';
+import 'package:getman/features/updates/domain/repositories/update_repository.dart';
+import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:provider/provider.dart';
 
 class _MockSaveSettings extends Mock implements SaveSettingsUseCase {}
+
+class _FakeUpdateRepository implements UpdateRepository {
+  @override
+  Future<ReleaseInfo?> fetchLatestRelease(UpdatePlatform platform) async =>
+      null;
+}
 
 SettingsBloc _bloc() {
   final save = _MockSaveSettings();
@@ -19,17 +29,24 @@ SettingsBloc _bloc() {
   );
 }
 
+UpdateController _controller() => UpdateController(_FakeUpdateRepository());
+
 Future<void> _open(WidgetTester tester, SettingsBloc bloc) async {
+  final controller = _controller();
+  addTearDown(controller.dispose);
   await tester.pumpWidget(
-    MaterialApp(
-      theme: brutalistTheme(Brightness.light),
-      home: BlocProvider.value(
-        value: bloc,
-        child: Scaffold(
-          body: Builder(
-            builder: (context) => TextButton(
-              onPressed: () => SettingsDialog.show(context),
-              child: const Text('open'),
+    ChangeNotifierProvider<UpdateController>.value(
+      value: controller,
+      child: MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: BlocProvider.value(
+          value: bloc,
+          child: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => SettingsDialog.show(context),
+                child: const Text('open'),
+              ),
             ),
           ),
         ),
@@ -41,7 +58,9 @@ Future<void> _open(WidgetTester tester, SettingsBloc bloc) async {
 }
 
 void main() {
-  setUpAll(() => registerFallbackValue(const SettingsEntity()));
+  setUpAll(() {
+    registerFallbackValue(const SettingsEntity());
+  });
 
   testWidgets('shows five tabs; GENERAL is the default pane', (tester) async {
     final bloc = _bloc();
@@ -99,5 +118,13 @@ void main() {
     expect(find.text('PANELS'), findsOneWidget);
     expect(find.text('Send request'), findsOneWidget);
     expect(find.text('Jump to panel 1–9'), findsOneWidget);
+  });
+
+  testWidgets('GENERAL tab shows the update settings section', (tester) async {
+    final bloc = _bloc();
+    addTearDown(bloc.close);
+    await _open(tester, bloc);
+
+    expect(find.byKey(const ValueKey('check_updates_switch')), findsOneWidget);
   });
 }

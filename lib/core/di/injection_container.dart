@@ -56,6 +56,10 @@ import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/updates/data/datasources/github_release_data_source.dart';
+import 'package:getman/features/updates/data/repositories/update_repository_impl.dart';
+import 'package:getman/features/updates/domain/repositories/update_repository.dart';
+import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 final GetIt sl = GetIt.instance;
@@ -239,6 +243,12 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(() => RealtimeBloc(service: sl()))
     // Features - Home
     ..registerLazySingleton(() => const TabDirtyChecker())
+    // Features - Updates (GitHub release auto-update)
+    ..registerLazySingleton(GithubReleaseDataSource.new)
+    ..registerLazySingleton<UpdateRepository>(
+      () => UpdateRepositoryImpl(sl<GithubReleaseDataSource>()),
+    )
+    ..registerLazySingleton(() => UpdateController(sl<UpdateRepository>()))
     // Lets the Cmd/Ctrl+L shortcut focus the active tab's URL field.
     ..registerLazySingleton(UrlFocusRegistry.new);
 

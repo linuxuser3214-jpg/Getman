@@ -18,6 +18,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/client_certificate_tile.dart';
+import 'package:getman/features/updates/presentation/widgets/update_settings_section.dart';
 
 /// Fixed width of the small numeric input boxes (history limit, timeouts, …).
 const double _numberFieldWidth = 96;
@@ -233,6 +234,7 @@ class _SettingsDialogState extends State<SettingsDialog>
         value: settings.saveLargeResponsesInHistory,
         onChanged: (v) => bloc.add(UpdateSaveLargeResponsesInHistory(value: v)),
       ),
+      const UpdateSettingsSection(),
     ]);
   }
 

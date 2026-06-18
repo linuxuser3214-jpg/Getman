@@ -31,6 +31,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/panel_selector.dart';
+import 'package:getman/features/updates/presentation/update_gate.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -353,15 +354,18 @@ class _MainScreenState extends State<MainScreen> {
                     drawer: context.useDrawerNav
                         ? const Drawer(child: SideMenu())
                         : null,
-                    body: context.useDrawerNav
-                        ? _buildDrawerShell(
+                    body: Stack(
+                      children: [
+                        if (context.useDrawerNav)
+                          _buildDrawerShell(
                             context,
                             theme,
                             tabsState,
                             activeIndex,
                             tabs,
                           )
-                        : _buildSplitShell(
+                        else
+                          _buildSplitShell(
                             context,
                             theme,
                             tabsState,
@@ -369,6 +373,9 @@ class _MainScreenState extends State<MainScreen> {
                             tabs,
                             currentSideMenuWidth,
                           ),
+                        const UpdateGate(),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -27,7 +27,9 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/network_settings_listener.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -186,6 +188,9 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
         RepositoryProvider<WorkspaceSyncService>.value(
           value: di.sl<WorkspaceSyncService>(),
+        ),
+        ChangeNotifierProvider<UpdateController>.value(
+          value: di.sl<UpdateController>(),
         ),
       ],
       child: MultiBlocProvider(
