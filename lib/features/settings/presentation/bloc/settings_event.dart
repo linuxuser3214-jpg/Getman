@@ -170,3 +170,17 @@ class UpdateWorkspacePath extends SettingsEvent {
   @override
   List<Object?> get props => [path, bookmark];
 }
+
+class UpdateCheckForUpdatesOnStartup extends SettingsEvent {
+  const UpdateCheckForUpdatesOnStartup({required this.enabled});
+  final bool enabled;
+  @override
+  List<Object?> get props => [enabled];
+}
+
+class SetSkippedUpdateVersion extends SettingsEvent {
+  const SetSkippedUpdateVersion(this.version);
+  final String? version;
+  @override
+  List<Object?> get props => [version];
+}

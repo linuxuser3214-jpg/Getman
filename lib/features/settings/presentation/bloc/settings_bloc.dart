@@ -126,6 +126,14 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         (s) => s.copyWith(workspacePath: e.path, workspaceBookmark: e.bookmark),
       ),
     );
+    on<UpdateCheckForUpdatesOnStartup>(
+      (e, emit) =>
+          _apply(emit, (s) => s.copyWith(checkForUpdatesOnStartup: e.enabled)),
+    );
+    on<SetSkippedUpdateVersion>(
+      (e, emit) =>
+          _apply(emit, (s) => s.copyWith(skippedUpdateVersion: e.version)),
+    );
   }
   final SaveSettingsUseCase _saveSettingsUseCase;
 
