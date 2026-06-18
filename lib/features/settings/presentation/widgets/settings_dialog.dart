@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,14 +8,19 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/workspace_settings_tile.dart';
 import 'package:getman/features/cookies/presentation/widgets/cookie_manager_dialog.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/client_certificate_tile.dart';
+
+/// Fixed width of the small numeric input boxes (history limit, timeouts, …).
+const double _numberFieldWidth = 96;
 
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
@@ -32,7 +38,16 @@ class SettingsDialog extends StatefulWidget {
   State<SettingsDialog> createState() => _SettingsDialogState();
 }
 
-class _SettingsDialogState extends State<SettingsDialog> {
+class _SettingsDialogState extends State<SettingsDialog>
+    with SingleTickerProviderStateMixin {
+  static const _tabLabels = <String>[
+    'GENERAL',
+    'APPEARANCE',
+    'NETWORK',
+    'WORKSPACE',
+  ];
+
+  late final TabController _tabController;
   late final TextEditingController _historyLimitController;
   late final TextEditingController _responseHistoryLimitController;
   late final TextEditingController _connectTimeoutController;
@@ -44,6 +59,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: _tabLabels.length, vsync: this);
     final s = context.read<SettingsBloc>().state.settings;
     _historyLimitController = TextEditingController(
       text: s.historyLimit.toString(),
@@ -68,6 +84,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _historyLimitController.dispose();
     _responseHistoryLimitController.dispose();
     _connectTimeoutController.dispose();
@@ -81,364 +98,56 @@ class _SettingsDialogState extends State<SettingsDialog> {
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
+    final fullscreen = context.isDialogFullscreen;
+    final media = MediaQuery.sizeOf(context);
 
     return BlocBuilder<SettingsBloc, SettingsState>(
       buildWhen: (prev, next) => prev.settings != next.settings,
       builder: (context, state) {
         final settings = state.settings;
-        return ResponsiveDialogScaffold(
-          title: const Text('SETTINGS'),
-          content: SizedBox(
-            width: context.isDialogFullscreen
-                ? double.infinity
-                : layout.dialogWidth,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+
+        final tabbed = Column(
+          children: [
+            BrandedTabBar(
+              controller: _tabController,
+              labels: _tabLabels,
+              isScrollable: true,
+              tabKeyPrefix: 'settingstab',
+            ),
+            SizedBox(height: layout.tabSpacing),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
                 children: [
-                  ListTile(
-                    title: Text(
-                      'HISTORY LIMIT',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    trailing: SizedBox(
-                      width: 80,
-                      child: TextField(
-                        key: const ValueKey('history_limit_field'),
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: layout.inputPadding,
-                            vertical: layout.inputPaddingVertical,
-                          ),
-                        ),
-                        controller: _historyLimitController,
-                        onChanged: (val) {
-                          final limit = int.tryParse(val);
-                          if (limit != null) {
-                            context.read<SettingsBloc>().add(
-                              UpdateHistoryLimit(limit),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: layout.tabSpacing),
-                  SwitchListTile(
-                    title: Text(
-                      'SAVE RESPONSE',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    value: settings.saveResponseInHistory,
-                    onChanged: (val) => context.read<SettingsBloc>().add(
-                      UpdateSaveResponseInHistory(save: val),
-                    ),
-                  ),
-                  SwitchListTile(
-                    secondary: Icon(Icons.data_object, size: layout.iconSize),
-                    title: Text(
-                      'ALWAYS PRETTIFY LARGE RESPONSES',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Format & highlight big bodies instead of plain text '
-                      '(may be slow)',
-                      style: TextStyle(fontSize: layout.fontSizeSmall),
-                    ),
-                    value: settings.alwaysPrettifyLargeResponses,
-                    onChanged: (val) => context.read<SettingsBloc>().add(
-                      UpdateAlwaysPrettifyLargeResponses(value: val),
-                    ),
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.history, size: layout.iconSize),
-                    title: Text(
-                      'RESPONSE HISTORY (PER TAB)',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Recent responses kept for time-travel (0 = off)',
-                      style: TextStyle(fontSize: layout.fontSizeSmall),
-                    ),
-                    trailing: SizedBox(
-                      width: 80,
-                      child: TextField(
-                        key: const ValueKey('response_history_limit_field'),
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: layout.inputPadding,
-                            vertical: layout.inputPaddingVertical,
-                          ),
-                        ),
-                        controller: _responseHistoryLimitController,
-                        onChanged: (val) {
-                          final limit = int.tryParse(val);
-                          if (limit != null) {
-                            context.read<SettingsBloc>().add(
-                              UpdateResponseHistoryLimit(limit),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  SwitchListTile(
-                    key: const ValueKey('save_large_responses_switch'),
-                    secondary: Icon(Icons.save_alt, size: layout.iconSize),
-                    title: Text(
-                      'SAVE LARGE RESPONSES IN HISTORY',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Off keeps big bodies out of history (metadata only)',
-                      style: TextStyle(fontSize: layout.fontSizeSmall),
-                    ),
-                    value: settings.saveLargeResponsesInHistory,
-                    onChanged: (val) => context.read<SettingsBloc>().add(
-                      UpdateSaveLargeResponsesInHistory(value: val),
-                    ),
-                  ),
-                  const Divider(),
-                  SwitchListTile(
-                    secondary: Icon(
-                      settings.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                      size: layout.iconSize,
-                    ),
-                    title: Text(
-                      'DARK MODE',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    value: settings.isDarkMode,
-                    onChanged: (val) => context.read<SettingsBloc>().add(
-                      UpdateDarkMode(isDarkMode: val),
-                    ),
-                  ),
-                  ListTile(
-                    leading: Icon(
-                      Icons.palette_outlined,
-                      size: layout.iconSize,
-                    ),
-                    title: Text(
-                      'THEME',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    trailing: DropdownButton<String>(
-                      key: const ValueKey('theme_dropdown'),
-                      value: settings.themeId,
-                      underline: const SizedBox.shrink(),
-                      items: [
-                        for (final descriptor in appThemes.values)
-                          DropdownMenuItem(
-                            value: descriptor.id,
-                            child: Text(descriptor.displayName),
-                          ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          context.read<SettingsBloc>().add(
-                            UpdateThemeId(value),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                  SwitchListTile(
-                    secondary: Icon(Icons.view_compact, size: layout.iconSize),
-                    title: Text(
-                      'COMPACT MODE',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    value: settings.isCompactMode,
-                    onChanged: (val) => context.read<SettingsBloc>().add(
-                      UpdateCompactMode(isCompactMode: val),
-                    ),
-                  ),
-                  SwitchListTile(
-                    key: const ValueKey('reduce_effects_switch'),
-                    secondary: Icon(Icons.auto_awesome, size: layout.iconSize),
-                    title: Text(
-                      'REDUCE VISUAL EFFECTS',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Disables backdrop blur & animations for performance',
-                      style: TextStyle(fontSize: layout.fontSizeSmall),
-                    ),
-                    value: settings.reduceVisualEffects,
-                    onChanged: (val) => context.read<SettingsBloc>().add(
-                      UpdateReduceVisualEffects(value: val),
-                    ),
-                  ),
-                  const Divider(),
-                  _sectionHeader(context, 'NETWORK'),
-                  _timeoutTile(
-                    context,
-                    'CONNECT TIMEOUT (ms)',
-                    _connectTimeoutController,
-                    UpdateConnectTimeout.new,
-                  ),
-                  _timeoutTile(
-                    context,
-                    'SEND TIMEOUT (ms)',
-                    _sendTimeoutController,
-                    UpdateSendTimeout.new,
-                  ),
-                  _timeoutTile(
-                    context,
-                    'RECEIVE TIMEOUT (ms)',
-                    _receiveTimeoutController,
-                    UpdateReceiveTimeout.new,
-                    fieldKey: const ValueKey('receive_timeout_field'),
-                  ),
-                  SwitchListTile(
-                    secondary: Icon(Icons.alt_route, size: layout.iconSize),
-                    title: Text(
-                      'FOLLOW REDIRECTS',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    value: settings.followRedirects,
-                    onChanged: (val) => context.read<SettingsBloc>().add(
-                      UpdateFollowRedirects(value: val),
-                    ),
-                  ),
-                  if (settings.followRedirects)
-                    _timeoutTile(
-                      context,
-                      'MAX REDIRECTS',
-                      _maxRedirectsController,
-                      UpdateMaxRedirects.new,
-                    ),
-                  SwitchListTile(
-                    secondary: Icon(Icons.lock_outline, size: layout.iconSize),
-                    title: Text(
-                      'VERIFY SSL',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    value: settings.verifySsl,
-                    onChanged: (val) => context.read<SettingsBloc>().add(
-                      UpdateVerifySsl(value: val),
-                    ),
-                  ),
-                  ListTile(
-                    title: Text(
-                      'PROXY (host:port)',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    subtitle: Padding(
-                      padding: EdgeInsets.only(top: layout.tabSpacing),
-                      child: TextField(
-                        controller: _proxyController,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        decoration: InputDecoration(
-                          hintText: 'e.g. 127.0.0.1:8888',
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: layout.inputPadding,
-                            vertical: layout.inputPaddingVertical,
-                          ),
-                        ),
-                        onChanged: (val) {
-                          final trimmed = val.trim();
-                          context.read<SettingsBloc>().add(
-                            UpdateProxyUrl(trimmed.isEmpty ? null : trimmed),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const ClientCertificateTile(),
-                  ListTile(
-                    leading: Icon(Icons.cookie_outlined, size: layout.iconSize),
-                    title: Text(
-                      'COOKIES',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeNormal,
-                        fontWeight: context.appTypography.titleWeight,
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextButton(
-                          key: const ValueKey('cookies_manage_button'),
-                          onPressed: () => CookieManagerDialog.show(context),
-                          child: const Text('MANAGE'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            unawaited(
-                              ConfirmDialog.show(
-                                context,
-                                title: 'Clear cookies?',
-                                message:
-                                    'Removes every stored cookie from the jar. '
-                                    'This cannot be undone.',
-                                confirmLabel: 'CLEAR',
-                                onConfirm: () async {
-                                  final messenger = ScaffoldMessenger.of(
-                                    context,
-                                  );
-                                  final store = context.read<CookieStore>();
-                                  await store.clear();
-                                  showAppSnackBarVia(
-                                    messenger,
-                                    'Cookie jar cleared',
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                          child: const Text('CLEAR'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(),
-                  _sectionHeader(context, 'COLLECTIONS'),
-                  const WorkspaceSettingsTile(),
+                  _generalTab(context, settings),
+                  _appearanceTab(context, settings),
+                  _networkTab(context, settings),
+                  _workspaceTab(context),
                 ],
               ),
             ),
-          ),
+          ],
+        );
+
+        final content = fullscreen
+            ? tabbed
+            : SizedBox(
+                width: math.min(layout.settingsDialogWidth, media.width),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: math.min(
+                      layout.settingsDialogHeight,
+                      media.height * 0.7,
+                    ),
+                  ),
+                  child: tabbed,
+                ),
+              );
+
+        return ResponsiveDialogScaffold(
+          title: const Text('SETTINGS'),
+          contentPadding: EdgeInsets.zero,
+          content: content,
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -450,61 +159,353 @@ class _SettingsDialogState extends State<SettingsDialog> {
     );
   }
 
-  Widget _sectionHeader(BuildContext context, String label) {
+  // --- Panes -----------------------------------------------------------------
+
+  Widget _pane(BuildContext context, List<Widget> children) {
     final layout = context.appLayout;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: layout.inputPadding,
-        top: layout.tabSpacing,
-        bottom: layout.tabSpacing,
-      ),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: layout.fontSizeSmall,
-            fontWeight: context.appTypography.displayWeight,
-            color: Theme.of(context).colorScheme.secondary,
-          ),
-        ),
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(vertical: layout.tabSpacing),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
       ),
     );
   }
 
-  Widget _timeoutTile(
-    BuildContext context,
-    String label,
-    TextEditingController controller,
-    SettingsEvent Function(int ms) event, {
-    Key? fieldKey,
-  }) {
-    final layout = context.appLayout;
-    return ListTile(
-      title: Text(
-        label,
-        style: TextStyle(
-          fontSize: layout.fontSizeNormal,
-          fontWeight: context.appTypography.titleWeight,
+  Widget _generalTab(BuildContext context, SettingsEntity settings) {
+    final bloc = context.read<SettingsBloc>();
+    return _pane(context, [
+      _SettingRow(
+        title: 'HISTORY LIMIT',
+        trailing: _numberField(
+          context,
+          _historyLimitController,
+          (v) => bloc.add(UpdateHistoryLimit(v)),
+          fieldKey: const ValueKey('history_limit_field'),
         ),
       ),
-      trailing: SizedBox(
-        width: 90,
-        child: TextField(
-          key: fieldKey,
-          keyboardType: TextInputType.number,
-          controller: controller,
+      _switch(
+        context,
+        title: 'SAVE RESPONSE',
+        value: settings.saveResponseInHistory,
+        onChanged: (v) => bloc.add(UpdateSaveResponseInHistory(save: v)),
+      ),
+      _switch(
+        context,
+        title: 'ALWAYS PRETTIFY LARGE RESPONSES',
+        icon: Icons.data_object,
+        subtitle:
+            'Format & highlight big bodies instead of plain text (may be slow)',
+        value: settings.alwaysPrettifyLargeResponses,
+        onChanged: (v) =>
+            bloc.add(UpdateAlwaysPrettifyLargeResponses(value: v)),
+      ),
+      _SettingRow(
+        title: 'RESPONSE HISTORY (PER TAB)',
+        icon: Icons.history,
+        subtitle: 'Recent responses kept for time-travel (0 = off)',
+        trailing: _numberField(
+          context,
+          _responseHistoryLimitController,
+          (v) => bloc.add(UpdateResponseHistoryLimit(v)),
+          fieldKey: const ValueKey('response_history_limit_field'),
+        ),
+      ),
+      _switch(
+        context,
+        switchKey: const ValueKey('save_large_responses_switch'),
+        title: 'SAVE LARGE RESPONSES IN HISTORY',
+        icon: Icons.save_alt,
+        subtitle: 'Off keeps big bodies out of history (metadata only)',
+        value: settings.saveLargeResponsesInHistory,
+        onChanged: (v) => bloc.add(UpdateSaveLargeResponsesInHistory(value: v)),
+      ),
+    ]);
+  }
+
+  Widget _appearanceTab(BuildContext context, SettingsEntity settings) {
+    final bloc = context.read<SettingsBloc>();
+    return _pane(context, [
+      _switch(
+        context,
+        title: 'DARK MODE',
+        icon: settings.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+        value: settings.isDarkMode,
+        onChanged: (v) => bloc.add(UpdateDarkMode(isDarkMode: v)),
+      ),
+      _SettingRow(
+        title: 'THEME',
+        icon: Icons.palette_outlined,
+        trailing: DropdownButton<String>(
+          key: const ValueKey('theme_dropdown'),
+          value: settings.themeId,
+          underline: const SizedBox.shrink(),
+          items: [
+            for (final descriptor in appThemes.values)
+              DropdownMenuItem(
+                value: descriptor.id,
+                child: Text(descriptor.displayName),
+              ),
+          ],
+          onChanged: (value) {
+            if (value != null) bloc.add(UpdateThemeId(value));
+          },
+        ),
+      ),
+      _switch(
+        context,
+        title: 'COMPACT MODE',
+        icon: Icons.view_compact,
+        value: settings.isCompactMode,
+        onChanged: (v) => bloc.add(UpdateCompactMode(isCompactMode: v)),
+      ),
+      _switch(
+        context,
+        switchKey: const ValueKey('reduce_effects_switch'),
+        title: 'REDUCE VISUAL EFFECTS',
+        icon: Icons.auto_awesome,
+        subtitle: 'Disables backdrop blur & animations for performance',
+        value: settings.reduceVisualEffects,
+        onChanged: (v) => bloc.add(UpdateReduceVisualEffects(value: v)),
+      ),
+    ]);
+  }
+
+  Widget _networkTab(BuildContext context, SettingsEntity settings) {
+    final bloc = context.read<SettingsBloc>();
+    final layout = context.appLayout;
+    return _pane(context, [
+      _SettingRow(
+        title: 'CONNECT TIMEOUT (ms)',
+        trailing: _numberField(
+          context,
+          _connectTimeoutController,
+          (v) => bloc.add(UpdateConnectTimeout(v)),
+        ),
+      ),
+      _SettingRow(
+        title: 'SEND TIMEOUT (ms)',
+        trailing: _numberField(
+          context,
+          _sendTimeoutController,
+          (v) => bloc.add(UpdateSendTimeout(v)),
+        ),
+      ),
+      _SettingRow(
+        title: 'RECEIVE TIMEOUT (ms)',
+        trailing: _numberField(
+          context,
+          _receiveTimeoutController,
+          (v) => bloc.add(UpdateReceiveTimeout(v)),
+          fieldKey: const ValueKey('receive_timeout_field'),
+        ),
+      ),
+      _switch(
+        context,
+        title: 'FOLLOW REDIRECTS',
+        icon: Icons.alt_route,
+        value: settings.followRedirects,
+        onChanged: (v) => bloc.add(UpdateFollowRedirects(value: v)),
+      ),
+      if (settings.followRedirects)
+        _SettingRow(
+          title: 'MAX REDIRECTS',
+          trailing: _numberField(
+            context,
+            _maxRedirectsController,
+            (v) => bloc.add(UpdateMaxRedirects(v)),
+          ),
+        ),
+      _switch(
+        context,
+        title: 'VERIFY SSL',
+        icon: Icons.lock_outline,
+        value: settings.verifySsl,
+        onChanged: (v) => bloc.add(UpdateVerifySsl(value: v)),
+      ),
+      _SettingRow(
+        title: 'PROXY (host:port)',
+        below: TextField(
+          controller: _proxyController,
+          autocorrect: false,
+          enableSuggestions: false,
           decoration: InputDecoration(
+            hintText: 'e.g. 127.0.0.1:8888',
+            isDense: true,
             contentPadding: EdgeInsets.symmetric(
               horizontal: layout.inputPadding,
               vertical: layout.inputPaddingVertical,
             ),
           ),
           onChanged: (val) {
-            final ms = int.tryParse(val);
-            if (ms != null) context.read<SettingsBloc>().add(event(ms));
+            final trimmed = val.trim();
+            bloc.add(UpdateProxyUrl(trimmed.isEmpty ? null : trimmed));
           },
         ),
+      ),
+      const ClientCertificateTile(),
+      _SettingRow(
+        title: 'COOKIES',
+        icon: Icons.cookie_outlined,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              key: const ValueKey('cookies_manage_button'),
+              onPressed: () => CookieManagerDialog.show(context),
+              child: const Text('MANAGE'),
+            ),
+            TextButton(
+              onPressed: () => _confirmClearCookies(context),
+              child: const Text('CLEAR'),
+            ),
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  Widget _workspaceTab(BuildContext context) {
+    return _pane(context, const [WorkspaceSettingsTile()]);
+  }
+
+  void _confirmClearCookies(BuildContext context) {
+    unawaited(
+      ConfirmDialog.show(
+        context,
+        title: 'Clear cookies?',
+        message:
+            'Removes every stored cookie from the jar. This cannot be undone.',
+        confirmLabel: 'CLEAR',
+        onConfirm: () async {
+          final messenger = ScaffoldMessenger.of(context);
+          final store = context.read<CookieStore>();
+          await store.clear();
+          showAppSnackBarVia(messenger, 'Cookie jar cleared');
+        },
+      ),
+    );
+  }
+
+  // --- Row helpers -----------------------------------------------------------
+
+  Widget _numberField(
+    BuildContext context,
+    TextEditingController controller,
+    void Function(int) onParsed, {
+    Key? fieldKey,
+  }) {
+    final layout = context.appLayout;
+    return SizedBox(
+      width: _numberFieldWidth,
+      child: TextField(
+        key: fieldKey,
+        keyboardType: TextInputType.number,
+        controller: controller,
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: layout.inputPadding,
+            vertical: layout.inputPaddingVertical,
+          ),
+        ),
+        onChanged: (val) {
+          final n = int.tryParse(val);
+          if (n != null) onParsed(n);
+        },
+      ),
+    );
+  }
+
+  Widget _switch(
+    BuildContext context, {
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    IconData? icon,
+    String? subtitle,
+    Key? switchKey,
+  }) {
+    final layout = context.appLayout;
+    return SwitchListTile(
+      key: switchKey,
+      contentPadding: EdgeInsets.symmetric(horizontal: layout.inputPadding),
+      secondary: icon == null ? null : Icon(icon, size: layout.iconSize),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: layout.fontSizeNormal,
+          fontWeight: context.appTypography.titleWeight,
+        ),
+      ),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle, style: TextStyle(fontSize: layout.fontSizeSmall)),
+      value: value,
+      onChanged: onChanged,
+    );
+  }
+}
+
+/// A single labelled settings row with a uniform vertical rhythm: a leading
+/// icon + title, an optional [trailing] control on the right, an optional
+/// [subtitle], and an optional full-width [below] control (text fields).
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({
+    required this.title,
+    this.icon,
+    this.subtitle,
+    this.trailing,
+    this.below,
+  });
+
+  final String title;
+  final IconData? icon;
+  final String? subtitle;
+  final Widget? trailing;
+  final Widget? below;
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = context.appLayout;
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.inputPadding,
+        vertical: layout.tabSpacing,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: layout.iconSize),
+                SizedBox(width: layout.tabSpacing),
+              ],
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: layout.fontSizeNormal,
+                    fontWeight: context.appTypography.titleWeight,
+                  ),
+                ),
+              ),
+              if (trailing != null) ...[
+                SizedBox(width: layout.tabSpacing),
+                trailing!,
+              ],
+            ],
+          ),
+          if (subtitle != null) ...[
+            SizedBox(height: layout.inputPaddingVertical),
+            Text(subtitle!, style: TextStyle(fontSize: layout.fontSizeSmall)),
+          ],
+          if (below != null) ...[
+            SizedBox(height: layout.tabSpacing),
+            below!,
+          ],
+        ],
       ),
     );
   }
