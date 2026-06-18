@@ -5,6 +5,24 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-18
+
+### Added
+
+- **Automatic updates** — Getman now checks GitHub for a newer release on
+  startup and offers **Update now**, **Skip this version**, or **Later**. A
+  toggle and a **CHECK FOR UPDATES** button live in **Settings → General**.
+  Updates install from per-platform packages: a `.dmg` on macOS, an Inno Setup
+  `.exe` on Windows, and an `AppImage` on Linux.
+
+### Fixed
+
+- **Auto-update reliability** — the detected version and changelog are no longer
+  cleared by intermediate progress updates; download failures now surface an
+  error instead of failing silently; the update prompt reliably reads the latest
+  release version (timing fix); and on macOS the app now exits cleanly so the
+  downloaded installer can replace the running app.
+
 ## [1.0.0] - 2026-06-15
 
 First stable release. Getman is a high-performance, local-only HTTP client built
