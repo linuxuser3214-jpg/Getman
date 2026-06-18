@@ -241,3 +241,13 @@ cheap LOW wins to bank momentum, then features/refactors as scoped.
 - **Files**: `collections_repository_impl.dart`, `collection_node_model.dart` (`fromEntity` recursion), `hive_helpers.dart`.
 - **Note**: Mostly mitigated this pass — saves are now debounced/coalesced (2s), so it's one whole-tree write per burst, not per edit. Residual jank only on very large Postman imports.
 - **Fix**: Move `fromEntity`-forest serialization to a background isolate via `compute`, or move collections to keyed/subtree writes (tabs/environments/cookies already are). **Effort**: M.
+
+### L13 — Compact-phone (≤500px) can't close a panel  *(tab-panels follow-up)*
+- **Files**: `lib/features/tabs/presentation/widgets/tab_switcher_sheet.dart` (the panel-chip row / `_PanelChip`); `lib/features/tabs/presentation/widgets/panel_close_coordinator.dart` (`closePanelWithSavePrompt` already exists + works).
+- **Problem**: The tab-panels feature deliberately scoped the compact-phone bottom-sheet panel UI to create / switch / rename / move only (spec §8.3) — there's no ✕/close affordance, so a phone-width user can't close a panel at all. Desktop/tablet close via the `PanelSelector` row ✕.
+- **Fix**: Add a close affordance to each panel chip/row in the switcher sheet that calls `closePanelWithSavePrompt(context, panelId)` (the sheet's context is below `MaterialApp`, so the existing coordinator works — no context-lifetime issue). Hide it when only one panel remains. **Effort**: S. **Verify**: extend `tab_switcher_sheet_test.dart` — close a clean panel → `RemovePanel`; affordance absent with one panel.
+
+### L14 — Panel widgets hardcode a few layout sizes/paddings (not in `AppLayout`)  *(tab-panels follow-up)*
+- **Files**: `panel_selector.dart` (module-level `_labelMaxWidth=120`, `_labelMaxWidthCompact=64`, `_menuWidth=260`, `_menuGap=4`); `tab_widget.dart` (`_TabDragFeedback` `EdgeInsets.symmetric(horizontal: 12, vertical: 6)`); `tab_switcher_sheet.dart` (panel-chip paddings).
+- **Problem**: CLAUDE.md §6 mandates no hardcoded sizes/paddings in widgets (pull from `context.appLayout`). The panels pass left a few literals; they aren't `custom_lint`-caught (that rule only covers colors) and were deferred at review because they're consistent with existing siblings (e.g. `EnvironmentSelector`'s identical 120 label cap).
+- **Fix**: Add fields to `AppLayout` (e.g. `selectorLabelMaxWidth`, `panelMenuWidth`, a chip padding) and route these through them across all theme builders. **Effort**: S. **Verify**: analyze clean; rendering unchanged. *Note*: debatable whether menu-overlay geometry belongs in the theme extension — low priority; consider also lifting `EnvironmentSelector`'s 120 cap at the same time for consistency.
