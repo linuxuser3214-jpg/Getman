@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Getman
+Exec=getman
+Icon=getman
+Categories=Development;
+Terminal=false

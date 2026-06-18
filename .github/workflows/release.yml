@@ -36,16 +36,18 @@ jobs:
       - run: flutter pub get
       - run: flutter build macos --release
 
-      - name: Package .app bundle
+      - name: Package .dmg
         run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            build/macos/Build/Products/Release/getman.app \
-            "getman-${VERSION}-macos-arm64.zip"
+          mkdir -p dmg_staging
+          cp -R build/macos/Build/Products/Release/getman.app dmg_staging/
+          ln -s /Applications dmg_staging/Applications
+          hdiutil create -volname "Getman" -srcfolder dmg_staging \
+            -ov -format UDZO "getman-${VERSION}-macos-arm64.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
           name: macos
-          path: getman-*-macos-arm64.zip
+          path: getman-*-macos-arm64.dmg
           if-no-files-found: error
 
   build-windows:
@@ -66,17 +68,17 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows --release
 
-      - name: Package Windows build
+      - name: Build installer (Inno Setup)
         shell: pwsh
         run: |
-          Compress-Archive `
-            -Path build\windows\x64\runner\Release\* `
-            -DestinationPath "getman-$env:VERSION-windows-x64.zip"
+          choco install innosetup -y --no-progress
+          $ver = $env:VERSION -replace '^v',''
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="$ver" windows\installer.iss
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: getman-*-windows-x64.zip
+          path: build/installer/getman-*-windows-x64-setup.exe
           if-no-files-found: error
 
   build-linux:
@@ -102,15 +104,25 @@ jobs:
       - run: flutter pub get
       - run: flutter build linux --release
 
-      - name: Package Linux bundle
+      - name: Package AppImage
         run: |
-          tar -czf "getman-${VERSION}-linux-x64.tar.gz" \
-            -C build/linux/x64/release/bundle .
+          export ARCH=x86_64
+          APPDIR=AppDir
+          mkdir -p "$APPDIR/usr/bin"
+          cp -r build/linux/x64/release/bundle/* "$APPDIR/usr/bin/"
+          cp linux/packaging/getman.desktop "$APPDIR/getman.desktop"
+          cp linux/icon.png "$APPDIR/getman.png"
+          cp linux/packaging/AppRun "$APPDIR/AppRun"
+          chmod +x "$APPDIR/AppRun"
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage --appimage-extract-and-run \
+            "$APPDIR" "getman-${VERSION}-linux-x86_64.AppImage"
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: getman-*-linux-x64.tar.gz
+          path: getman-*-linux-x86_64.AppImage
           if-no-files-found: error
 
   build-web:
