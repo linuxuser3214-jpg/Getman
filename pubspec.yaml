@@ -56,6 +56,7 @@ dev_dependencies:
   # need and runs under integration_test without a native test harness.
   patrol_finders: ^3.2.0
   plugin_platform_interface: ^2.1.8
+  provider: ^6.1.2
   very_good_analysis: ^10.2.0
 
 flutter:
