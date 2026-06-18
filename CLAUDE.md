@@ -31,6 +31,7 @@ Getman is a high-performance, aesthetically pleasing HTTP client built with Flut
 - **File I/O**: `file_picker` (import/export, binary & multipart bodies).
 - **Static analysis** (three independent passes — all part of the done-bar, see §5): `very_good_analysis` (strict lint baseline, via `fvm flutter analyze`); `custom_lint` running the project-local architecture rules in `tools/getman_lints/` (via `fvm dart run custom_lint`); and `bloc_lint` (the bloc team's rules, via `fvm dart run bloc_tools:bloc lint lib`). All three are gated by the `.githooks/pre-commit` hook (+ `dart format`).
 - **Loading UI**: `shimmer` (response-pending skeleton).
+- **Auto-update**: `updat ^1.4.0` (GitHub-release updater) + `package_info_plus` (current version) + `path_provider` (download path); `provider ^6.1.2` exposes `UpdateController` (a `ChangeNotifier`) app-wide via `ChangeNotifierProvider`. **Web-safety**: only `lib/features/updates/presentation/update_gate_io.dart` imports `updat`, `dart:io`, `package_info_plus`, and `path_provider`; web uses `update_gate_stub.dart` via the conditional export in `update_gate.dart`.
 
 ---
 
@@ -68,7 +69,7 @@ lib/
 ```
 
 Features today: `tabs`, `collections`, `history`, `settings`, `home`, `environments`, `chaining`,
-`cookies`, `realtime`, `command_palette`.
+`cookies`, `realtime`, `command_palette`, `updates`.
 
 - **chaining** — no-code post-response **assertions** + variable **extraction** (`domain/logic/`:
   `assertion_engine.dart`, `extraction_engine.dart`, `rules_runner.dart`). Rules are stored per
@@ -84,6 +85,7 @@ Features today: `tabs`, `collections`, `history`, `settings`, `home`, `environme
   `WebSocketChannel.connect`) so WS teardown is unit-testable with a fake channel.
 - **command_palette** — Cmd/Ctrl+K fuzzy jump to a saved request / environment / theme. Reads
   bloc state at open time; dispatches existing events (no new bloc). Arrow-key navigable.
+- **updates** — GitHub-release auto-updater. On startup (when `checkForUpdatesOnStartup` is `true`) one `releases/latest` check via `GithubReleaseDataSource`; if a newer version is found, `UpdateDialog` prompts Update now / Skip this version / Later. Logic lives in `update_decision.dart` (`isNewerVersion` + `shouldPromptForUpdate`); `UpdateController` (a `ChangeNotifier`) drives dialog state and is provided via `ChangeNotifierProvider` above `MaterialApp`. The platform gate — `update_gate.dart` (conditional export), `update_gate_io.dart` (native only; the sole importer of `updat`/`dart:io`/`package_info_plus`/`path_provider`), `update_gate_stub.dart` (web no-op) — keeps web builds clean. Per-platform installers: `.dmg` (macOS), Inno Setup `.exe` (Windows), `AppImage` (Linux). A GENERAL-tab toggle + "CHECK FOR UPDATES" button are in `UpdateSettingsSection`.
 
 Also shipped but cross-cutting (not their own feature dirs): **auth** (`auth_config.dart` —
 bearer/basic/api-key, applied in `request_serializer.dart`), **code generation**
@@ -131,7 +133,9 @@ As of the pluggable-themes refactor, `SettingsModel` also carries a `String them
 
 `SettingsModel` also carries network/redirect/mTLS fields: `int maxRedirects` at `HiveField(18)` (default `5`, applied to `BaseOptions.maxRedirects`), and the client-certificate trio `String? clientCertPath` / `clientKeyPath` / `clientCertPassphrase` at `HiveField(19/20/21)` (nullable; mTLS). Cert config is plain-string data on `NetworkConfig`/`SettingsEntity` (never a `dart:io` `SecurityContext`, which is built only inside `dio_adapter_config_io.dart`, guarded with a try/catch fallback; the web stub ignores it). All reach the live Dio via `NetworkSettingsListener.listenWhen`.
 
-`SettingsModel` also carries response-history fields: `int responseHistoryLimit` at `HiveField(23)` (default `5`; `0` disables time-travel, clamped `0..50`) and `bool saveLargeResponsesInHistory` at `HiveField(24)` (default `true`; when `false`, history entries over `kLargeResponseViewerChars` are stored metadata-only). Both are carried on the `SendRequest` event (computed at dispatch from `SettingsBloc`, like `envVars`) — the bloc holds no settings reference. (Highest `HiveField` on `SettingsModel`; next free: 25.)
+`SettingsModel` also carries response-history fields: `int responseHistoryLimit` at `HiveField(23)` (default `5`; `0` disables time-travel, clamped `0..50`) and `bool saveLargeResponsesInHistory` at `HiveField(24)` (default `true`; when `false`, history entries over `kLargeResponseViewerChars` are stored metadata-only). Both are carried on the `SendRequest` event (computed at dispatch from `SettingsBloc`, like `envVars`) — the bloc holds no settings reference.
+
+`SettingsModel` also carries auto-update fields: `bool checkForUpdatesOnStartup` at `HiveField(25)` (default `true`; toggled via `UpdateCheckForUpdatesOnStartup`) and `String? skippedUpdateVersion` at `HiveField(26)` (nullable; set via `SetSkippedUpdateVersion` when the user picks "Skip this version"; cleared to `null` on the next check if a still-newer release appears). (Highest `HiveField` on `SettingsModel`; next free: 27.)
 
 After editing any `@HiveType` field, regenerate:
 ```
