@@ -79,7 +79,8 @@ class _UpdateGateState extends State<UpdateGate> {
             required launchInstaller,
             required dismissUpdate,
           }) {
-            // Capture the callbacks + mapped phase; render nothing.
+            // Capture the callbacks synchronously — plain field assignments,
+            // no listener notification.
             controller
               ..triggerCheck = checkForUpdate
               // updat's startUpdate is void Function(); wrap to match
@@ -87,12 +88,24 @@ class _UpdateGateState extends State<UpdateGate> {
               ..startUpdate = () async {
                 startUpdate();
               }
-              ..dismiss = dismissUpdate
-              ..updateFromGate(
-                phase: _mapPhase(status),
-                latestVersion: latestVersion,
-                changelog: controller.cachedRelease?.changelog,
+              ..dismiss = dismissUpdate;
+
+            // Defer the notifying updateFromGate call out of build, mirroring
+            // _onStatus, to avoid "markNeedsBuild called during build" when
+            // updat rebuilds the chip (e.g. on downloading state change) while
+            // the UpdateDialog's AnimatedBuilder is already listening.
+            final mappedPhase = _mapPhase(status);
+            final capturedLatest = latestVersion;
+            final capturedChangelog = controller.cachedRelease?.changelog;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              controller.updateFromGate(
+                phase: mappedPhase,
+                latestVersion: capturedLatest,
+                changelog: capturedChangelog,
               );
+            });
+
             return const SizedBox.shrink();
           },
     );
