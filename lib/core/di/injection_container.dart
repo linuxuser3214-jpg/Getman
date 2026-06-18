@@ -49,11 +49,17 @@ import 'package:getman/features/settings/domain/usecases/settings_usecases.dart'
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
+import 'package:getman/features/tabs/data/models/panel_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
+import 'package:getman/features/tabs/data/models/stored_response_model.dart';
 import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/updates/data/datasources/github_release_data_source.dart';
+import 'package:getman/features/updates/data/repositories/update_repository_impl.dart';
+import 'package:getman/features/updates/domain/repositories/update_repository.dart';
+import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 final GetIt sl = GetIt.instance;
@@ -83,6 +89,8 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       ..registerAdapter(SettingsModelAdapter())
       ..registerAdapter(HttpRequestConfigAdapter())
       ..registerAdapter(HttpRequestTabModelAdapter())
+      ..registerAdapter(StoredResponseModelAdapter())
+      ..registerAdapter(PanelModelAdapter())
       ..registerAdapter(CollectionNodeAdapter())
       ..registerAdapter(SavedExampleModelAdapter())
       ..registerAdapter(EnvironmentModelAdapter())
@@ -110,6 +118,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     Hive.openBox<CollectionNode>(HiveBoxes.collections),
     Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
     Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules),
+    Hive.openBox<PanelModel>(HiveBoxes.panels),
   ]);
   final settingsBox = boxes[0] as Box<SettingsModel>;
   final environmentsBox = boxes[1] as Box<EnvironmentModel>;
@@ -234,6 +243,12 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(() => RealtimeBloc(service: sl()))
     // Features - Home
     ..registerLazySingleton(() => const TabDirtyChecker())
+    // Features - Updates (GitHub release auto-update)
+    ..registerLazySingleton(GithubReleaseDataSource.new)
+    ..registerLazySingleton<UpdateRepository>(
+      () => UpdateRepositoryImpl(sl<GithubReleaseDataSource>()),
+    )
+    ..registerLazySingleton(() => UpdateController(sl<UpdateRepository>()))
     // Lets the Cmd/Ctrl+L shortcut focus the active tab's URL field.
     ..registerLazySingleton(UrlFocusRegistry.new);
 

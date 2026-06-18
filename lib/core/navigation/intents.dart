@@ -49,3 +49,24 @@ class JumpToTabIntent extends Intent {
 class FocusUrlIntent extends Intent {
   const FocusUrlIntent();
 }
+
+/// Create a new panel (Cmd/Ctrl+Shift+N).
+class NewPanelIntent extends Intent {
+  const NewPanelIntent();
+}
+
+/// Activate the next panel, wrapping (Cmd/Ctrl+Shift+]).
+class NextPanelIntent extends Intent {
+  const NextPanelIntent();
+}
+
+/// Activate the previous panel, wrapping (Cmd/Ctrl+Shift+[).
+class PrevPanelIntent extends Intent {
+  const PrevPanelIntent();
+}
+
+/// Jump to the panel at [panelIndex] (0-based) (Cmd/Ctrl+Shift+1..9).
+class JumpToPanelIntent extends Intent {
+  const JumpToPanelIntent(this.panelIndex);
+  final int panelIndex;
+}

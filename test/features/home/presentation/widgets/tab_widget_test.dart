@@ -12,6 +12,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/tab_widget.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
@@ -26,6 +27,23 @@ class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
+
+class _FakePanel extends Fake implements PanelEntity {}
+
+/// Stub the panel reads so [LoadTabs] surfaces [tab] in the active panel.
+void _stubLoad(MockTabsRepository repo, HttpRequestTabEntity tab) {
+  when(() => repo.getPanels()).thenAnswer(
+    (_) async => [
+      PanelEntity(
+        id: 'p1',
+        name: 'Panel 1',
+        tabs: [tab],
+        activeTabId: tab.tabId,
+      ),
+    ],
+  );
+  when(() => repo.getActivePanelId()).thenAnswer((_) async => 'p1');
+}
 
 HttpRequestTabEntity _linkedTab() => const HttpRequestTabEntity(
   tabId: 'tab1',
@@ -46,6 +64,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
+    registerFallbackValue(_FakePanel());
     registerFallbackValue(<CollectionNodeEntity>[]);
     registerFallbackValue(
       const HttpRequestTabEntity(
@@ -63,6 +82,11 @@ void main() {
     when(() => tabsRepo.putTab(any())).thenAnswer((_) async {});
     when(() => tabsRepo.deleteTabs(any())).thenAnswer((_) async {});
     when(() => tabsRepo.saveTabOrder(any())).thenAnswer((_) async {});
+    when(() => tabsRepo.putPanel(any())).thenAnswer((_) async {});
+    when(() => tabsRepo.deletePanels(any())).thenAnswer((_) async {});
+    when(
+      () => tabsRepo.savePanelMeta(any(), any()),
+    ).thenAnswer((_) async {});
     when(
       () => collectionsRepo.getCollections(),
     ).thenAnswer((_) async => const []);
@@ -70,7 +94,7 @@ void main() {
   });
 
   Future<void> pumpTab(WidgetTester tester, HttpRequestTabEntity tab) async {
-    when(() => tabsRepo.getTabs()).thenAnswer((_) async => [tab]);
+    _stubLoad(tabsRepo, tab);
     final tabsBloc = TabsBloc(
       repository: tabsRepo,
       sendRequestUseCase: sendUseCase,
@@ -165,7 +189,7 @@ void main() {
     'chrome (no borderRadius-on-non-uniform-border lerp)',
     (tester) async {
       final tab = _linkedTab();
-      when(() => tabsRepo.getTabs()).thenAnswer((_) async => [tab]);
+      _stubLoad(tabsRepo, tab);
       final tabsBloc = TabsBloc(
         repository: tabsRepo,
         sendRequestUseCase: sendUseCase,
@@ -260,4 +284,189 @@ void main() {
 
     expect(tooltip, findsNothing);
   });
+
+  testWidgets(
+    'context menu shows MOVE TO PANEL when multiple panels exist',
+    (tester) async {
+      final tab1 = _linkedTab();
+      final tab2 = _emptyTab();
+      // Set up two panels so the MOVE TO PANEL item appears.
+      when(() => tabsRepo.getPanels()).thenAnswer(
+        (_) async => [
+          PanelEntity(
+            id: 'p1',
+            name: 'Panel 1',
+            tabs: [tab1],
+            activeTabId: tab1.tabId,
+          ),
+          PanelEntity(
+            id: 'p2',
+            name: 'Panel 2',
+            tabs: [tab2],
+            activeTabId: tab2.tabId,
+          ),
+        ],
+      );
+      when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => 'p1');
+
+      final tabsBloc = TabsBloc(
+        repository: tabsRepo,
+        sendRequestUseCase: sendUseCase,
+      )..add(const LoadTabs());
+      await tabsBloc.stream.firstWhere(
+        (s) => !s.isLoading && s.tabs.isNotEmpty,
+      );
+
+      final collectionsBloc = CollectionsBloc(
+        getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+        saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+        saveDebounce: const Duration(milliseconds: 5),
+      )..add(const ReplaceCollections([]));
+      await collectionsBloc.stream.first;
+
+      addTearDown(tabsBloc.close);
+      addTearDown(collectionsBloc.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: tabsBloc),
+                BlocProvider.value(value: collectionsBloc),
+              ],
+              child: RepositoryProvider<TabDirtyChecker>.value(
+                value: const TabDirtyChecker(),
+                child: Center(
+                  child: TabWidget(
+                    tabId: tab1.tabId,
+                    index: 0,
+                    isActive: true,
+                    onTap: () {},
+                    onClose: () async => true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The tab title text is inside the GestureDetector — tap there with the
+      // secondary mouse button to trigger onSecondaryTapDown → context menu.
+      final titlePos = tester.getCenter(find.text('GetUsers'));
+      await tester.tapAt(titlePos, buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('tab_context_move_to_panel')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'MOVE TO PANEL submenu dispatches MoveTabToPanel on target panel tap',
+    (tester) async {
+      final tab1 = _linkedTab();
+      final tab2 = _emptyTab();
+      when(() => tabsRepo.getPanels()).thenAnswer(
+        (_) async => [
+          PanelEntity(
+            id: 'p1',
+            name: 'Panel 1',
+            tabs: [tab1],
+            activeTabId: tab1.tabId,
+          ),
+          PanelEntity(
+            id: 'p2',
+            name: 'Panel 2',
+            tabs: [tab2],
+            activeTabId: tab2.tabId,
+          ),
+        ],
+      );
+      when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => 'p1');
+
+      final tabsBloc = TabsBloc(
+        repository: tabsRepo,
+        sendRequestUseCase: sendUseCase,
+      )..add(const LoadTabs());
+      await tabsBloc.stream.firstWhere(
+        (s) => !s.isLoading && s.tabs.isNotEmpty,
+      );
+
+      final collectionsBloc = CollectionsBloc(
+        getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+        saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+        saveDebounce: const Duration(milliseconds: 5),
+      )..add(const ReplaceCollections([]));
+      await collectionsBloc.stream.first;
+
+      addTearDown(tabsBloc.close);
+      addTearDown(collectionsBloc.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: tabsBloc),
+                BlocProvider.value(value: collectionsBloc),
+              ],
+              child: RepositoryProvider<TabDirtyChecker>.value(
+                value: const TabDirtyChecker(),
+                child: Center(
+                  child: TabWidget(
+                    tabId: tab1.tabId,
+                    index: 0,
+                    isActive: true,
+                    onTap: () {},
+                    onClose: () async => true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap the tab title with the secondary button to open the context menu.
+      final titlePos2 = tester.getCenter(find.text('GetUsers'));
+      await tester.tapAt(titlePos2, buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+
+      // Tap MOVE TO PANEL — this triggers the post-frame callback that opens
+      // the submenu.
+      await tester.tap(
+        find.byKey(const ValueKey('tab_context_move_to_panel')),
+      );
+      // Let the post-frame callback fire and the submenu build.
+      await tester.pumpAndSettle();
+
+      // The submenu should show Panel 2 (not Panel 1, which owns this tab).
+      expect(
+        find.byKey(const ValueKey('tab_move_to_panel_p2')),
+        findsOneWidget,
+      );
+      // Panel 1 should NOT appear (it's the owner).
+      expect(find.byKey(const ValueKey('tab_move_to_panel_p1')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('tab_move_to_panel_p2')));
+      await tester.pumpAndSettle();
+
+      // The bloc should have received MoveTabToPanel for tab1 → p2.
+      expect(
+        tabsBloc.state.panels
+            .firstWhere((p) => p.id == 'p2')
+            .tabs
+            .any((t) => t.tabId == tab1.tabId),
+        isTrue,
+      );
+    },
+  );
 }

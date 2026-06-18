@@ -32,6 +32,8 @@ dirty/edge-path coverage (~95 cases). What remains is genuinely blocked
 - **Error & edge states** — `error_states_test` (404/500, cancel in-flight,
   connection failure, malformed JSON, 204) + `settings_network_test`
   (history-limit trim, receive-timeout abort).
+- **Settings tabs** — `settings_tabs_test` (four-tab dialog: navigate
+  GENERAL/APPEARANCE/NETWORK/WORKSPACE on desktop + switch tabs at phone width).
 - **Themes** — `theme_stress_test` (every theme in light + dark, compact, rapid
   glass↔flat switching, the LIQUID GLASS reduce-effects toggle-twice guard).
 - **Chaining (deep)** — `chaining_deep_test` (JSONPath / header / contains
@@ -44,6 +46,18 @@ dirty/edge-path coverage (~95 cases). What remains is genuinely blocked
 - **History (deep)** — `history_deep_test` (search filter, re-send as a tab).
 - **Response views (deep)** — `response_views_deep_test` (empty placeholder,
   copy, empty cookies, compare/diff).
+- **Tab panels** — `panels_test` (24 flows): create via footer + Cmd+Shift+N;
+  switch via dropdown row (remembered active tab) + next/prev/jump shortcuts;
+  rename via double-tap, per-row pencil, inactive-row pencil, empty→`Panel N`
+  reset; reorder rows (persist verified by reopening the dropdown); move tabs
+  via the `MOVE TO PANEL` submenu + `NEW PANEL…` + drag-onto-selector (row /
+  + New panel) + last-tab-out auto-seed; close clean (confirm), dirty Discard
+  all, dirty Review & save (save unlinked → collection), Review→Cancel keeps
+  panel, last-panel close blocked; last-tab-close auto-seed; per-panel active
+  tab memory; in-flight send in Panel A lands while focused on Panel B (mock
+  delay server); full restart persistence (names + order + active panel +
+  per-panel active tab + dirty tab, via a manual same-dir double `di.init`);
+  compact-phone `TabSwitcherSheet` (create / switch via chip) + resize back.
 
 ---
 

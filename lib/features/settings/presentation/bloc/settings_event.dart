@@ -56,6 +56,20 @@ class UpdateAlwaysPrettifyLargeResponses extends SettingsEvent {
   List<Object?> get props => [value];
 }
 
+class UpdateResponseHistoryLimit extends SettingsEvent {
+  const UpdateResponseHistoryLimit(this.limit);
+  final int limit;
+  @override
+  List<Object?> get props => [limit];
+}
+
+class UpdateSaveLargeResponsesInHistory extends SettingsEvent {
+  const UpdateSaveLargeResponsesInHistory({required this.value});
+  final bool value;
+  @override
+  List<Object?> get props => [value];
+}
+
 class UpdateSplitRatio extends SettingsEvent {
   const UpdateSplitRatio(this.ratio);
   final double ratio;
@@ -155,4 +169,18 @@ class UpdateWorkspacePath extends SettingsEvent {
   final String? bookmark;
   @override
   List<Object?> get props => [path, bookmark];
+}
+
+class UpdateCheckForUpdatesOnStartup extends SettingsEvent {
+  const UpdateCheckForUpdatesOnStartup({required this.enabled});
+  final bool enabled;
+  @override
+  List<Object?> get props => [enabled];
+}
+
+class SetSkippedUpdateVersion extends SettingsEvent {
+  const SetSkippedUpdateVersion(this.version);
+  final String? version;
+  @override
+  List<Object?> get props => [version];
 }

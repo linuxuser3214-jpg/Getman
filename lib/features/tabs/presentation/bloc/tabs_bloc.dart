@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:collection/collection.dart';
 // Imported only for `compute` (evaluates rules off the UI isolate for large
 // bodies). There is no Flutter-free equivalent — Isolate.run is unsupported on
 // web, which this app targets — so this import must stay.
@@ -8,13 +9,16 @@ import 'dart:developer';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/utils/perf_trace.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
 import 'package:getman/features/chaining/domain/logic/rules_runner.dart';
 import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/request_manager.dart';
@@ -42,7 +46,15 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     on<CloseTabsToTheLeft>(_onCloseTabsToTheLeft);
     on<DuplicateTab>(_onDuplicateTab);
     on<SendRequest>(_onSendRequest);
+    on<ViewResponseHistoryEntry>(_onViewResponseHistoryEntry);
     on<CancelRequest>(_onCancelRequest);
+    on<AddPanel>(_onAddPanel);
+    on<RemovePanel>(_onRemovePanel);
+    on<RenamePanel>(_onRenamePanel);
+    on<SetActivePanel>(_onSetActivePanel);
+    on<ReorderPanels>(_onReorderPanels);
+    on<MoveTabToPanel>(_onMoveTabToPanel);
+    on<MoveTabToNewPanel>(_onMoveTabToNewPanel);
   }
   final TabsRepository _repository;
   final SendRequestUseCase _sendRequestUseCase;
@@ -81,7 +93,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final pending = _dirtyTabIds.toList(growable: false);
     for (final id in pending) {
       _dirtyTabIds.remove(id);
-      final tab = state.tabs.byId(id);
+      final tab = _findTab(id);
       if (tab == null) continue;
       try {
         await traceAsync('tabs.putTab', () => _repository.putTab(tab));
@@ -92,17 +104,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }
   }
 
-  Future<void> _persistOrder() async {
-    try {
-      await _repository.saveTabOrder(
-        state.tabs.map((t) => t.tabId).toList(growable: false),
-      );
-    } on PersistenceFailure catch (f) {
-      log('Tab order save failed: ${f.message}', name: 'TabsBloc');
-    }
-  }
-
-  /// Run a structural write (putTab/deleteTabs/saveTabOrder). UI state is
+  /// Run a structural write (putTab/deleteTabs/putPanel/...). UI state is
   /// already emitted and must never be blocked or reverted by a failed write —
   /// failures are logged, matching the debounce path.
   Future<void> _guardWrite(Future<void> Function() write) async {
@@ -113,48 +115,156 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }
   }
 
+  // --- Panel helpers -------------------------------------------------------
+
+  PanelEntity get _activePanel =>
+      state.panels.byId(state.activePanelId) ?? state.panels.first;
+
+  Iterable<HttpRequestTabEntity> get _allTabs =>
+      state.panels.expand((p) => p.tabs);
+
+  HttpRequestTabEntity? _findTab(String tabId) => _allTabs.byId(tabId);
+
+  /// Recompute the derived active-panel view (tabs/activeIndex) from panels.
+  TabsState _derive(
+    List<PanelEntity> panels,
+    String activePanelId, {
+    bool? isLoading,
+  }) {
+    final active =
+        panels.byId(activePanelId) ?? (panels.isNotEmpty ? panels.first : null);
+    final tabs = active?.tabs ?? const <HttpRequestTabEntity>[];
+    final idx = active == null
+        ? 0
+        : tabs.indexWhere((t) => t.tabId == active.activeTabId);
+    return TabsState(
+      panels: panels,
+      activePanelId: active?.id ?? '',
+      tabs: tabs,
+      activeIndex: idx < 0 ? 0 : idx,
+      isLoading: isLoading ?? state.isLoading,
+    );
+  }
+
+  List<PanelEntity> _replacePanel(
+    List<PanelEntity> panels,
+    PanelEntity replacement,
+  ) {
+    final i = panels.indexWhere((p) => p.id == replacement.id);
+    if (i == -1) return panels;
+    final copy = [...panels];
+    copy[i] = replacement;
+    return copy;
+  }
+
+  /// Replace a tab wherever it lives (in-flight sends, update, time-travel —
+  /// the owning panel may not be the active one).
+  List<PanelEntity> _replaceTabAcrossPanels(HttpRequestTabEntity replacement) {
+    return state.panels.map((p) {
+      final i = p.tabs.indexWhere((t) => t.tabId == replacement.tabId);
+      if (i == -1) return p;
+      final tabs = [...p.tabs];
+      tabs[i] = replacement;
+      return p.copyWith(tabs: tabs);
+    }).toList();
+  }
+
+  String _nextPanelName() => _nextPanelNameExcluding(null);
+
+  /// Returns the first "Panel N" name not in use, optionally ignoring the panel
+  /// with [excludeId] (used when a rename-to-empty wants to reclaim the panel's
+  /// own slot — e.g. "Panel 1" renamed to "" resets to "Panel 1" rather than
+  /// skipping to "Panel 2").
+  String _nextPanelNameExcluding(String? excludeId) {
+    final used = state.panels
+        .where((p) => p.id != excludeId)
+        .map((p) => p.name)
+        .toSet();
+    var n = 1;
+    while (used.contains('Panel $n')) {
+      n++;
+    }
+    return 'Panel $n';
+  }
+
+  Future<void> _persistPanel(PanelEntity panel) =>
+      _guardWrite(() => _repository.putPanel(panel));
+
+  Future<void> _persistPanelMeta() => _guardWrite(
+    () => _repository.savePanelMeta(
+      state.panels.map((p) => p.id).toList(),
+      state.activePanelId,
+    ),
+  );
+
   @override
   Future<void> close() async {
     _debounceTimer?.cancel();
     _requests.cancelAll();
-    // Flush pending edits incrementally — no full saveTabs rewrite on quit.
     await _flushDirtyTabs();
-    await _persistOrder();
+    for (final p in state.panels) {
+      await _persistPanel(p);
+    }
+    await _persistPanelMeta();
     return super.close();
   }
 
   Future<void> _onLoadTabs(LoadTabs event, Emitter<TabsState> emit) async {
     emit(state.copyWith(isLoading: true));
     try {
-      final tabs = await _repository.getTabs();
-      if (tabs.isEmpty) {
-        // First run (nothing persisted): seed a working sample request so the
-        // user can hit SEND immediately rather than facing a blank URL bar.
-        final newTabId = _uuid.v4();
-        final newTab = HttpRequestTabEntity(
-          tabId: newTabId,
-          config: HttpRequestConfigEntity(
-            id: newTabId,
-            url: 'https://httpbin.org/get',
-          ),
+      var panels = await _repository.getPanels();
+      final storedActive = await _repository.getActivePanelId();
+
+      if (panels.isEmpty) {
+        // True first run: seed "Panel 1" with a working sample request.
+        final tabId = _uuid.v4();
+        final panelId = _uuid.v4();
+        final seed = PanelEntity(
+          id: panelId,
+          name: 'Panel 1',
+          tabs: [
+            HttpRequestTabEntity(
+              tabId: tabId,
+              config: HttpRequestConfigEntity(
+                id: tabId,
+                url: 'https://httpbin.org/get',
+              ),
+            ),
+          ],
+          activeTabId: tabId,
         );
-        emit(
-          state.copyWith(
-            tabs: [newTab],
-            activeIndex: 0,
-            isLoading: false,
-          ),
-        );
-        // Persist the fresh tab + order so a clean boot is consistent on disk.
-        await _guardWrite(() => _repository.putTab(newTab));
-        await _persistOrder();
-      } else {
-        // Reset transient in-flight flags — there is no live request after a
-        // restart.
-        final sanitized = tabs
-            .map((t) => t.isSending ? t.copyWith(isSending: false) : t)
-            .toList();
-        emit(state.copyWith(tabs: sanitized, activeIndex: 0, isLoading: false));
+        emit(_derive([seed], panelId, isLoading: false));
+        await _guardWrite(() => _repository.putTab(seed.tabs.first));
+        await _persistPanel(seed);
+        await _persistPanelMeta();
+        return;
+      }
+
+      // Sanitize transient flags. Panels may be empty (a workspace the user
+      // closed every tab in) — they round-trip empty, never re-seeded.
+      panels = panels
+          .map(
+            (p) => p.copyWith(
+              tabs: p.tabs
+                  .map((t) => t.isSending ? t.copyWith(isSending: false) : t)
+                  .toList(),
+            ),
+          )
+          .toList();
+
+      final activeId =
+          (storedActive != null && panels.byId(storedActive) != null)
+          ? storedActive
+          : panels.first.id;
+      emit(_derive(panels, activeId, isLoading: false));
+
+      // If meta was absent, we just migrated from the legacy layout — persist
+      // the assembled panels so the next launch reads from the panels box.
+      if (storedActive == null) {
+        for (final p in panels) {
+          await _persistPanel(p);
+        }
+        await _persistPanelMeta();
       }
     } on PersistenceFailure catch (f) {
       log('LoadTabs failed: ${f.message}', name: 'TabsBloc');
@@ -163,13 +273,21 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   Future<void> _onAddTab(AddTab event, Emitter<TabsState> emit) async {
+    if (state.panels.isEmpty) return;
+    // Global dedup: if a tab for this node is already open in any panel, switch
+    // to it instead of opening a duplicate.
     if (event.collectionNodeId != null) {
-      final existingIndex = state.tabs.indexWhere(
-        (t) => t.collectionNodeId == event.collectionNodeId,
-      );
-      if (existingIndex != -1) {
-        emit(state.copyWith(activeIndex: existingIndex));
-        return;
+      for (final p in state.panels) {
+        final existing = p.tabs.firstWhereOrNull(
+          (t) => t.collectionNodeId == event.collectionNodeId,
+        );
+        if (existing != null) {
+          final updated = p.copyWith(activeTabId: existing.tabId);
+          emit(_derive(_replacePanel(state.panels, updated), p.id));
+          await _persistPanel(updated);
+          await _persistPanelMeta();
+          return;
+        }
       }
     }
 
@@ -180,76 +298,75 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       collectionName: event.collectionName,
       response: event.response,
     );
-
-    emit(
-      state.copyWith(
-        tabs: [...state.tabs, newTab],
-        activeIndex: state.tabs.length,
-      ),
+    final active = _activePanel;
+    final updated = active.copyWith(
+      tabs: [...active.tabs, newTab],
+      activeTabId: newTab.tabId,
     );
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     await _guardWrite(() => _repository.putTab(newTab));
-    await _persistOrder();
+    await _persistPanel(updated);
   }
 
   Future<void> _onRemoveTab(RemoveTab event, Emitter<TabsState> emit) async {
-    final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
-    if (index == -1) return;
+    final owner = state.panels.firstWhereOrNull(
+      (p) => p.tabs.any((t) => t.tabId == event.tabId),
+    );
+    if (owner == null) return;
     _requests.cancelAndFinish(event.tabId);
 
-    final newTabs = [...state.tabs]..removeAt(index);
-    var newActiveIndex = state.activeIndex;
-    if (newTabs.isEmpty) {
-      newActiveIndex = -1;
-    } else if (newActiveIndex >= newTabs.length) {
-      newActiveIndex = newTabs.length - 1;
+    final removedIdx = owner.tabs.indexWhere((t) => t.tabId == event.tabId);
+    final remaining = [...owner.tabs]..removeAt(removedIdx);
+    var updated = owner.copyWith(tabs: remaining);
+    // Re-point activeTabId only when the closed tab was active. An emptied
+    // panel resets it to '' (the panel shows the "NO OPEN TABS" placeholder).
+    if (owner.activeTabId == event.tabId) {
+      updated = updated.copyWith(
+        activeTabId: remaining.isEmpty
+            ? ''
+            : remaining[removedIdx.clamp(0, remaining.length - 1)].tabId,
+      );
     }
-    emit(state.copyWith(tabs: newTabs, activeIndex: newActiveIndex));
+
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.remove(event.tabId);
     await _guardWrite(() => _repository.deleteTabs([event.tabId]));
-    await _persistOrder();
+    await _persistPanel(updated);
   }
 
-  void _onSetActiveIndex(SetActiveIndex event, Emitter<TabsState> emit) {
-    // Reject out-of-range indices (e.g. from a stale sheet/menu context) so
-    // widgets can index `tabs[activeIndex]` without re-checking bounds.
-    if (event.index < 0 || event.index >= state.tabs.length) return;
-    emit(state.copyWith(activeIndex: event.index));
+  Future<void> _onSetActiveIndex(
+    SetActiveIndex event,
+    Emitter<TabsState> emit,
+  ) async {
+    if (state.panels.isEmpty) return;
+    final active = _activePanel;
+    if (event.index < 0 || event.index >= active.tabs.length) return;
+    final updated = active.copyWith(
+      activeTabId: active.tabs[event.index].tabId,
+    );
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
+    await _persistPanel(updated);
   }
 
   Future<void> _onReorderTabs(
     ReorderTabs event,
     Emitter<TabsState> emit,
   ) async {
-    final tabs = [...state.tabs];
-    final oldIndex = event.oldIndex;
+    if (state.panels.isEmpty) return;
+    final active = _activePanel;
+    final tabs = [...active.tabs];
     var newIndex = event.newIndex;
-    if (oldIndex < newIndex) {
-      newIndex -= 1;
-    }
-    final item = tabs.removeAt(oldIndex);
+    if (event.oldIndex < newIndex) newIndex -= 1;
+    final item = tabs.removeAt(event.oldIndex);
     tabs.insert(newIndex, item);
-
-    var newActiveIndex = state.activeIndex;
-    if (oldIndex == state.activeIndex) {
-      newActiveIndex = newIndex;
-    } else if (oldIndex < state.activeIndex && newIndex >= state.activeIndex) {
-      newActiveIndex -= 1;
-    } else if (oldIndex > state.activeIndex && newIndex <= state.activeIndex) {
-      newActiveIndex += 1;
-    }
-
-    emit(state.copyWith(tabs: tabs, activeIndex: newActiveIndex));
-    // Reordering changes no tab payloads — only the order list.
-    await _persistOrder();
+    final updated = active.copyWith(tabs: tabs);
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
+    await _persistPanel(updated);
   }
 
   void _onUpdateTab(UpdateTab event, Emitter<TabsState> emit) {
-    final index = state.tabs.indexWhere((t) => t.tabId == event.tab.tabId);
-    if (index == -1) return;
-
-    final newTabs = [...state.tabs];
-    newTabs[index] = event.tab;
-    emit(state.copyWith(tabs: newTabs));
+    if (_findTab(event.tab.tabId) == null) return;
+    emit(_derive(_replaceTabAcrossPanels(event.tab), state.activePanelId));
     _dirtyTabIds.add(event.tab.tabId);
     _scheduleSave();
   }
@@ -258,109 +375,94 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     CloseOtherTabs event,
     Emitter<TabsState> emit,
   ) async {
-    if (state.tabs.length <= 1) return;
-    final tabToKeep = state.tabs.byId(event.tabId);
-    if (tabToKeep == null) return;
-    final removedIds = state.tabs
+    if (state.panels.isEmpty) return;
+    final active = _activePanel;
+    if (active.tabs.length <= 1) return;
+    final keep = active.tabs.byId(event.tabId);
+    if (keep == null) return;
+    final removedIds = active.tabs
         .where((t) => t.tabId != event.tabId)
         .map((t) => t.tabId)
         .toList(growable: false);
-    emit(
-      state.copyWith(
-        tabs: [tabToKeep],
-        activeIndex: 0,
-      ),
-    );
+    final updated = active.copyWith(tabs: [keep], activeTabId: keep.tabId);
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
     await _guardWrite(() => _repository.deleteTabs(removedIds));
-    await _persistOrder();
+    await _persistPanel(updated);
   }
 
   Future<void> _onCloseTabsToTheRight(
     CloseTabsToTheRight event,
     Emitter<TabsState> emit,
   ) async {
-    final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
-    if (index == -1 || index >= state.tabs.length - 1) return;
-    final newTabs = state.tabs.sublist(0, index + 1);
-    final removedIds = state.tabs
+    if (state.panels.isEmpty) return;
+    final active = _activePanel;
+    final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
+    if (index == -1 || index >= active.tabs.length - 1) return;
+    final kept = active.tabs.sublist(0, index + 1);
+    final removedIds = active.tabs
         .sublist(index + 1)
         .map((t) => t.tabId)
         .toList(growable: false);
-    var newActiveIndex = state.activeIndex;
-    if (newActiveIndex > index) {
-      newActiveIndex = index;
-    }
-    emit(
-      state.copyWith(
-        tabs: newTabs,
-        activeIndex: newActiveIndex,
-      ),
+    final activeKept = kept.any((t) => t.tabId == active.activeTabId);
+    final updated = active.copyWith(
+      tabs: kept,
+      activeTabId: activeKept ? active.activeTabId : kept.last.tabId,
     );
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
     await _guardWrite(() => _repository.deleteTabs(removedIds));
-    await _persistOrder();
+    await _persistPanel(updated);
   }
 
   Future<void> _onCloseTabsToTheLeft(
     CloseTabsToTheLeft event,
     Emitter<TabsState> emit,
   ) async {
-    final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
+    if (state.panels.isEmpty) return;
+    final active = _activePanel;
+    final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index <= 0) return;
-    final newTabs = state.tabs.sublist(index);
-    final removedIds = state.tabs
+    final kept = active.tabs.sublist(index);
+    final removedIds = active.tabs
         .sublist(0, index)
         .map((t) => t.tabId)
         .toList(growable: false);
-    // Every kept tab shifts left by `index` positions, so move the active
-    // index by the same amount; clamp to 0 if it pointed at a removed tab.
-    final newActiveIndex = (state.activeIndex - index).clamp(0, newTabs.length);
-    emit(
-      state.copyWith(
-        tabs: newTabs,
-        activeIndex: newActiveIndex,
-      ),
+    final activeKept = kept.any((t) => t.tabId == active.activeTabId);
+    final updated = active.copyWith(
+      tabs: kept,
+      activeTabId: activeKept ? active.activeTabId : kept.first.tabId,
     );
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
     await _guardWrite(() => _repository.deleteTabs(removedIds));
-    await _persistOrder();
+    await _persistPanel(updated);
   }
 
   Future<void> _onDuplicateTab(
     DuplicateTab event,
     Emitter<TabsState> emit,
   ) async {
-    final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
+    if (state.panels.isEmpty) return;
+    final active = _activePanel;
+    final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1) return;
-    final tabToDuplicate = state.tabs[index];
-    final duplicatedTab = HttpRequestTabEntity(
+    final dup = HttpRequestTabEntity(
       tabId: _uuid.v4(),
-      config: tabToDuplicate.config.copyWith(),
+      config: active.tabs[index].config.copyWith(),
     );
-
-    final newTabs = [...state.tabs]..insert(index + 1, duplicatedTab);
-
-    var newActiveIndex = state.activeIndex;
-    if (newActiveIndex >= index + 1) {
-      newActiveIndex += 1;
-    }
-
-    emit(
-      state.copyWith(
-        tabs: newTabs,
-        activeIndex: index + 1,
-      ),
-    );
-    await _guardWrite(() => _repository.putTab(duplicatedTab));
-    await _persistOrder();
+    final tabs = [...active.tabs]..insert(index + 1, dup);
+    final updated = active.copyWith(tabs: tabs, activeTabId: dup.tabId);
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
+    await _guardWrite(() => _repository.putTab(dup));
+    await _persistPanel(updated);
   }
 
   Future<void> _onSendRequest(
     SendRequest event,
     Emitter<TabsState> emit,
   ) async {
-    final tab = state.tabs.byId(event.tabId);
+    final tab = _findTab(event.tabId);
     if (tab == null || tab.isSending) return;
 
     final tabId = tab.tabId;
@@ -369,15 +471,15 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
     // Clear the previous run's rule results when a new send starts.
     emit(
-      state.copyWith(
-        tabs: _replaceTabById(
-          state.tabs,
+      _derive(
+        _replaceTabAcrossPanels(
           tab.copyWith(
             isSending: true,
             extractionResults: const [],
             assertionResults: const [],
           ),
         ),
+        state.activePanelId,
       ),
     );
 
@@ -391,9 +493,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       _applyToTab(
         emit,
         tabId,
-        (live) => live.copyWith(
-          isSending: false,
-          response: response,
+        (live) => _recordResponse(
+          live,
+          response,
+          event.responseHistoryLimit,
+          saveLarge: event.saveLargeResponsesInHistory,
         ),
       );
       _markResponseDirty(tabId);
@@ -415,9 +519,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       _applyToTab(
         emit,
         tabId,
-        (live) => live.copyWith(
-          isSending: false,
-          response: errorResponse,
+        (live) => _recordResponse(
+          live,
+          errorResponse,
+          event.responseHistoryLimit,
+          saveLarge: event.saveLargeResponsesInHistory,
         ),
       );
       _markResponseDirty(tabId);
@@ -433,11 +539,70 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }
   }
 
+  /// Sets [response] as the tab's displayed response and prepends it to the
+  /// time-travel history (newest-first), trimmed to [limit]. A [limit] of 0
+  /// disables history (clears any accumulated entries). When [saveLarge] is
+  /// false, a history entry whose body exceeds the large-viewer threshold is
+  /// stored as a placeholder (the displayed [response] still keeps the full
+  /// body); on-disk capping at 1 MiB happens at the persistence boundary.
+  HttpRequestTabEntity _recordResponse(
+    HttpRequestTabEntity live,
+    HttpResponseEntity response,
+    int limit, {
+    required bool saveLarge,
+  }) {
+    if (limit <= 0) {
+      return live.copyWith(
+        isSending: false,
+        response: response,
+        responseHistory: const [],
+      );
+    }
+    final stored =
+        !saveLarge && response.body.length > kLargeResponseViewerChars
+        ? response.copyWithBody(kResponseBodyTooLargePlaceholder)
+        : response;
+    final entry = ResponseHistoryEntry(
+      id: _uuid.v4(),
+      response: stored,
+      capturedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    final history = [entry, ...live.responseHistory];
+    return live.copyWith(
+      isSending: false,
+      response: response,
+      responseHistory: history.length > limit
+          ? history.sublist(0, limit)
+          : history,
+    );
+  }
+
+  /// Time-travel: swap the displayed response to the chosen history entry
+  /// without mutating the history. No-op if the tab or entry is gone.
+  void _onViewResponseHistoryEntry(
+    ViewResponseHistoryEntry event,
+    Emitter<TabsState> emit,
+  ) {
+    final tab = _findTab(event.tabId);
+    if (tab == null) return;
+    final entry = tab.responseHistory.firstWhereOrNull(
+      (e) => e.id == event.entryId,
+    );
+    if (entry == null) return;
+    emit(
+      _derive(
+        _replaceTabAcrossPanels(tab.copyWith(response: entry.response)),
+        state.activePanelId,
+      ),
+    );
+    _markResponseDirty(event.tabId);
+  }
+
   /// Schedule a debounced persist for the tab that just received a response
   /// (or error response) so cached responses survive a restart. No-op when the
   /// tab was closed while the request ran.
   void _markResponseDirty(String tabId) {
-    if (state.tabs.byId(tabId) == null) return;
+    if (_findTab(tabId) == null) return;
     _dirtyTabIds.add(tabId);
     _scheduleSave();
   }
@@ -449,9 +614,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     String tabId,
     HttpRequestTabEntity Function(HttpRequestTabEntity live) transform,
   ) {
-    final live = state.tabs.byId(tabId);
+    final live = _findTab(tabId);
     if (live == null) return;
-    emit(state.copyWith(tabs: _replaceTabById(state.tabs, transform(live))));
+    emit(
+      _derive(_replaceTabAcrossPanels(transform(live)), state.activePanelId),
+    );
   }
 
   /// Loads the request's rules and runs the extraction + assertion engines
@@ -495,18 +662,154 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     );
   }
 
-  List<HttpRequestTabEntity> _replaceTabById(
-    List<HttpRequestTabEntity> tabs,
-    HttpRequestTabEntity replacement,
-  ) {
-    final index = tabs.indexWhere((t) => t.tabId == replacement.tabId);
-    if (index == -1) return tabs;
-    final copy = [...tabs];
-    copy[index] = replacement;
-    return copy;
-  }
-
   void _onCancelRequest(CancelRequest event, Emitter<TabsState> emit) {
     _requests.cancel(event.tabId);
+  }
+
+  Future<void> _onAddPanel(AddPanel event, Emitter<TabsState> emit) async {
+    final panelId = _uuid.v4();
+    // A new panel starts empty (no seeded tab) — it shows the "NO OPEN TABS"
+    // placeholder until the user adds a request.
+    final panel = PanelEntity(
+      id: panelId,
+      name: event.name ?? _nextPanelName(),
+      tabs: const [],
+      activeTabId: '',
+    );
+    emit(_derive([...state.panels, panel], panelId));
+    await _persistPanel(panel);
+    await _persistPanelMeta();
+  }
+
+  Future<void> _onRemovePanel(
+    RemovePanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    if (state.panels.length <= 1) return;
+    final idx = state.panels.indexWhere((p) => p.id == event.panelId);
+    if (idx == -1) return;
+    final removed = state.panels[idx];
+    for (final t in removed.tabs) {
+      _requests.cancelAndFinish(t.tabId);
+      _dirtyTabIds.remove(t.tabId);
+    }
+    final newPanels = [...state.panels]..removeAt(idx);
+    var activeId = state.activePanelId;
+    if (activeId == event.panelId) {
+      activeId = newPanels[(idx - 1).clamp(0, newPanels.length - 1)].id;
+    }
+    emit(_derive(newPanels, activeId));
+    await _guardWrite(
+      () => _repository.deleteTabs(removed.tabs.map((t) => t.tabId).toList()),
+    );
+    await _guardWrite(() => _repository.deletePanels([event.panelId]));
+    await _persistPanelMeta();
+  }
+
+  Future<void> _onRenamePanel(
+    RenamePanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    final panel = state.panels.byId(event.panelId);
+    if (panel == null) return;
+    final trimmed = event.name.trim();
+    // When the name is blanked, reset to a "Panel N" auto-name. Exclude the
+    // panel being renamed from the used-names set so it can reclaim its own
+    // slot (e.g. renaming "Panel 1" to "" resets back to "Panel 1").
+    final name = trimmed.isEmpty
+        ? _nextPanelNameExcluding(event.panelId)
+        : trimmed;
+    final updated = panel.copyWith(name: name);
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
+    await _persistPanel(updated);
+  }
+
+  Future<void> _onSetActivePanel(
+    SetActivePanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    if (state.panels.byId(event.panelId) == null) return;
+    if (event.panelId == state.activePanelId) return;
+    emit(_derive(state.panels, event.panelId));
+    await _persistPanelMeta();
+  }
+
+  Future<void> _onReorderPanels(
+    ReorderPanels event,
+    Emitter<TabsState> emit,
+  ) async {
+    final panels = [...state.panels];
+    var newIndex = event.newIndex;
+    if (event.oldIndex < newIndex) newIndex -= 1;
+    final item = panels.removeAt(event.oldIndex);
+    panels.insert(newIndex, item);
+    emit(_derive(panels, state.activePanelId));
+    await _persistPanelMeta();
+  }
+
+  /// Removes [tabId] from its owning panel, fixing the panel's active tab.
+  /// The source may empty out (it is left empty, not re-seeded). Returns
+  /// (updatedSource, movedTab) or null if the tab isn't found. Persistence of
+  /// the source is the caller's job.
+  ({PanelEntity source, HttpRequestTabEntity tab})? _detachTab(String tabId) {
+    final source = state.panels.firstWhereOrNull(
+      (p) => p.tabs.any((t) => t.tabId == tabId),
+    );
+    if (source == null) return null;
+    final removedIdx = source.tabs.indexWhere((t) => t.tabId == tabId);
+    final tab = source.tabs[removedIdx];
+    final remaining = [...source.tabs]..removeAt(removedIdx);
+    var updated = source.copyWith(tabs: remaining);
+    if (source.activeTabId == tabId) {
+      updated = updated.copyWith(
+        activeTabId: remaining.isEmpty
+            ? ''
+            : remaining[removedIdx.clamp(0, remaining.length - 1)].tabId,
+      );
+    }
+    return (source: updated, tab: tab);
+  }
+
+  Future<void> _onMoveTabToPanel(
+    MoveTabToPanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    final target = state.panels.byId(event.targetPanelId);
+    if (target == null) return;
+    final owner = state.panels.firstWhereOrNull(
+      (p) => p.tabs.any((t) => t.tabId == event.tabId),
+    );
+    if (owner == null || owner.id == target.id) return;
+
+    final detached = _detachTab(event.tabId);
+    if (detached == null) return;
+    final updatedTarget = target.copyWith(
+      tabs: [...target.tabs, detached.tab],
+    );
+
+    var panels = _replacePanel(state.panels, detached.source);
+    panels = _replacePanel(panels, updatedTarget);
+    emit(_derive(panels, state.activePanelId)); // stay on current panel
+    await _persistPanel(detached.source);
+    await _persistPanel(updatedTarget);
+  }
+
+  Future<void> _onMoveTabToNewPanel(
+    MoveTabToNewPanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    final detached = _detachTab(event.tabId);
+    if (detached == null) return;
+    final newPanel = PanelEntity(
+      id: _uuid.v4(),
+      name: event.name ?? _nextPanelName(),
+      tabs: [detached.tab],
+      activeTabId: detached.tab.tabId,
+    );
+    final panels = [..._replacePanel(state.panels, detached.source), newPanel];
+    emit(_derive(panels, state.activePanelId)); // stay on current panel
+    await _persistPanel(detached.source);
+    await _persistPanel(newPanel);
+    await _persistPanelMeta();
   }
 }

@@ -1,8 +1,10 @@
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
@@ -106,5 +108,44 @@ void main() {
       await bloc.stream.firstWhere((s) => s.settings.workspacePath == null);
       expect(bloc.state.settings.workspaceBookmark, isNull);
     },
+  );
+
+  blocTest<SettingsBloc, SettingsState>(
+    'UpdateCheckForUpdatesOnStartup persists and emits',
+    build: () => SettingsBloc(
+      saveSettingsUseCase: save,
+      initialSettings: const SettingsEntity(),
+    ),
+    act: (b) => b.add(const UpdateCheckForUpdatesOnStartup(enabled: false)),
+    expect: () => [
+      isA<SettingsState>().having(
+        (s) => s.settings.checkForUpdatesOnStartup,
+        'checkForUpdatesOnStartup',
+        false,
+      ),
+    ],
+  );
+
+  blocTest<SettingsBloc, SettingsState>(
+    'SetSkippedUpdateVersion stores then clears the version',
+    build: () => SettingsBloc(
+      saveSettingsUseCase: save,
+      initialSettings: const SettingsEntity(),
+    ),
+    act: (b) => b
+      ..add(const SetSkippedUpdateVersion('2.0.0'))
+      ..add(const SetSkippedUpdateVersion(null)),
+    expect: () => [
+      isA<SettingsState>().having(
+        (s) => s.settings.skippedUpdateVersion,
+        'skipped',
+        '2.0.0',
+      ),
+      isA<SettingsState>().having(
+        (s) => s.settings.skippedUpdateVersion,
+        'skipped',
+        isNull,
+      ),
+    ],
   );
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -159,109 +160,218 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
               axisAlignment: -1,
               child: ReorderableDragStartListener(
                 index: widget.index,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) {
-                    setState(() => _isHovered = true);
-                    _scheduleTooltip(tab);
-                  },
-                  onExit: (_) {
-                    setState(() => _isHovered = false);
-                    _hideTooltip();
-                  },
-                  child: GestureDetector(
-                    onTap: () {
-                      _hideTooltip();
-                      widget.onTap();
-                    },
-                    onTertiaryTapUp: (_) => _handleClose(),
-                    onSecondaryTapDown: (details) =>
-                        _showContextMenu(context, details.globalPosition, tab),
-                    child: Semantics(
-                      tooltip: tab.config.url.isEmpty
-                          ? tab.displayTitle
-                          : '${tab.displayTitle}\n${tab.config.url}',
-                      child: AnimatedContainer(
-                        // Re-key per theme so a theme switch REPLACES this
-                        // container instead of tweening into the new shape.
-                        // Flat themes use an asymmetric border + no radius;
-                        // glass uses a uniform border + radius. A mid-tween
-                        // frame between the two families would carry a
-                        // non-uniform border AND a borderRadius, which
-                        // Border.paint rejects. The builder ref changes exactly
-                        // when the shape family does, so hover/active/brightness
-                        // changes within a theme still animate.
-                        key: ValueKey(context.appDecoration.tabShape),
-                        duration: const Duration(milliseconds: 200),
-                        height: layout.tabBarHeight,
-                        constraints: BoxConstraints(
-                          minWidth: layout.isCompact ? 80 : 120,
-                          maxWidth: layout.isCompact ? 150 : 250,
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: layout.tabPaddingHorizontal,
-                        ),
-                        decoration: context.appDecoration.tabShape(
+                child: LongPressDraggable<String>(
+                  data: widget.tabId,
+                  feedback: _TabDragFeedback(title: displayTitle),
+                  childWhenDragging: Opacity(
+                    opacity: 0.4,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () {
+                          _hideTooltip();
+                          widget.onTap();
+                        },
+                        onTertiaryTapUp: (_) => _handleClose(),
+                        onSecondaryTapDown: (details) => _showContextMenu(
                           context,
-                          active: widget.isActive,
-                          hovered: _isHovered,
-                          isFirst: widget.index == 0,
+                          details.globalPosition,
+                          tab,
                         ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                displayTitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: layout.tabFontSize,
-                                  color: widget.isActive
-                                      ? (theme.tabBarTheme.labelColor ??
-                                            theme.colorScheme.onSurface)
-                                      : (theme
-                                                .tabBarTheme
-                                                .unselectedLabelColor ??
-                                            theme.colorScheme.onSurface),
-                                  fontWeight: isDirty
-                                      ? context.appTypography.displayWeight
-                                      : (widget.isActive
-                                            ? context
-                                                  .appTypography
-                                                  .displayWeight
-                                            : context.appTypography.bodyWeight),
-                                ),
-                              ),
+                        child: Semantics(
+                          tooltip: tab.config.url.isEmpty
+                              ? tab.displayTitle
+                              : '${tab.displayTitle}\n${tab.config.url}',
+                          child: AnimatedContainer(
+                            key: ValueKey(context.appDecoration.tabShape),
+                            duration: const Duration(milliseconds: 200),
+                            height: layout.tabBarHeight,
+                            constraints: BoxConstraints(
+                              minWidth: layout.isCompact ? 80 : 120,
+                              maxWidth: layout.isCompact ? 150 : 250,
                             ),
-                            if (isDirty)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 6),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: layout.tabPaddingHorizontal,
+                            ),
+                            decoration: context.appDecoration.tabShape(
+                              context,
+                              active: widget.isActive,
+                              hovered: _isHovered,
+                              isFirst: widget.index == 0,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    displayTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: layout.tabFontSize,
+                                      color: widget.isActive
+                                          ? (theme.tabBarTheme.labelColor ??
+                                                theme.colorScheme.onSurface)
+                                          : (theme
+                                                    .tabBarTheme
+                                                    .unselectedLabelColor ??
+                                                theme.colorScheme.onSurface),
+                                      fontWeight: isDirty
+                                          ? context.appTypography.displayWeight
+                                          : (widget.isActive
+                                                ? context
+                                                      .appTypography
+                                                      .displayWeight
+                                                : context
+                                                      .appTypography
+                                                      .bodyWeight),
+                                    ),
+                                  ),
+                                ),
+                                if (isDirty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 6),
+                                    child: Text(
+                                      '*',
+                                      style: TextStyle(
+                                        color: theme.colorScheme.secondary,
+                                        fontSize: layout.dirtyStarSize,
+                                        fontWeight:
+                                            context.appTypography.displayWeight,
+                                      ),
+                                    ),
+                                  ),
+                                SizedBox(width: layout.tabSpacing),
+                                IconButton(
+                                  key: ValueKey('tab_close_${tab.tabId}'),
+                                  icon: Icon(
+                                    Icons.close,
+                                    size: layout.tabCloseIconSize,
+                                    color: theme.dividerColor,
+                                  ),
+                                  onPressed: _handleClose,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 24,
+                                    minHeight: 24,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    onEnter: (_) {
+                      setState(() => _isHovered = true);
+                      _scheduleTooltip(tab);
+                    },
+                    onExit: (_) {
+                      setState(() => _isHovered = false);
+                      _hideTooltip();
+                    },
+                    child: GestureDetector(
+                      onTap: () {
+                        _hideTooltip();
+                        widget.onTap();
+                      },
+                      onTertiaryTapUp: (_) => _handleClose(),
+                      onSecondaryTapDown: (details) => _showContextMenu(
+                        context,
+                        details.globalPosition,
+                        tab,
+                      ),
+                      child: Semantics(
+                        tooltip: tab.config.url.isEmpty
+                            ? tab.displayTitle
+                            : '${tab.displayTitle}\n${tab.config.url}',
+                        child: AnimatedContainer(
+                          // Re-key per theme so a theme switch REPLACES this
+                          // container instead of tweening into the new shape.
+                          // Flat themes use an asymmetric border + no radius;
+                          // glass uses a uniform border + radius. A mid-tween
+                          // frame between the two families would carry a
+                          // non-uniform border AND a borderRadius, which
+                          // Border.paint rejects. The builder ref changes
+                          // exactly when the shape family does, so
+                          // hover/active/brightness changes within a theme
+                          // still animate.
+                          key: ValueKey(context.appDecoration.tabShape),
+                          duration: const Duration(milliseconds: 200),
+                          height: layout.tabBarHeight,
+                          constraints: BoxConstraints(
+                            minWidth: layout.isCompact ? 80 : 120,
+                            maxWidth: layout.isCompact ? 150 : 250,
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: layout.tabPaddingHorizontal,
+                          ),
+                          decoration: context.appDecoration.tabShape(
+                            context,
+                            active: widget.isActive,
+                            hovered: _isHovered,
+                            isFirst: widget.index == 0,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
                                 child: Text(
-                                  '*',
+                                  displayTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: theme.colorScheme.secondary,
-                                    fontSize: layout.dirtyStarSize,
-                                    fontWeight:
-                                        context.appTypography.displayWeight,
+                                    fontSize: layout.tabFontSize,
+                                    color: widget.isActive
+                                        ? (theme.tabBarTheme.labelColor ??
+                                              theme.colorScheme.onSurface)
+                                        : (theme
+                                                  .tabBarTheme
+                                                  .unselectedLabelColor ??
+                                              theme.colorScheme.onSurface),
+                                    fontWeight: isDirty
+                                        ? context.appTypography.displayWeight
+                                        : (widget.isActive
+                                              ? context
+                                                    .appTypography
+                                                    .displayWeight
+                                              : context
+                                                    .appTypography
+                                                    .bodyWeight),
                                   ),
                                 ),
                               ),
-                            SizedBox(width: layout.tabSpacing),
-                            IconButton(
-                              key: ValueKey('tab_close_${tab.tabId}'),
-                              icon: Icon(
-                                Icons.close,
-                                size: layout.tabCloseIconSize,
-                                color: theme.dividerColor,
+                              if (isDirty)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 6),
+                                  child: Text(
+                                    '*',
+                                    style: TextStyle(
+                                      color: theme.colorScheme.secondary,
+                                      fontSize: layout.dirtyStarSize,
+                                      fontWeight:
+                                          context.appTypography.displayWeight,
+                                    ),
+                                  ),
+                                ),
+                              SizedBox(width: layout.tabSpacing),
+                              IconButton(
+                                key: ValueKey('tab_close_${tab.tabId}'),
+                                icon: Icon(
+                                  Icons.close,
+                                  size: layout.tabCloseIconSize,
+                                  color: theme.dividerColor,
+                                ),
+                                onPressed: _handleClose,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 24,
+                                  minHeight: 24,
+                                ),
                               ),
-                              onPressed: _handleClose,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 24,
-                                minHeight: 24,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -347,6 +457,87 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
             },
             child: _buildMenuItem(context, Icons.link, 'COPY URL'),
           ),
+          if (tabsBloc.state.panels.length > 1)
+            PopupMenuItem(
+              key: const ValueKey('tab_context_move_to_panel'),
+              onTap: () {
+                // showMenu closes the first menu before onTap returns; we need
+                // to defer the second menu to the next frame so the first
+                // menu's route is fully dismissed before a new route is pushed.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _showMoveToPanelMenu(context, position, tab, tabsBloc);
+                });
+              },
+              child: _buildMenuItem(
+                context,
+                Icons.drive_file_move_outline,
+                'MOVE TO PANEL',
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showMoveToPanelMenu(
+    BuildContext context,
+    Offset position,
+    HttpRequestTabEntity tab,
+    TabsBloc tabsBloc,
+  ) {
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    final state = tabsBloc.state;
+
+    // Find the panel that currently owns this tab.
+    final ownerPanel = state.panels.firstWhereOrNull(
+      (p) => p.tabs.any((t) => t.tabId == widget.tabId),
+    );
+
+    // Show only the panels this tab can be moved TO (i.e. not its current one).
+    final otherPanels = state.panels
+        .where((p) => p.id != ownerPanel?.id)
+        .toList();
+
+    unawaited(
+      showMenu<void>(
+        context: context,
+        position: RelativeRect.fromLTRB(
+          position.dx,
+          position.dy,
+          position.dx + 1,
+          position.dy + 1,
+        ),
+        color: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+          side: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThick,
+          ),
+        ),
+        elevation: 0,
+        items: <PopupMenuEntry<void>>[
+          for (final panel in otherPanels)
+            PopupMenuItem(
+              key: ValueKey('tab_move_to_panel_${panel.id}'),
+              onTap: () => tabsBloc.add(MoveTabToPanel(widget.tabId, panel.id)),
+              child: _buildMenuItem(
+                context,
+                Icons.dashboard_customize_outlined,
+                panel.name.toUpperCase(),
+              ),
+            ),
+          PopupMenuItem(
+            key: const ValueKey('tab_move_to_new_panel'),
+            onTap: () => tabsBloc.add(MoveTabToNewPanel(widget.tabId)),
+            child: _buildMenuItem(
+              context,
+              Icons.add,
+              'NEW PANEL…',
+            ),
+          ),
         ],
       ),
     );
@@ -366,6 +557,37 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Small chip rendered as the drag feedback when a tab is long-pressed and
+/// dragged toward the panel selector. Uses theme colors so it reads correctly
+/// over any background.
+class _TabDragFeedback extends StatelessWidget {
+  const _TabDragFeedback({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return Material(
+      color: theme.colorScheme.surface,
+      elevation: 4,
+      borderRadius: BorderRadius.circular(context.appShape.buttonRadius),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: layout.fontSizeNormal,
+            fontWeight: context.appTypography.titleWeight,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -30,6 +30,8 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/panel_selector.dart';
+import 'package:getman/features/updates/presentation/update_gate.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -234,16 +236,16 @@ class _MainScreenState extends State<MainScreen> {
                     if (activeIndex >= 0 &&
                         activeIndex < tabs.length &&
                         !tabs[activeIndex].isSending) {
+                      final settings = context
+                          .read<SettingsBloc>()
+                          .state
+                          .settings;
                       final envVars = RequestVariableResolver.variablesFor(
                         environments: context
                             .read<EnvironmentsBloc>()
                             .state
                             .environments,
-                        activeEnvironmentId: context
-                            .read<SettingsBloc>()
-                            .state
-                            .settings
-                            .activeEnvironmentId,
+                        activeEnvironmentId: settings.activeEnvironmentId,
                         collections: context
                             .read<CollectionsBloc>()
                             .state
@@ -254,6 +256,9 @@ class _MainScreenState extends State<MainScreen> {
                         SendRequest(
                           tabId: tabs[activeIndex].tabId,
                           envVars: envVars,
+                          responseHistoryLimit: settings.responseHistoryLimit,
+                          saveLargeResponsesInHistory:
+                              settings.saveLargeResponsesInHistory,
                         ),
                       );
                     }
@@ -299,6 +304,48 @@ class _MainScreenState extends State<MainScreen> {
                     return null;
                   },
                 ),
+                NewPanelIntent: CallbackAction<NewPanelIntent>(
+                  onInvoke: (_) {
+                    context.read<TabsBloc>().add(const AddPanel());
+                    return null;
+                  },
+                ),
+                NextPanelIntent: CallbackAction<NextPanelIntent>(
+                  onInvoke: (_) {
+                    final s = context.read<TabsBloc>().state;
+                    if (s.panels.length < 2) return null;
+                    final i = s.panels.indexWhere(
+                      (p) => p.id == s.activePanelId,
+                    );
+                    final next = s.panels[(i + 1) % s.panels.length];
+                    context.read<TabsBloc>().add(SetActivePanel(next.id));
+                    return null;
+                  },
+                ),
+                PrevPanelIntent: CallbackAction<PrevPanelIntent>(
+                  onInvoke: (_) {
+                    final s = context.read<TabsBloc>().state;
+                    if (s.panels.length < 2) return null;
+                    final i = s.panels.indexWhere(
+                      (p) => p.id == s.activePanelId,
+                    );
+                    final prev =
+                        s.panels[(i - 1 + s.panels.length) % s.panels.length];
+                    context.read<TabsBloc>().add(SetActivePanel(prev.id));
+                    return null;
+                  },
+                ),
+                JumpToPanelIntent: CallbackAction<JumpToPanelIntent>(
+                  onInvoke: (intent) {
+                    final s = context.read<TabsBloc>().state;
+                    if (intent.panelIndex < s.panels.length) {
+                      context.read<TabsBloc>().add(
+                        SetActivePanel(s.panels[intent.panelIndex].id),
+                      );
+                    }
+                    return null;
+                  },
+                ),
               },
               child: Focus(
                 focusNode: _mainFocusNode,
@@ -307,15 +354,18 @@ class _MainScreenState extends State<MainScreen> {
                     drawer: context.useDrawerNav
                         ? const Drawer(child: SideMenu())
                         : null,
-                    body: context.useDrawerNav
-                        ? _buildDrawerShell(
+                    body: Stack(
+                      children: [
+                        if (context.useDrawerNav)
+                          _buildDrawerShell(
                             context,
                             theme,
                             tabsState,
                             activeIndex,
                             tabs,
                           )
-                        : _buildSplitShell(
+                        else
+                          _buildSplitShell(
                             context,
                             theme,
                             tabsState,
@@ -323,6 +373,9 @@ class _MainScreenState extends State<MainScreen> {
                             tabs,
                             currentSideMenuWidth,
                           ),
+                        const UpdateGate(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -519,6 +572,10 @@ class _MainScreenState extends State<MainScreen> {
                   ),
           ),
           const AddTabButton(),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
+            child: const PanelSelector(),
+          ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
             child: const EnvironmentSelector(),

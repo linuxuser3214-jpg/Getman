@@ -1,5 +1,6 @@
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
+import 'package:getman/features/tabs/data/models/panel_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
@@ -9,6 +10,11 @@ abstract class TabsLocalDataSource {
   Future<void> putTab(HttpRequestTabModel tab);
   Future<void> deleteTabs(Iterable<String> tabIds);
   Future<void> saveOrder(List<String> orderedTabIds);
+  Future<List<PanelModel>> getPanels();
+  Future<String?> getActivePanelId();
+  Future<void> putPanel(PanelModel panel);
+  Future<void> deletePanels(Iterable<String> panelIds);
+  Future<void> savePanelMeta(List<String> panelOrder, String activePanelId);
 }
 
 class TabsLocalDataSourceImpl implements TabsLocalDataSource {
@@ -92,6 +98,71 @@ class TabsLocalDataSourceImpl implements TabsLocalDataSource {
       await _metaBox().put(orderKey, orderedTabIds);
     } catch (e) {
       throw PersistenceException('Failed to save tab order', cause: e);
+    }
+  }
+
+  static const String panelOrderKey = 'panelOrder';
+  static const String activePanelKey = 'activePanelId';
+
+  Box<PanelModel> _panelsBox() => Hive.box<PanelModel>(HiveBoxes.panels);
+
+  @override
+  Future<List<PanelModel>> getPanels() async {
+    try {
+      final box = _panelsBox();
+      final stored = _metaBox().get(panelOrderKey);
+      final order = stored is List ? stored.cast<String>() : const <String>[];
+      final byId = {for (final p in box.values) p.id: p};
+      final result = <PanelModel>[];
+      for (final id in order) {
+        final p = byId.remove(id);
+        if (p != null) result.add(p);
+      }
+      result.addAll(byId.values);
+      return result;
+    } catch (e) {
+      throw PersistenceException('Failed to read panels', cause: e);
+    }
+  }
+
+  @override
+  Future<String?> getActivePanelId() async {
+    try {
+      final v = _metaBox().get(activePanelKey);
+      return v is String ? v : null;
+    } catch (e) {
+      throw PersistenceException('Failed to read active panel id', cause: e);
+    }
+  }
+
+  @override
+  Future<void> putPanel(PanelModel panel) async {
+    try {
+      await _panelsBox().put(panel.id, panel);
+    } catch (e) {
+      throw PersistenceException('Failed to save panel', cause: e);
+    }
+  }
+
+  @override
+  Future<void> deletePanels(Iterable<String> panelIds) async {
+    try {
+      await _panelsBox().deleteAll(panelIds);
+    } catch (e) {
+      throw PersistenceException('Failed to delete panels', cause: e);
+    }
+  }
+
+  @override
+  Future<void> savePanelMeta(
+    List<String> panelOrder,
+    String activePanelId,
+  ) async {
+    try {
+      await _metaBox().put(panelOrderKey, panelOrder);
+      await _metaBox().put(activePanelKey, activePanelId);
+    } catch (e) {
+      throw PersistenceException('Failed to save panel meta', cause: e);
     }
   }
 }

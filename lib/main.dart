@@ -27,7 +27,9 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/network_settings_listener.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -129,6 +131,36 @@ final Map<ShortcutActivator, Intent> appShortcuts = {
     SingleActivator(_tabDigitKeys[i], meta: true): JumpToTabIntent(i),
     SingleActivator(_tabDigitKeys[i], control: true): JumpToTabIntent(i),
   },
+  const SingleActivator(LogicalKeyboardKey.keyN, control: true, shift: true):
+      const NewPanelIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyN, meta: true, shift: true):
+      const NewPanelIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.bracketRight,
+    control: true,
+    shift: true,
+  ): const NextPanelIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.bracketRight,
+    meta: true,
+    shift: true,
+  ): const NextPanelIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.bracketLeft,
+    control: true,
+    shift: true,
+  ): const PrevPanelIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.bracketLeft,
+    meta: true,
+    shift: true,
+  ): const PrevPanelIntent(),
+  for (var i = 0; i < _tabDigitKeys.length; i++) ...{
+    SingleActivator(_tabDigitKeys[i], control: true, shift: true):
+        JumpToPanelIntent(i),
+    SingleActivator(_tabDigitKeys[i], meta: true, shift: true):
+        JumpToPanelIntent(i),
+  },
 };
 
 class MyApp extends StatelessWidget {
@@ -156,6 +188,9 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
         RepositoryProvider<WorkspaceSyncService>.value(
           value: di.sl<WorkspaceSyncService>(),
+        ),
+        ChangeNotifierProvider<UpdateController>.value(
+          value: di.sl<UpdateController>(),
         ),
       ],
       child: MultiBlocProvider(

@@ -13,4 +13,9 @@ class HiveBoxes {
   static const String environments = 'environments';
   static const String cookies = 'cookies';
   static const String requestRules = 'request_rules';
+
+  /// Panel structure (typeId 12). Tab entities stay in [tabs]; this box stores
+  /// only `{id, name, orderedTabIds, activeTabId}`. Order + active panel live
+  /// in [tabsMeta] under `panelOrder` / `activePanelId`.
+  static const String panels = 'panels';
 }

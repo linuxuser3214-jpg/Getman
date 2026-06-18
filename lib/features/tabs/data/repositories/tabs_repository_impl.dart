@@ -9,10 +9,13 @@ import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dart';
+import 'package:getman/features/tabs/data/models/panel_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/data/request_serializer.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
+import 'package:uuid/uuid.dart';
 
 class TabsRepositoryImpl implements TabsRepository {
   TabsRepositoryImpl({
@@ -51,18 +54,80 @@ class TabsRepositoryImpl implements TabsRepository {
         await localDataSource.saveOrder(orderedTabIds);
       });
 
-  /// Maps the entity to its Hive model, replacing an over-limit response body
-  /// with [kResponseBodyTooLargePlaceholder]. The in-memory session keeps the
-  /// full body — only the on-disk copy is capped (see persistence_limits.dart).
+  @override
+  Future<List<PanelEntity>> getPanels() => guardPersistence(() async {
+    final tabModels = await localDataSource.getTabs();
+    final tabsById = {for (final m in tabModels) m.tabId: m.toEntity()};
+    final panelModels = await localDataSource.getPanels();
+    if (panelModels.isEmpty) {
+      if (tabsById.isEmpty) return <PanelEntity>[];
+      // Legacy upgrade: wrap all existing tabs (in their saved order) into
+      // one "Panel 1". The bloc persists this on first load.
+      final ordered = tabModels.map((m) => m.tabId).toList();
+      return [
+        PanelEntity(
+          id: const Uuid().v4(),
+          name: 'Panel 1',
+          tabs: ordered.map((id) => tabsById[id]!).toList(),
+          activeTabId: ordered.first,
+        ),
+      ];
+    }
+    return panelModels.map((pm) => pm.toEntity(tabsById)).toList();
+  });
+
+  @override
+  Future<String?> getActivePanelId() =>
+      guardPersistence(localDataSource.getActivePanelId);
+
+  @override
+  Future<void> putPanel(PanelEntity panel) => guardPersistence(
+    () => localDataSource.putPanel(PanelModel.fromEntity(panel)),
+  );
+
+  @override
+  Future<void> deletePanels(List<String> panelIds) =>
+      guardPersistence(() => localDataSource.deletePanels(panelIds));
+
+  @override
+  Future<void> savePanelMeta(List<String> panelOrder, String activePanelId) =>
+      guardPersistence(
+        () => localDataSource.savePanelMeta(panelOrder, activePanelId),
+      );
+
+  /// Maps the entity to its Hive model, replacing any over-limit response body
+  /// — the displayed response and every time-travel history entry — with
+  /// [kResponseBodyTooLargePlaceholder]. The in-memory session keeps the full
+  /// bodies; only the on-disk copy is capped (see persistence_limits.dart).
   HttpRequestTabModel _toPersistableModel(HttpRequestTabEntity entity) {
-    final response = entity.response;
-    final capped =
-        response != null &&
-            response.body.length > kMaxPersistedResponseBodyChars
-        ? entity.copyWith(
-            response: response.copyWithBody(kResponseBodyTooLargePlaceholder),
-          )
-        : entity;
+    var capped = entity;
+
+    final response = capped.response;
+    if (response != null &&
+        response.body.length > kMaxPersistedResponseBodyChars) {
+      capped = capped.copyWith(
+        response: response.copyWithBody(kResponseBodyTooLargePlaceholder),
+      );
+    }
+
+    if (capped.responseHistory.any(
+      (e) => e.response.body.length > kMaxPersistedResponseBodyChars,
+    )) {
+      capped = capped.copyWith(
+        responseHistory: capped.responseHistory
+            .map(
+              (e) => e.response.body.length > kMaxPersistedResponseBodyChars
+                  ? e.copyWith(
+                      response: e.response.copyWithBody(
+                        kResponseBodyTooLargePlaceholder,
+                      ),
+                    )
+                  : e,
+            )
+            .toList(),
+      );
+    }
+
     return HttpRequestTabModel.fromEntity(capped);
   }
 
