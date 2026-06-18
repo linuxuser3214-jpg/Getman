@@ -20,13 +20,7 @@ class _FakeRepo implements UpdateRepository {
 class _MockSave extends Mock implements SaveSettingsUseCase {}
 
 void main() {
-  setUpAll(() {
-    registerFallbackValue(const SettingsEntity());
-    // UpdateController extends ChangeNotifier; suppress Provider's debug
-    // check so RepositoryProvider.value works in tests (Task 12 will wire it
-    // via ChangeNotifierProvider app-wide).
-    Provider.debugCheckInvalidValueType = null;
-  });
+  setUpAll(() => registerFallbackValue(const SettingsEntity()));
 
   testWidgets('renders toggle + check button and dispatches toggle', (t) async {
     final save = _MockSave();
@@ -38,7 +32,7 @@ void main() {
     await t.pumpWidget(
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
-        home: RepositoryProvider.value(
+        home: ChangeNotifierProvider<UpdateController>.value(
           value: controller,
           child: BlocProvider.value(
             value: bloc,
