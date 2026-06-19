@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/motion/latency_weight.dart';
 import 'package:getman/core/theme/motion/reaction_stage.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
@@ -16,7 +17,7 @@ AppMotion brutalistMotion({required bool reduceEffects}) {
     reactionOverlay: (context, {required child, required controller}) =>
         _BrutalReactionOverlay(controller: controller, child: child),
     sendAffordance: (context, {required child, required isSending}) =>
-        _BrutalStampSend(child: child),
+        _BrutalStampSend(isSending: isSending, child: child),
   );
 }
 
@@ -34,9 +35,11 @@ class _BrutalReactionOverlayState extends State<_BrutalReactionOverlay>
   AnimationController? _stamp;
   String _label = '';
   bool _isError = false;
+  double _weight = 0;
 
   void _onReaction(ThemeReaction r) {
     if (r.kind == ThemeReactionKind.sendStarted) return;
+    _weight = latencyWeight(r.durationMs);
     final label = switch (r.kind) {
       ThemeReactionKind.cancelled => 'CANCELLED',
       ThemeReactionKind.networkError => 'FAILED',
@@ -49,7 +52,7 @@ class _BrutalReactionOverlayState extends State<_BrutalReactionOverlay>
     c =
         AnimationController(
           vsync: this,
-          duration: const Duration(milliseconds: 900),
+          duration: Duration(milliseconds: 900 + (600 * _weight).round()),
         )..addStatusListener((s) {
           if (s == AnimationStatus.completed && mounted) {
             if (_stamp == c) {
@@ -75,7 +78,7 @@ class _BrutalReactionOverlayState extends State<_BrutalReactionOverlay>
   double _shakeDx(double t) {
     if (!_isError) return 0;
     final decay = (1 - (t / 0.4)).clamp(0.0, 1.0);
-    return math.sin(t * math.pi * 16) * 8 * decay;
+    return math.sin(t * math.pi * 16) * (8 * (0.6 + 0.7 * _weight)) * decay;
   }
 
   @override
@@ -96,7 +99,9 @@ class _BrutalReactionOverlayState extends State<_BrutalReactionOverlay>
                 // Stamp: scale from big->1 in 0..0.18 (the "thud"), hold,
                 // fade out.
                 final inT = (t / 0.18).clamp(0.0, 1.0);
-                final scale = 2.4 - 1.4 * Curves.easeOutBack.transform(inT);
+                final scale =
+                    (2.4 + 0.8 * _weight) -
+                    (1.4 + 0.8 * _weight) * Curves.easeOutBack.transform(inT);
                 final alpha = t < 0.6
                     ? 1.0
                     : (1 - (t - 0.6) / 0.4).clamp(0.0, 1.0);
@@ -153,9 +158,11 @@ class _StampLabel extends StatelessWidget {
   }
 }
 
-/// SEND "STAMP": a hard downward slam onto its shadow on press.
+/// SEND "STAMP": a hard downward slam on press + a marching fill bar along the
+/// bottom edge while [isSending] (tension builds the longer the wait runs).
 class _BrutalStampSend extends StatefulWidget {
-  const _BrutalStampSend({required this.child});
+  const _BrutalStampSend({required this.isSending, required this.child});
+  final bool isSending;
   final Widget child;
 
   @override
@@ -163,31 +170,98 @@ class _BrutalStampSend extends StatefulWidget {
 }
 
 class _BrutalStampSendState extends State<_BrutalStampSend>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
+    with TickerProviderStateMixin {
+  late final AnimationController _press = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 140),
   );
+  // 0→1 over kTensionFullMs, then holds at 1 while still sending.
+  late final AnimationController _build = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: kTensionFullMs),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isSending) unawaited(_build.forward(from: 0));
+  }
+
+  @override
+  void didUpdateWidget(_BrutalStampSend old) {
+    super.didUpdateWidget(old);
+    if (widget.isSending && !_build.isAnimating && _build.value == 0) {
+      unawaited(_build.forward(from: 0));
+    } else if (!widget.isSending && _build.value != 0) {
+      _build
+        ..stop()
+        ..value = 0;
+    }
+  }
 
   @override
   void dispose() {
-    _c.dispose();
+    _press.dispose();
+    _build.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.appPalette.statusSuccess;
     return Listener(
-      onPointerDown: (_) => unawaited(_c.forward(from: 0)),
-      onPointerUp: (_) => unawaited(_c.reverse()),
+      onPointerDown: (_) => unawaited(_press.forward(from: 0)),
+      onPointerUp: (_) => unawaited(_press.reverse()),
       child: AnimatedBuilder(
-        animation: _c,
-        builder: (_, child) => Transform.translate(
-          offset: Offset(_c.value * 3, _c.value * 3),
-          child: child,
-        ),
+        animation: Listenable.merge([_press, _build]),
         child: widget.child,
+        builder: (_, child) => Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Transform.translate(
+              offset: Offset(_press.value * 3, _press.value * 3),
+              child: child,
+            ),
+            if (widget.isSending)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _MarchingBarPainter(
+                      tension: inFlightTension(
+                        (_build.value * kTensionFullMs).round(),
+                      ),
+                      color: accent,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// A hard fill bar along the bottom edge: width grows with tension; a marching
+/// dash pattern conveys "working".
+class _MarchingBarPainter extends CustomPainter {
+  _MarchingBarPainter({required this.tension, required this.color});
+  final double tension;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const h = 4.0;
+    final y = size.height - h;
+    final w = size.width * (0.15 + 0.85 * tension);
+    final paint = Paint()..color = color;
+    const dash = 10.0;
+    for (var x = 0.0; x < w; x += dash * 2) {
+      canvas.drawRect(Rect.fromLTWH(x, y, dash, h), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MarchingBarPainter old) =>
+      old.tension != tension || old.color != color;
 }
