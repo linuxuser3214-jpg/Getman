@@ -279,9 +279,9 @@ class _BrutalStampSendState extends State<_BrutalStampSend>
   @override
   void didUpdateWidget(_BrutalStampSend old) {
     super.didUpdateWidget(old);
-    if (widget.isSending && !_build.isAnimating) {
+    if (widget.isSending && !old.isSending) {
       unawaited(_build.forward(from: 0));
-    } else if (!widget.isSending && _build.value != 0) {
+    } else if (!widget.isSending && old.isSending) {
       _build
         ..stop()
         ..value = 0;

@@ -121,8 +121,8 @@ class _CalmReactionOverlayState extends State<_CalmReactionOverlay>
                   // heavier.
                   final t = _c.value;
                   final phase = (t * _blinks) % 1.0;
-                  final base = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
-                  final a = (base * (0.5 + 0.5 * _weight)).clamp(0.0, 1.0);
+                  final envelope = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+                  final a = (envelope * (0.5 + 0.5 * _weight)).clamp(0.0, 1.0);
                   return Container(
                     height: 3,
                     color: color.withValues(alpha: a),

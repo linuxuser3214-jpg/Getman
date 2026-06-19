@@ -70,6 +70,7 @@ class _RpgReactionOverlayState extends State<_RpgReactionOverlay>
   final math.Random _rng = math.Random();
 
   void _onReaction(ThemeReaction r) {
+    if (r.kind == ThemeReactionKind.sendStarted) return;
     final w = latencyWeight(r.durationMs);
     final spec = rpgSpecFor(flavorFor(r));
     final controller = AnimationController(
@@ -404,9 +405,9 @@ class _RpgSendAffordanceState extends State<_RpgSendAffordance>
         ..stop()
         ..value = 0;
     }
-    if (widget.isSending && !_build.isAnimating) {
+    if (widget.isSending && !old.isSending) {
       unawaited(_build.forward(from: 0));
-    } else if (!widget.isSending && _build.value != 0) {
+    } else if (!widget.isSending && old.isSending) {
       _build
         ..stop()
         ..value = 0;

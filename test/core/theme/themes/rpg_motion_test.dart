@@ -6,6 +6,7 @@ import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_motion.dart';
+import 'package:getman/core/theme/themes/rpg/rpg_theme.dart';
 
 void main() {
   test('reduced effects returns identity AppMotion', () {
@@ -156,4 +157,38 @@ void main() {
     expect(tester.takeException(), isNull);
     controller.dispose();
   });
+
+  testWidgets(
+    'A1: send build-up starts and stops via didUpdateWidget',
+    (tester) async {
+      final motion = rpgMotion(reduceEffects: false);
+      late StateSetter setOuter;
+      var sending = true;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, ss) {
+            setOuter = ss;
+            return MaterialApp(
+              theme: rpgTheme(Brightness.light),
+              home: Scaffold(
+                body: Center(
+                  child: motion.sendAffordance(
+                    context,
+                    isSending: sending,
+                    child: const Text('SEND'),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('SEND'), findsOneWidget);
+      // Flip isSending in place — triggers didUpdateWidget stop/reset path.
+      setOuter(() => sending = false);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

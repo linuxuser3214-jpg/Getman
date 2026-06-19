@@ -53,6 +53,10 @@ void main() {
       3,
     );
     expect(
+      calmSpecFor(StatusReactionFlavor.rateLimited, base, error).color,
+      error,
+    );
+    expect(
       calmSpecFor(StatusReactionFlavor.unauthorized, base, error).color,
       error,
     );

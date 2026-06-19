@@ -86,7 +86,6 @@ class _GlassReactionOverlayState extends State<_GlassReactionOverlay>
     );
     final effect = _GlassEffect(
       controller: controller,
-      isError: r.isError,
       weight: w,
       spec: spec,
       color: r.isError ? Theme.of(context).colorScheme.error : accent,
@@ -170,13 +169,11 @@ class _GlassReactionOverlayState extends State<_GlassReactionOverlay>
 class _GlassEffect {
   _GlassEffect({
     required this.controller,
-    required this.isError,
     required this.weight,
     required this.spec,
     required this.color,
   });
   final AnimationController controller;
-  final bool isError;
   final double weight;
   final GlassSpec spec;
   final Color color;
@@ -402,9 +399,9 @@ class _GlassSendAffordanceState extends State<_GlassSendAffordance>
   @override
   void didUpdateWidget(_GlassSendAffordance old) {
     super.didUpdateWidget(old);
-    if (widget.isSending && !_build.isAnimating) {
+    if (widget.isSending && !old.isSending) {
       unawaited(_build.forward(from: 0));
-    } else if (!widget.isSending && _build.value != 0) {
+    } else if (!widget.isSending && old.isSending) {
       _build
         ..stop()
         ..value = 0;
