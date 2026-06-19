@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/theme/themes/classic/classic_theme.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_theme.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_theme.dart';
 import 'package:getman/core/theme/themes/glass/glass_theme.dart';
@@ -29,6 +30,11 @@ class ThemeDescriptor {
 const String defaultThemeId = kBrutalistThemeId;
 
 const Map<String, ThemeDescriptor> appThemes = {
+  kClassicThemeId: ThemeDescriptor(
+    id: kClassicThemeId,
+    displayName: 'CLASSIC',
+    builder: classicTheme,
+  ),
   kBrutalistThemeId: ThemeDescriptor(
     id: kBrutalistThemeId,
     displayName: 'BRUTALIST',
