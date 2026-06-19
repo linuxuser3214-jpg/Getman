@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
+import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_motion.dart';
@@ -107,6 +108,50 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('app'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.takeException(), isNull);
+    controller.dispose();
+  });
+
+  test('A2: rpgSpecFor selects the right effect per flavor', () {
+    expect(rpgSpecFor(StatusReactionFlavor.created).style, RpgFx.sparkle);
+    expect(rpgSpecFor(StatusReactionFlavor.notModified).style, RpgFx.echo);
+    expect(rpgSpecFor(StatusReactionFlavor.unauthorized).style, RpgFx.ward);
+    expect(rpgSpecFor(StatusReactionFlavor.forbidden).style, RpgFx.ward);
+    expect(rpgSpecFor(StatusReactionFlavor.notFound).style, RpgFx.scatter);
+    expect(rpgSpecFor(StatusReactionFlavor.serverCrash).style, RpgFx.crack);
+    expect(rpgSpecFor(StatusReactionFlavor.rateLimited).repeat, 3);
+  });
+
+  testWidgets('A2: rpg overlay survives every mapped status code', (
+    tester,
+  ) async {
+    final motion = rpgMotion(reduceEffects: false);
+    final controller = ThemeReactionController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: motion.reactionOverlay(
+              context,
+              controller: controller,
+              child: const Text('app'),
+            ),
+          ),
+        ),
+      ),
+    );
+    for (final code in [201, 204, 304, 401, 403, 404, 408, 429, 500, 503]) {
+      controller.fire(
+        ThemeReaction(
+          kind: ThemeReaction.kindForStatus(code),
+          statusCode: code,
+          durationMs: 400,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(find.text('app'), findsOneWidget, reason: 'code=$code');
+    }
     await tester.pump(const Duration(seconds: 2));
     expect(tester.takeException(), isNull);
     controller.dispose();

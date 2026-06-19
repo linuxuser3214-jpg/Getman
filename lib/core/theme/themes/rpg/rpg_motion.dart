@@ -6,9 +6,41 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
 import 'package:getman/core/theme/motion/latency_weight.dart';
 import 'package:getman/core/theme/motion/reaction_stage.dart';
+import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
+
+/// Visual effect style for the Arcane (rpg) reaction overlay.
+enum RpgFx { sparkle, echo, ward, scatter, crack }
+
+/// Parameters that drive a single rpg reaction effect.
+class RpgSpec {
+  const RpgSpec(this.style, {this.repeat = 1, this.amplitude = 1.0});
+  final RpgFx style;
+  final int repeat;
+  final double amplitude;
+}
+
+/// Selects the [RpgSpec] for a given [StatusReactionFlavor].
+RpgSpec rpgSpecFor(StatusReactionFlavor f) => switch (f) {
+  StatusReactionFlavor.noContent => const RpgSpec(
+    RpgFx.sparkle,
+    amplitude: 0.4,
+  ),
+  StatusReactionFlavor.notModified => const RpgSpec(RpgFx.echo),
+  StatusReactionFlavor.unauthorized ||
+  StatusReactionFlavor.forbidden => const RpgSpec(RpgFx.ward),
+  StatusReactionFlavor.notFound => const RpgSpec(RpgFx.scatter),
+  StatusReactionFlavor.timeout => const RpgSpec(RpgFx.sparkle, amplitude: 0.5),
+  StatusReactionFlavor.rateLimited => const RpgSpec(RpgFx.sparkle, repeat: 3),
+  StatusReactionFlavor.serverCrash ||
+  StatusReactionFlavor.serverError ||
+  StatusReactionFlavor.clientError ||
+  StatusReactionFlavor.networkError ||
+  StatusReactionFlavor.serviceUnavailable => const RpgSpec(RpgFx.crack),
+  _ => const RpgSpec(RpgFx.sparkle),
+};
 
 /// Arcane Quest motion: a golden sparkle shower ("spell lands") on success, a
 /// crimson runic crack + a brief screen shake on error, and a spinning rune
@@ -39,6 +71,7 @@ class _RpgReactionOverlayState extends State<_RpgReactionOverlay>
 
   void _onReaction(ThemeReaction r) {
     final w = latencyWeight(r.durationMs);
+    final spec = rpgSpecFor(flavorFor(r));
     final controller = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 900 + (500 * w).round()),
@@ -48,6 +81,7 @@ class _RpgReactionOverlayState extends State<_RpgReactionOverlay>
       isError: r.isError,
       seed: _rng.nextInt(1 << 30),
       weight: w,
+      spec: spec,
     );
     controller.addStatusListener((s) {
       if (s == AnimationStatus.completed && mounted) {
@@ -96,16 +130,25 @@ class _RpgReactionOverlayState extends State<_RpgReactionOverlay>
                   Positioned.fill(
                     child: IgnorePointer(
                       child: CustomPaint(
-                        painter: e.isError
-                            ? _RunicCrackPainter(
-                                t: e.controller.value,
-                                seed: e.seed,
-                              )
-                            : _SparkleShowerPainter(
-                                t: e.controller.value,
-                                seed: e.seed,
-                                weight: e.weight,
-                              ),
+                        painter: switch (e.spec.style) {
+                          RpgFx.crack => _RunicCrackPainter(
+                            t: e.controller.value,
+                            seed: e.seed,
+                          ),
+                          RpgFx.ward => _WardPainter(t: e.controller.value),
+                          RpgFx.scatter => _MoteScatterPainter(
+                            t: e.controller.value,
+                            seed: e.seed,
+                          ),
+                          RpgFx.echo => _RuneEchoPainter(t: e.controller.value),
+                          RpgFx.sparkle => _SparkleShowerPainter(
+                            t: e.controller.value,
+                            seed: e.seed,
+                            weight: e.weight,
+                            repeat: e.spec.repeat,
+                            amplitude: e.spec.amplitude,
+                          ),
+                        },
                       ),
                     ),
                   ),
@@ -124,11 +167,13 @@ class _RpgEffect {
     required this.isError,
     required this.seed,
     required this.weight,
+    required this.spec,
   });
   final AnimationController controller;
   final bool isError;
   final int seed;
   final double weight;
+  final RpgSpec spec;
 }
 
 /// Gold sparkles rain from the top + a gold shimmer sweep.
@@ -137,20 +182,26 @@ class _SparkleShowerPainter extends CustomPainter {
     required this.t,
     required this.seed,
     required this.weight,
+    this.repeat = 1,
+    this.amplitude = 1.0,
   });
   final double t;
   final int seed;
   final double weight;
+  final int repeat;
+  final double amplitude;
 
   @override
   void paint(Canvas canvas, Size size) {
     final rng = math.Random(seed);
     final core = Paint();
-    final count = 36 + (weight * 30).round();
+    final count = ((36 + (weight * 30).round()) * amplitude).round();
+    // For repeat > 1, phase time so sparkles fall in staggered waves.
+    final tPhased = repeat > 1 ? (t * repeat) % 1.0 : t;
     for (var i = 0; i < count; i++) {
       final x = rng.nextDouble() * size.width;
       final delay = rng.nextDouble() * 0.3;
-      final p = ((t - delay) / (1 - delay)).clamp(0.0, 1.0);
+      final p = ((tPhased - delay) / (1 - delay)).clamp(0.0, 1.0);
       if (p <= 0) continue;
       final y = Curves.easeIn.transform(p) * size.height;
       final alpha = (1 - p).clamp(0.0, 1.0);
@@ -178,7 +229,10 @@ class _SparkleShowerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SparkleShowerPainter old) =>
-      old.t != t || old.weight != weight;
+      old.t != t ||
+      old.weight != weight ||
+      old.repeat != repeat ||
+      old.amplitude != amplitude;
 }
 
 /// Crimson runic crack flash + dark vignette pulse.
@@ -222,6 +276,91 @@ class _RunicCrackPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RunicCrackPainter old) => old.t != t;
+}
+
+/// Hexagonal arcane ward that flares then fades — "blocked by magic".
+class _WardPainter extends CustomPainter {
+  _WardPainter({required this.t});
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final flare = math.sin(t.clamp(0.0, 1.0) * math.pi).clamp(0.0, 1.0);
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide * 0.32;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..color = RpgPalette.arcane.withValues(alpha: 0.8 * flare);
+    final path = Path();
+    for (var i = 0; i < 6; i++) {
+      final a = -math.pi / 2 + i * (math.pi * 2 / 6);
+      final p = center + Offset(math.cos(a), math.sin(a)) * radius;
+      if (i == 0) {
+        path.moveTo(p.dx, p.dy);
+      } else {
+        path.lineTo(p.dx, p.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _WardPainter old) => old.t != t;
+}
+
+/// Motes scatter outward and wink out — "vanished / not found".
+class _MoteScatterPainter extends CustomPainter {
+  _MoteScatterPainter({required this.t, required this.seed});
+  final double t;
+  final int seed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = math.Random(seed);
+    final center = size.center(Offset.zero);
+    final fade = (1 - t).clamp(0.0, 1.0);
+    final core = Paint();
+    for (var i = 0; i < 28; i++) {
+      final a = rng.nextDouble() * math.pi * 2;
+      final dist =
+          Curves.easeOut.transform(t) *
+          size.shortestSide *
+          (0.2 + rng.nextDouble() * 0.4);
+      final p = center + Offset(math.cos(a), math.sin(a)) * dist;
+      core.color =
+          (rng.nextDouble() < 0.8 ? RpgPalette.gold : RpgPalette.arcane)
+              .withValues(alpha: fade);
+      canvas.drawCircle(p, 1.5 + rng.nextDouble() * 2, core);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MoteScatterPainter old) => old.t != t;
+}
+
+/// A translucent rune doubles and drifts — déjà-vu (304 not-modified).
+class _RuneEchoPainter extends CustomPainter {
+  _RuneEchoPainter({required this.t});
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final fade = math.sin(t.clamp(0.0, 1.0) * math.pi).clamp(0.0, 1.0);
+    for (var k = 0; k < 2; k++) {
+      final r = size.shortestSide * (0.18 + k * 0.04);
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = RpgPalette.arcane.withValues(alpha: (0.5 - k * 0.2) * fade);
+      canvas.drawCircle(center + Offset(k * 10.0, 0), r, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RuneEchoPainter old) => old.t != t;
 }
 
 /// Spinning rune ring around SEND while [isSending].
