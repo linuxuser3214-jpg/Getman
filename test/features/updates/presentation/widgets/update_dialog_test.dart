@@ -4,7 +4,6 @@ import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/features/updates/domain/entities/release_info.dart';
 import 'package:getman/features/updates/domain/repositories/update_repository.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
-import 'package:getman/features/updates/presentation/update_phase.dart';
 import 'package:getman/features/updates/presentation/widgets/update_dialog.dart';
 import 'package:provider/provider.dart';
 
@@ -36,20 +35,36 @@ void main() {
     expect(find.byKey(const ValueKey('update_now_button')), findsOneWidget);
   });
 
-  testWidgets('shows downloading spinner when phase is downloading', (t) async {
+  testWidgets('UPDATE NOW invokes startUpdate and closes the dialog', (
+    t,
+  ) async {
     final controller = UpdateController(_FakeUpdateRepository());
+    var started = false;
+    controller.startUpdate = () async => started = true;
 
     await t.pumpWidget(
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
         home: ChangeNotifierProvider<UpdateController>.value(
           value: controller,
-          child: Builder(
-            builder: (context) => const Scaffold(
-              body: UpdateDialog(
-                latestVersion: '1.1.0',
-                currentVersion: '1.0.0',
-                changelog: null,
+          child: Scaffold(
+            body: Builder(
+              builder: (context) => Center(
+                child: ElevatedButton(
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) =>
+                        ChangeNotifierProvider<UpdateController>.value(
+                          value: controller,
+                          child: const UpdateDialog(
+                            latestVersion: '1.1.0',
+                            currentVersion: '1.0.0',
+                            changelog: null,
+                          ),
+                        ),
+                  ),
+                  child: const Text('open'),
+                ),
               ),
             ),
           ),
@@ -57,13 +72,15 @@ void main() {
       ),
     );
 
-    // Spinner should not be visible before downloading starts.
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await t.tap(find.text('open'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('update_now_button')), findsOneWidget);
 
-    controller.updateFromGate(phase: UpdatePhase.downloading);
-    await t.pump();
+    await t.tap(find.byKey(const ValueKey('update_now_button')));
+    await t.pumpAndSettle();
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.text('Downloading…'), findsOneWidget);
+    expect(started, isTrue);
+    // Dialog is dismissed after the hand-off.
+    expect(find.byKey(const ValueKey('update_now_button')), findsNothing);
   });
 }

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -12,12 +11,16 @@ import 'package:getman/features/updates/presentation/update_decision.dart';
 import 'package:getman/features/updates/presentation/update_phase.dart';
 import 'package:getman/features/updates/presentation/widgets/update_dialog.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:updat/updat.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-/// Invisible widget mounted in `MainScreen`. Hosts one `UpdatWidget` that
-/// checks GitHub on mount, bridges its callbacks into [UpdateController], and
-/// shows the themed [UpdateDialog] / snackbars per the prompt decision.
+/// Invisible widget mounted in `MainScreen`. Hosts one `UpdatWidget` purely for
+/// the GitHub version *check*, bridges its callbacks into [UpdateController],
+/// and shows the themed [UpdateDialog] / snackbars per the prompt decision.
+///
+/// Note: the actual download is intentionally handed to the user's browser
+/// (see `_openDownloadInBrowser`), not performed in-process, so this gate
+/// never drives `updat`'s download/install flow.
 class UpdateGate extends StatefulWidget {
   const UpdateGate({super.key});
 
@@ -27,15 +30,12 @@ class UpdateGate extends StatefulWidget {
 
 class _UpdateGateState extends State<UpdateGate> {
   String? _currentVersion;
-  String? _downloadPath;
 
   static const _appName = 'getman';
 
-  /// Native macOS channel that opens the downloaded installer via NSWorkspace
-  /// (sandbox-safe). Registered in `macos/Runner/MainFlutterWindow.swift`.
-  static const MethodChannel _installerChannel = MethodChannel(
-    'getman/installer',
-  );
+  /// Where to send the browser when no matching asset URL is known.
+  static const _releasesUrl =
+      'https://github.com/thiagomiranda3/Getman/releases/latest';
 
   bool get _supported =>
       Platform.isMacOS || Platform.isWindows || Platform.isLinux;
@@ -71,8 +71,9 @@ class _UpdateGateState extends State<UpdateGate> {
       getLatestVersion: () => _getLatestVersion(controller),
       getChangelog: (latestVer, appVer) async =>
           controller.cachedRelease?.changelog,
+      // Required by UpdatWidget but never invoked: we hand the download to the
+      // browser rather than calling updat's in-process `startUpdate()`.
       getBinaryUrl: (_) async => controller.cachedRelease?.assetUrl ?? '',
-      getDownloadFileLocation: _downloadLocation,
       callback: (status) => _onStatus(context, controller, status),
       updateChipBuilder:
           ({
@@ -87,20 +88,21 @@ class _UpdateGateState extends State<UpdateGate> {
             required dismissUpdate,
           }) {
             // Capture the callbacks synchronously — plain field assignments,
-            // no listener notification.
+            // no listener notification. `startUpdate` is repointed at the
+            // browser hand-off instead of updat's downloader. It is assigned
+            // last and with a block body: a trailing `=> expr` in a cascade
+            // would bind the next `..` to the closure's return value.
             controller
               ..triggerCheck = checkForUpdate
-              // updat's startUpdate is void Function(); wrap to match
-              // UpdateController.startUpdate which is Future<void> Function()?
-              ..startUpdate = () async {
-                startUpdate();
-              }
-              ..dismiss = dismissUpdate;
+              ..dismiss = dismissUpdate
+              ..startUpdate = () {
+                return _openDownloadInBrowser(controller);
+              };
 
             // Defer the notifying updateFromGate call out of build, mirroring
             // _onStatus, to avoid "markNeedsBuild called during build" when
-            // updat rebuilds the chip (e.g. on downloading state change) while
-            // the UpdateDialog's AnimatedBuilder is already listening.
+            // updat rebuilds the chip while the UpdateDialog's AnimatedBuilder
+            // is already listening.
             final mappedPhase = _mapPhase(status);
             final capturedLatest = latestVersion;
             final capturedChangelog = controller.cachedRelease?.changelog;
@@ -130,21 +132,34 @@ class _UpdateGateState extends State<UpdateGate> {
     return release?.version;
   }
 
-  Future<File> _downloadLocation(String? version) async {
-    final controller = context.read<UpdateController>();
-    // macOS runs under the App Sandbox, where ~/Downloads is off-limits
-    // without a shared-folder entitlement (and that entitlement isn't
-    // reliably present). The app's own support directory is always writable
-    // inside the container, and NSWorkspace can still open the .dmg from
-    // there. Other platforms aren't sandboxed, so keep using ~/Downloads.
-    final dir = Platform.isMacOS
-        ? await getApplicationSupportDirectory()
-        : (await getDownloadsDirectory() ?? await getTemporaryDirectory());
-    final url = controller.cachedRelease?.assetUrl ?? '';
-    final ext = url.contains('.') ? url.split('.').last : 'bin';
-    final path = '${dir.path}${Platform.pathSeparator}getman-$version.$ext';
-    _downloadPath = path;
-    return File(path);
+  /// Opens the release download in the user's default browser instead of
+  /// fetching it in-process.
+  ///
+  /// A file written by this *sandboxed* app over the network is stamped with a
+  /// strict `com.apple.quarantine` flag (agent = us) that macOS escalates into
+  /// a "damaged and can't be opened" Gatekeeper block on our un-notarized app —
+  /// even though the bytes are byte-identical to the GitHub asset. The sandbox
+  /// forbids us from clearing that attribute ourselves (verified: `removexattr`
+  /// fails with EPERM). A browser download instead carries a benign quarantine
+  /// that opens normally, so we route the user there.
+  Future<void> _openDownloadInBrowser(UpdateController controller) async {
+    final url = controller.cachedRelease?.assetUrl ?? _releasesUrl;
+    final uri = Uri.tryParse(url);
+    var ok = false;
+    if (uri != null) {
+      try {
+        ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } on Exception {
+        ok = false;
+      }
+    }
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      ok
+          ? 'Opening the download in your browser…'
+          : "Couldn't open your browser. Download from $_releasesUrl",
+    );
   }
 
   void _onStatus(
@@ -155,9 +170,6 @@ class _UpdateGateState extends State<UpdateGate> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final mapped = _mapPhase(status);
-      // Capture the phase we're leaving before updateFromGate overwrites it, so
-      // an error after a download can be distinguished from a failed check.
-      final wasDownloading = controller.phase == UpdatePhase.downloading;
       controller.updateFromGate(phase: mapped);
 
       switch (mapped) {
@@ -169,23 +181,18 @@ class _UpdateGateState extends State<UpdateGate> {
             showAppSnackBar(context, "You're on the latest version.");
           }
         case UpdatePhase.error:
-          // Always surface a failed download (the user explicitly pressed
-          // UPDATE NOW) so it never silently does nothing; a failed background
-          // check stays quiet unless it was a manual check.
-          if (controller.manualInFlight || wasDownloading) {
+          // A failed *check* only matters to surface when the user explicitly
+          // pressed "Check for updates"; background checks stay quiet.
+          if (controller.manualInFlight) {
             controller.manualInFlight = false;
-            showAppSnackBar(
-              context,
-              wasDownloading
-                  ? 'Update download failed. Please try again later.'
-                  : "Couldn't check for updates.",
-            );
+            showAppSnackBar(context, "Couldn't check for updates.");
           }
-        case UpdatePhase.readyToInstall:
-          unawaited(_launchInstaller());
+        // The download/install phases never occur now that the browser handles
+        // the download, but the switch over UpdatStatus must stay exhaustive.
         case UpdatePhase.idle:
         case UpdatePhase.checking:
         case UpdatePhase.downloading:
+        case UpdatePhase.readyToInstall:
         case UpdatePhase.dismissed:
           break;
       }
@@ -220,35 +227,6 @@ class _UpdateGateState extends State<UpdateGate> {
         settingsBloc: context.read<SettingsBloc>(),
       ),
     );
-  }
-
-  Future<void> _launchInstaller() async {
-    final path = _downloadPath;
-    if (path == null) return;
-    try {
-      if (Platform.isMacOS) {
-        // The App Sandbox forbids exec'ing `/usr/bin/open`, so mount the .dmg
-        // via the native NSWorkspace channel (brokered by LaunchServices,
-        // permitted under the sandbox) instead of Process.run. Then quit:
-        // macOS won't let the user replace a running .app bundle, so the app
-        // must exit for the drag-install to succeed. The mounted volume +
-        // Finder window are owned by the system and survive our exit.
-        await _installerChannel.invokeMethod<bool>('openInstaller', {
-          'path': path,
-        });
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-        exit(0);
-      } else if (Platform.isWindows) {
-        await Process.start(path, [], mode: ProcessStartMode.detached);
-        exit(0);
-      } else if (Platform.isLinux) {
-        await Process.run('chmod', ['+x', path]);
-        final parent = File(path).parent.path;
-        await Process.run('xdg-open', [parent]);
-      }
-    } on Exception {
-      if (mounted) showAppSnackBar(context, 'Could not open the installer.');
-    }
   }
 
   UpdatePhase _mapPhase(UpdatStatus s) => switch (s) {

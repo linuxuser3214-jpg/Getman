@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -5,19 +7,18 @@ import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
-import 'package:getman/features/updates/presentation/update_phase.dart';
 import 'package:provider/provider.dart';
 
 /// Themed dialog shown when an update is available. Shows the version line,
-/// optional changelog, an unsigned-app note, and three actions: SKIP THIS
-/// VERSION, LATER, and UPDATE NOW. The body switches to a downloading spinner
-/// while [UpdateController.phase] == [UpdatePhase.downloading].
+/// optional changelog, a note about how the download works, and three actions:
+/// SKIP THIS VERSION, LATER, and UPDATE NOW. UPDATE NOW opens the release
+/// download in the user's browser (see `update_gate_io._openDownloadInBrowser`)
+/// and closes the dialog.
 ///
 /// Normally opened via [UpdateDialog.show], which injects [UpdateController]
 /// via [ChangeNotifierProvider] and [SettingsBloc] via [BlocProvider]. The
 /// widget tolerates a missing [UpdateController] in the tree (render-only
-/// tests): controller callbacks become no-ops and the downloading branch is
-/// never entered.
+/// tests): controller callbacks become no-ops.
 class UpdateDialog extends StatelessWidget {
   const UpdateDialog({
     required this.latestVersion,
@@ -70,28 +71,14 @@ class UpdateDialog extends StatelessWidget {
     final layout = context.appLayout;
     final controller = _controller(context);
 
-    final body = controller != null
-        ? AnimatedBuilder(
-            animation: controller,
-            builder: (ctx, _) => _DialogBody(
-              latestVersion: latestVersion,
-              currentVersion: currentVersion,
-              changelog: changelog,
-              controller: controller,
-              layout: layout,
-            ),
-          )
-        : _DialogBody(
-            latestVersion: latestVersion,
-            currentVersion: currentVersion,
-            changelog: changelog,
-            controller: null,
-            layout: layout,
-          );
-
     return ResponsiveDialogScaffold(
       title: const Text('UPDATE AVAILABLE'),
-      content: body,
+      content: _DialogBody(
+        latestVersion: latestVersion,
+        currentVersion: currentVersion,
+        changelog: changelog,
+        layout: layout,
+      ),
       actions: [
         TextButton(
           key: const ValueKey('update_skip_button'),
@@ -113,7 +100,10 @@ class UpdateDialog extends StatelessWidget {
         ),
         TextButton(
           key: const ValueKey('update_now_button'),
-          onPressed: () => controller?.startUpdate?.call(),
+          onPressed: () {
+            unawaited(controller?.startUpdate?.call());
+            Navigator.pop(context);
+          },
           style: TextButton.styleFrom(
             foregroundColor: Theme.of(context).colorScheme.primary,
           ),
@@ -124,26 +114,22 @@ class UpdateDialog extends StatelessWidget {
   }
 }
 
-/// Stateless body content for [UpdateDialog]. Separated so [AnimatedBuilder]
-/// can rebuild only the body when the controller notifies.
+/// Stateless body content for [UpdateDialog].
 class _DialogBody extends StatelessWidget {
   const _DialogBody({
     required this.latestVersion,
     required this.currentVersion,
     required this.changelog,
-    required this.controller,
     required this.layout,
   });
 
   final String latestVersion;
   final String currentVersion;
   final String? changelog;
-  final UpdateController? controller;
   final AppLayout layout;
 
   @override
   Widget build(BuildContext context) {
-    final downloading = controller?.phase == UpdatePhase.downloading;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,28 +151,11 @@ class _DialogBody extends StatelessWidget {
           ),
         SizedBox(height: layout.tabSpacing),
         Text(
-          'Getman is not code-signed, so your OS may warn on first '
-          'launch — allow it via right-click → Open (macOS) or '
-          'More info → Run anyway (Windows).',
+          'UPDATE NOW opens the download in your browser. Getman is not '
+          'code-signed, so your OS may warn on first launch — allow it via '
+          'right-click → Open (macOS) or More info → Run anyway (Windows).',
           style: TextStyle(fontSize: layout.fontSizeSmall),
         ),
-        if (downloading) ...[
-          SizedBox(height: layout.tabSpacing),
-          Row(
-            children: [
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              SizedBox(width: layout.tabSpacing),
-              Text(
-                'Downloading…',
-                style: TextStyle(fontSize: layout.fontSizeSmall),
-              ),
-            ],
-          ),
-        ],
       ],
     );
   }

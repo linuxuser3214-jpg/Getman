@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **macOS: "Update now" no longer produces an app that won't open** — the
+  in-app updater used to download the `.dmg` itself, but a file written by the
+  sandboxed app is flagged by macOS in a way that makes the dragged-out app get
+  blocked as "damaged" on this un-notarized build (the download was never
+  actually corrupted — it is byte-identical to the release). **Update now** now
+  opens the download in your default browser instead, which installs cleanly.
+  As before, on first launch allow it via right-click → Open.
 - **Paste cURL on Windows and the web** — pasting a multi-line `curl` command
   (one that uses `\` line continuations) into the URL bar now fills in the
   method, headers, and body on every platform. Previously only the URL was
