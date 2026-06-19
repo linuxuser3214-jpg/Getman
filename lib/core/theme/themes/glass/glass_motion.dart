@@ -6,8 +6,46 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
 import 'package:getman/core/theme/motion/latency_weight.dart';
 import 'package:getman/core/theme/motion/reaction_stage.dart';
+import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
+
+/// The visual style of a glass reaction effect.
+enum GlassFx { ripple, echo, barrier, shards, flicker, crack }
+
+/// Per-flavor spec: which [GlassFx], how many ring-sets, and amplitude scale.
+class GlassSpec {
+  const GlassSpec(this.style, {this.repeat = 1, this.amplitude = 1.0});
+  final GlassFx style;
+  final int repeat; // e.g. 3 for rateLimited cooldown rings
+  final double amplitude; // scales maxR: 0.4 for 204 (small), 0.5 for timeout
+}
+
+/// Maps a [StatusReactionFlavor] to the [GlassSpec] that drives its painter.
+GlassSpec glassSpecFor(StatusReactionFlavor f) => switch (f) {
+  StatusReactionFlavor.noContent => const GlassSpec(
+    GlassFx.ripple,
+    amplitude: 0.4,
+  ),
+  StatusReactionFlavor.notModified => const GlassSpec(GlassFx.echo),
+  StatusReactionFlavor.unauthorized ||
+  StatusReactionFlavor.forbidden => const GlassSpec(GlassFx.barrier),
+  StatusReactionFlavor.notFound => const GlassSpec(GlassFx.shards),
+  StatusReactionFlavor.timeout => const GlassSpec(
+    GlassFx.ripple,
+    amplitude: 0.5,
+  ),
+  StatusReactionFlavor.rateLimited => const GlassSpec(
+    GlassFx.ripple,
+    repeat: 3,
+  ),
+  StatusReactionFlavor.serviceUnavailable => const GlassSpec(GlassFx.flicker),
+  StatusReactionFlavor.serverCrash ||
+  StatusReactionFlavor.serverError ||
+  StatusReactionFlavor.clientError ||
+  StatusReactionFlavor.networkError => const GlassSpec(GlassFx.crack),
+  _ => const GlassSpec(GlassFx.ripple),
+};
 
 /// Liquid Glass motion: a concentric ripple bloom on success, a crack-and-heal
 /// on error, and a liquid ripple from the SEND button on press. Identity when
@@ -36,8 +74,10 @@ class _GlassReactionOverlayState extends State<_GlassReactionOverlay>
   final List<_GlassEffect> _effects = [];
 
   void _onReaction(ThemeReaction r) {
+    if (r.kind == ThemeReactionKind.sendStarted) return;
     final accent = Theme.of(context).primaryColor;
     final w = latencyWeight(r.durationMs);
+    final spec = glassSpecFor(flavorFor(r));
     final controller = AnimationController(
       vsync: this,
       duration: r.isError
@@ -48,6 +88,7 @@ class _GlassReactionOverlayState extends State<_GlassReactionOverlay>
       controller: controller,
       isError: r.isError,
       weight: w,
+      spec: spec,
       color: r.isError ? Theme.of(context).colorScheme.error : accent,
     );
     controller.addStatusListener((s) {
@@ -82,16 +123,39 @@ class _GlassReactionOverlayState extends State<_GlassReactionOverlay>
                 child: AnimatedBuilder(
                   animation: e.controller,
                   builder: (_, child) => CustomPaint(
-                    painter: e.isError
-                        ? _GlassCrackPainter(
-                            t: e.controller.value,
-                            color: e.color,
-                          )
-                        : _GlassRipplePainter(
-                            t: e.controller.value,
-                            color: e.color,
-                            weight: e.weight,
-                          ),
+                    painter: switch (e.spec.style) {
+                      GlassFx.crack => _GlassCrackPainter(
+                        t: e.controller.value,
+                        color: e.color,
+                      ),
+                      GlassFx.barrier => _GlassBarrierPainter(
+                        t: e.controller.value,
+                        color: e.color,
+                      ),
+                      GlassFx.shards => _GlassShardPainter(
+                        t: e.controller.value,
+                        color: e.color,
+                      ),
+                      GlassFx.echo => _GlassRipplePainter(
+                        t: e.controller.value,
+                        color: e.color,
+                        weight: e.weight,
+                        echo: true,
+                      ),
+                      GlassFx.flicker => _GlassRipplePainter(
+                        t: e.controller.value,
+                        color: e.color,
+                        weight: e.weight,
+                        flicker: true,
+                      ),
+                      GlassFx.ripple => _GlassRipplePainter(
+                        t: e.controller.value,
+                        color: e.color,
+                        weight: e.weight,
+                        repeat: e.spec.repeat,
+                        amplitude: e.spec.amplitude,
+                      ),
+                    },
                     child: child,
                   ),
                 ),
@@ -108,38 +172,78 @@ class _GlassEffect {
     required this.controller,
     required this.isError,
     required this.weight,
+    required this.spec,
     required this.color,
   });
   final AnimationController controller;
   final bool isError;
   final double weight;
+  final GlassSpec spec;
   final Color color;
 }
 
 /// Concentric ripple sweep from screen center + a soft accent bloom that fades.
 /// [weight] (0..1) adds extra rings and grows the bloom for slow responses.
+/// [echo] draws a second offset ghost ring (notModified).
+/// [flicker] modulates alpha by sin (serviceUnavailable).
+/// [repeat] draws N ring-sets at staggered phases (rateLimited).
+/// [amplitude] scales maxR (noContent=0.4, timeout=0.5).
 class _GlassRipplePainter extends CustomPainter {
-  _GlassRipplePainter({required this.t, required this.color, this.weight = 0});
+  _GlassRipplePainter({
+    required this.t,
+    required this.color,
+    this.weight = 0,
+    this.echo = false,
+    this.flicker = false,
+    this.repeat = 1,
+    this.amplitude = 1.0,
+  });
   final double t;
   final Color color;
   final double weight;
+  final bool echo;
+  final bool flicker;
+  final int repeat;
+  final double amplitude;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
-    final maxR = size.longestSide * 0.75 * (1 + 0.25 * weight);
-    final fade = (1.0 - t).clamp(0.0, 1.0);
+    final maxR = size.longestSide * 0.75 * amplitude * (1 + 0.25 * weight);
+    final rawFade = (1.0 - t).clamp(0.0, 1.0);
+    final fade = flicker
+        ? rawFade * (0.5 + 0.5 * math.sin(t * math.pi * 8).abs())
+        : rawFade;
     final rings = 3 + (weight * 2).round();
-    for (var i = 0; i < rings; i++) {
-      final phase = (t - i * 0.12).clamp(0.0, 1.0);
-      if (phase <= 0) continue;
-      final r = Curves.easeOut.transform(phase) * maxR;
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
-        ..color = color.withValues(alpha: 0.28 * fade);
-      canvas.drawCircle(center, r, paint);
+
+    for (var rep = 0; rep < repeat; rep++) {
+      final phaseOffset = rep * (1.0 / repeat);
+      final tRep = ((t - phaseOffset) % 1.0).clamp(0.0, 1.0);
+      for (var i = 0; i < rings; i++) {
+        final phase = (tRep - i * 0.12).clamp(0.0, 1.0);
+        if (phase <= 0) continue;
+        final r = Curves.easeOut.transform(phase) * maxR;
+        final paint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0
+          ..color = color.withValues(alpha: 0.28 * fade);
+        canvas.drawCircle(center, r, paint);
+      }
     }
+
+    if (echo) {
+      // Second ghost ring offset in time — the "echo" of a cached response.
+      final ghostPhase = (t - 0.2).clamp(0.0, 1.0);
+      if (ghostPhase > 0) {
+        final r = Curves.easeOut.transform(ghostPhase) * maxR;
+        final ghost = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0
+          ..color = color.withValues(alpha: 0.14 * fade);
+        canvas.drawCircle(center, r, ghost);
+      }
+    }
+
     // Soft central bloom.
     final bloom = Paint()
       ..shader = RadialGradient(
@@ -153,7 +257,13 @@ class _GlassRipplePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GlassRipplePainter old) =>
-      old.t != t || old.color != color || old.weight != weight;
+      old.t != t ||
+      old.color != color ||
+      old.weight != weight ||
+      old.echo != echo ||
+      old.flicker != flicker ||
+      old.repeat != repeat ||
+      old.amplitude != amplitude;
 }
 
 /// A thin crack-line spider that snaps in (0..0.4) then heals/fades (0.4..1).
@@ -199,6 +309,65 @@ class _GlassCrackPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GlassCrackPainter old) =>
+      old.t != t || old.color != color;
+}
+
+/// A frosted pane that slams down from the top then settles — "blocked".
+class _GlassBarrierPainter extends CustomPainter {
+  _GlassBarrierPainter({required this.t, required this.color});
+  final double t;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final drop = Curves.easeOutBack.transform((t / 0.4).clamp(0.0, 1.0));
+    final fade = (1 - (t - 0.5).clamp(0.0, 0.5) / 0.5).clamp(0.0, 1.0);
+    final h = size.height * 0.5 * drop;
+    final pane = Paint()..color = color.withValues(alpha: 0.16 * fade);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, h), pane);
+    final edge = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = color.withValues(alpha: 0.5 * fade);
+    canvas.drawLine(Offset(0, h), Offset(size.width, h), edge);
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlassBarrierPainter old) =>
+      old.t != t || old.color != color;
+}
+
+/// The surface fractures into a few triangular shards that drift and fade.
+class _GlassShardPainter extends CustomPainter {
+  _GlassShardPainter({required this.t, required this.color});
+  final double t;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = math.Random(11);
+    final center = size.center(Offset.zero);
+    final fade = (1 - t).clamp(0.0, 1.0);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = color.withValues(alpha: 0.5 * fade);
+    for (var i = 0; i < 9; i++) {
+      final a = i * (math.pi * 2 / 9) + rng.nextDouble() * 0.3;
+      final dir = Offset(math.cos(a), math.sin(a));
+      final drift = Curves.easeOut.transform(t) * size.shortestSide * 0.4;
+      final p = center + dir * (20 + drift);
+      final path = Path()
+        ..moveTo(p.dx, p.dy)
+        ..lineTo(p.dx + 12, p.dy + 6)
+        ..lineTo(p.dx + 4, p.dy + 16)
+        ..close();
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlassShardPainter old) =>
       old.t != t || old.color != color;
 }
 
