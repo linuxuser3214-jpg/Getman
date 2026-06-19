@@ -334,6 +334,10 @@ class BodyTabView extends StatelessWidget {
         return FormDataEditor(tabId: tabId, allowFiles: true);
       case BodyType.binary:
         return _BinaryBodyPicker(tabId: tabId);
+      case BodyType.graphql:
+        // Real dual-pane editor + visible chip land in the editor task; the
+        // chip is hidden for now (no _labels entry), so this is unreachable.
+        return _RawBodyEditor(controller: controller);
     }
   }
 }
@@ -364,21 +368,22 @@ class _BodyTypeSelector extends StatelessWidget {
         runSpacing: layout.tabSpacing,
         children: [
           for (final type in BodyType.values)
-            _BodyTypeChip(
-              key: ValueKey('bodytype_${_labels[type]!}'),
-              label: _labels[type]!,
-              active: type == active,
-              onTap: () {
-                final bloc = context.read<TabsBloc>();
-                final tab = bloc.state.tabs.byId(tabId);
-                if (tab == null || tab.config.bodyType == type) return;
-                bloc.add(
-                  UpdateTab(
-                    tab.copyWith(config: tab.config.copyWith(bodyType: type)),
-                  ),
-                );
-              },
-            ),
+            if (_labels.containsKey(type))
+              _BodyTypeChip(
+                key: ValueKey('bodytype_${_labels[type]!}'),
+                label: _labels[type]!,
+                active: type == active,
+                onTap: () {
+                  final bloc = context.read<TabsBloc>();
+                  final tab = bloc.state.tabs.byId(tabId);
+                  if (tab == null || tab.config.bodyType == type) return;
+                  bloc.add(
+                    UpdateTab(
+                      tab.copyWith(config: tab.config.copyWith(bodyType: type)),
+                    ),
+                  );
+                },
+              ),
         ],
       ),
     );
