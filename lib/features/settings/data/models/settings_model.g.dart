@@ -28,7 +28,7 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       isVerticalLayout: fields[4] == null ? false : fields[4] as bool,
       splitRatio: fields[5] == null ? 0.5 : (fields[5] as num).toDouble(),
       sideMenuWidth: fields[6] == null ? 300.0 : (fields[6] as num).toDouble(),
-      themeId: fields[7] == null ? 'brutalist' : fields[7] as String,
+      themeId: fields[7] == null ? 'classic' : fields[7] as String,
       activeEnvironmentId: fields[8] as String?,
       connectTimeoutMs: fields[9] == null ? 30000 : (fields[9] as num).toInt(),
       sendTimeoutMs: fields[10] == null ? 30000 : (fields[10] as num).toInt(),

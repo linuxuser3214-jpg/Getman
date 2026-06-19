@@ -39,6 +39,10 @@ void main() {
       expect(appThemes[kClassicThemeId]!.id, kClassicThemeId);
     });
 
+    test('is the app default theme', () {
+      expect(defaultThemeId, kClassicThemeId);
+    });
+
     testWidgets('panels are soft cards: rounded, soft shadow, no hard offset', (
       tester,
     ) async {

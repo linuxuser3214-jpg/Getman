@@ -15,7 +15,7 @@ class SettingsEntity extends Equatable {
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
-    this.themeId = kBrutalistThemeId,
+    this.themeId = kClassicThemeId,
     this.activeEnvironmentId,
     this.connectTimeoutMs = 30000,
     this.sendTimeoutMs = 30000,

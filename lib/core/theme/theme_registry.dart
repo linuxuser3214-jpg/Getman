@@ -27,7 +27,7 @@ class ThemeDescriptor {
   final AppThemeBuilder builder;
 }
 
-const String defaultThemeId = kBrutalistThemeId;
+const String defaultThemeId = kClassicThemeId;
 
 const Map<String, ThemeDescriptor> appThemes = {
   kClassicThemeId: ThemeDescriptor(

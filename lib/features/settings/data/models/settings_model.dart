@@ -18,7 +18,7 @@ class SettingsModel extends HiveObject {
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
-    this.themeId = kBrutalistThemeId,
+    this.themeId = kClassicThemeId,
     this.activeEnvironmentId,
     this.connectTimeoutMs = 30000,
     this.sendTimeoutMs = 30000,
@@ -49,7 +49,7 @@ class SettingsModel extends HiveObject {
     isVerticalLayout: json['isVerticalLayout'] as bool? ?? false,
     splitRatio: (json['splitRatio'] as num?)?.toDouble() ?? 0.5,
     sideMenuWidth: (json['sideMenuWidth'] as num?)?.toDouble() ?? 300.0,
-    themeId: json['themeId'] as String? ?? kBrutalistThemeId,
+    themeId: json['themeId'] as String? ?? kClassicThemeId,
     activeEnvironmentId: json['activeEnvironmentId'] as String?,
     connectTimeoutMs: json['connectTimeoutMs'] as int? ?? 30000,
     sendTimeoutMs: json['sendTimeoutMs'] as int? ?? 30000,
@@ -120,7 +120,7 @@ class SettingsModel extends HiveObject {
   @HiveField(6, defaultValue: 300.0)
   double sideMenuWidth;
 
-  @HiveField(7, defaultValue: kBrutalistThemeId)
+  @HiveField(7, defaultValue: kClassicThemeId)
   String themeId;
 
   @HiveField(8)
