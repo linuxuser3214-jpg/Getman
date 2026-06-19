@@ -98,6 +98,24 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byKey(const ValueKey('s')), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    // Assert that a _GlassSendPainter with level > 0 is in the tree.
+    // Dynamic cast is used because _GlassSendPainter is library-private.
+    final sendPainterFinder = find.byWidgetPredicate((widget) {
+      if (widget is! CustomPaint) return false;
+      final p = widget.painter;
+      if (p == null) return false;
+      if (!p.runtimeType.toString().contains('_GlassSendPainter')) return false;
+      // Dynamic cast needed: _GlassSendPainter is library-private; there is no
+      // other way to read its `level` field from an external test library.
+      return ((p as dynamic).level as double) > 0;
+    });
+    expect(
+      sendPainterFinder,
+      findsAtLeastNWidgets(1),
+      reason: '_GlassSendPainter.level must be > 0 after 600ms of sending',
+    );
+
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

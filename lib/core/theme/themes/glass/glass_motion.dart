@@ -233,7 +233,7 @@ class _GlassSendAffordanceState extends State<_GlassSendAffordance>
   @override
   void didUpdateWidget(_GlassSendAffordance old) {
     super.didUpdateWidget(old);
-    if (widget.isSending && !_build.isAnimating && _build.value == 0) {
+    if (widget.isSending && !_build.isAnimating) {
       unawaited(_build.forward(from: 0));
     } else if (!widget.isSending && _build.value != 0) {
       _build
