@@ -53,4 +53,62 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     controller.dispose();
   });
+
+  testWidgets('A1: rune ring build-up runs and tears down cleanly', (
+    tester,
+  ) async {
+    final motion = rpgMotion(reduceEffects: false);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: motion.sendAffordance(
+                context,
+                isSending: true,
+                child: const Text('SEND'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.text('SEND'), findsOneWidget);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A1: slow error (5xx, high latency) shakes and resolves', (
+    tester,
+  ) async {
+    final motion = rpgMotion(reduceEffects: false);
+    final controller = ThemeReactionController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: motion.reactionOverlay(
+              context,
+              controller: controller,
+              child: const Text('app'),
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.fire(
+      const ThemeReaction(
+        kind: ThemeReactionKind.serverError,
+        statusCode: 500,
+        durationMs: 2900,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('app'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.takeException(), isNull);
+    controller.dispose();
+  });
 }

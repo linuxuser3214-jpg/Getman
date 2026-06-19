@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
+import 'package:getman/core/theme/motion/latency_weight.dart';
 import 'package:getman/core/theme/motion/reaction_stage.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
@@ -37,14 +38,16 @@ class _RpgReactionOverlayState extends State<_RpgReactionOverlay>
   final math.Random _rng = math.Random();
 
   void _onReaction(ThemeReaction r) {
+    final w = latencyWeight(r.durationMs);
     final controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: Duration(milliseconds: 900 + (500 * w).round()),
     );
     final effect = _RpgEffect(
       controller: controller,
       isError: r.isError,
       seed: _rng.nextInt(1 << 30),
+      weight: w,
     );
     controller.addStatusListener((s) {
       if (s == AnimationStatus.completed && mounted) {
@@ -69,7 +72,8 @@ class _RpgReactionOverlayState extends State<_RpgReactionOverlay>
     var dx = 0.0;
     for (final e in _effects.where((e) => e.isError)) {
       final decay = (1 - e.controller.value).clamp(0.0, 1.0);
-      dx += math.sin(e.controller.value * math.pi * 12) * 6 * decay;
+      final amplitude = 6 * (0.6 + 0.7 * e.weight);
+      dx += math.sin(e.controller.value * math.pi * 12) * amplitude * decay;
     }
     return dx;
   }
@@ -100,6 +104,7 @@ class _RpgReactionOverlayState extends State<_RpgReactionOverlay>
                             : _SparkleShowerPainter(
                                 t: e.controller.value,
                                 seed: e.seed,
+                                weight: e.weight,
                               ),
                       ),
                     ),
@@ -118,23 +123,31 @@ class _RpgEffect {
     required this.controller,
     required this.isError,
     required this.seed,
+    required this.weight,
   });
   final AnimationController controller;
   final bool isError;
   final int seed;
+  final double weight;
 }
 
 /// Gold sparkles rain from the top + a gold shimmer sweep.
 class _SparkleShowerPainter extends CustomPainter {
-  _SparkleShowerPainter({required this.t, required this.seed});
+  _SparkleShowerPainter({
+    required this.t,
+    required this.seed,
+    required this.weight,
+  });
   final double t;
   final int seed;
+  final double weight;
 
   @override
   void paint(Canvas canvas, Size size) {
     final rng = math.Random(seed);
     final core = Paint();
-    for (var i = 0; i < 36; i++) {
+    final count = 36 + (weight * 30).round();
+    for (var i = 0; i < count; i++) {
       final x = rng.nextDouble() * size.width;
       final delay = rng.nextDouble() * 0.3;
       final p = ((t - delay) / (1 - delay)).clamp(0.0, 1.0);
@@ -164,7 +177,8 @@ class _SparkleShowerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SparkleShowerPainter old) => old.t != t;
+  bool shouldRepaint(covariant _SparkleShowerPainter old) =>
+      old.t != t || old.weight != weight;
 }
 
 /// Crimson runic crack flash + dark vignette pulse.
@@ -221,16 +235,24 @@ class _RpgSendAffordance extends StatefulWidget {
 }
 
 class _RpgSendAffordanceState extends State<_RpgSendAffordance>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _spin = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1600),
   );
 
+  late final AnimationController _build = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: kTensionFullMs),
+  );
+
   @override
   void initState() {
     super.initState();
-    if (widget.isSending) unawaited(_spin.repeat());
+    if (widget.isSending) {
+      unawaited(_spin.repeat());
+      unawaited(_build.forward(from: 0));
+    }
   }
 
   @override
@@ -243,11 +265,19 @@ class _RpgSendAffordanceState extends State<_RpgSendAffordance>
         ..stop()
         ..value = 0;
     }
+    if (widget.isSending && !_build.isAnimating) {
+      unawaited(_build.forward(from: 0));
+    } else if (!widget.isSending && _build.value != 0) {
+      _build
+        ..stop()
+        ..value = 0;
+    }
   }
 
   @override
   void dispose() {
     _spin.dispose();
+    _build.dispose();
     super.dispose();
   }
 
@@ -261,9 +291,14 @@ class _RpgSendAffordanceState extends State<_RpgSendAffordance>
         Positioned.fill(
           child: IgnorePointer(
             child: AnimatedBuilder(
-              animation: _spin,
+              animation: Listenable.merge([_spin, _build]),
               builder: (_, child) => CustomPaint(
-                painter: _RuneRingPainter(t: _spin.value),
+                painter: _RuneRingPainter(
+                  t: _spin.value,
+                  fill: inFlightTension(
+                    (_build.value * kTensionFullMs).round(),
+                  ),
+                ),
               ),
             ),
           ),
@@ -275,21 +310,35 @@ class _RpgSendAffordanceState extends State<_RpgSendAffordance>
 }
 
 class _RuneRingPainter extends CustomPainter {
-  _RuneRingPainter({required this.t});
+  _RuneRingPainter({required this.t, required this.fill});
   final double t;
+  final double fill;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.shortestSide * 0.65;
+    final brightTickCount = (fill * 12).round();
+
+    // Progress arc behind ticks.
+    if (fill > 0) {
+      final rect = Rect.fromCircle(center: center, radius: radius);
+      final arcPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..color = RpgPalette.gold.withValues(alpha: 0.35);
+      canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * fill, false, arcPaint);
+    }
+
     canvas
       ..save()
       ..translate(center.dx, center.dy)
       ..rotate(t * math.pi * 2);
-    final tick = Paint()
-      ..strokeWidth = 1.5
-      ..color = RpgPalette.gold.withValues(alpha: 0.7);
     for (var i = 0; i < 12; i++) {
+      final bright = i < brightTickCount;
+      final tick = Paint()
+        ..strokeWidth = 1.5
+        ..color = RpgPalette.gold.withValues(alpha: bright ? 1.0 : 0.7);
       final a = i * (math.pi * 2 / 12);
       final o = Offset(math.cos(a), math.sin(a));
       canvas.drawLine(o * (radius - 3), o * (radius + 3), tick);
@@ -298,5 +347,6 @@ class _RuneRingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _RuneRingPainter old) => old.t != t;
+  bool shouldRepaint(covariant _RuneRingPainter old) =>
+      old.t != t || old.fill != fill;
 }
