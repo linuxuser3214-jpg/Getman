@@ -4,6 +4,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/classic/classic_decorations.dart';
 import 'package:getman/core/theme/themes/classic/classic_palette.dart';
 import 'package:getman/core/theme/themes/classic/classic_press.dart';
+import 'package:getman/core/theme/themes/shared/calm_motion.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 ThemeData classicTheme(
@@ -277,7 +278,7 @@ ThemeData classicTheme(
       shape,
       typography,
       decoration,
-      const AppMotion(),
+      calmMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'No response yet.'),
     ],
   );
