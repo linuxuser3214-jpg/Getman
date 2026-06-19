@@ -245,6 +245,21 @@ ThemeData classicTheme(
     listTileTheme: ListTileThemeData(
       selectedTileColor: accent.withValues(alpha: 0.10),
       selectedColor: accent,
+      // Pin the ListTile text styles (inherit:true, like the other themes).
+      // Without these, ListTile falls back to the geometry-localized
+      // `textTheme` styles, which are inherit:false — and a ListTile mounted
+      // during a theme switch then lerps the previous theme's inherit:true
+      // style against this one, crashing AnimatedDefaultTextStyle with
+      // "Failed to interpolate TextStyles with different inherit values".
+      titleTextStyle: TextStyle(
+        fontFamily: interFamily,
+        fontWeight: typography.titleWeight,
+        color: ink,
+      ),
+      subtitleTextStyle: TextStyle(
+        fontFamily: interFamily,
+        color: inkSoft,
+      ),
     ),
     popupMenuTheme: PopupMenuThemeData(
       color: surface,

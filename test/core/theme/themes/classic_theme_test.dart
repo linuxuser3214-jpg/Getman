@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/theme/themes/classic/classic_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -63,6 +64,41 @@ void main() {
           ),
         ),
       );
+    });
+
+    // Regression: ListTile text styles must be pinned inherit:true so that a
+    // ListTile/SwitchListTile mounted during a theme switch never lerps an
+    // inherit:true style against a geometry-localized inherit:false fallback
+    // ("Failed to interpolate TextStyles with different inherit values").
+    for (final b in [Brightness.light, Brightness.dark]) {
+      test('pins inherit:true ListTile text styles ($b)', () {
+        final lt = classicTheme(b).listTileTheme;
+        expect(lt.titleTextStyle?.inherit, isTrue);
+        expect(lt.subtitleTextStyle?.inherit, isTrue);
+      });
+    }
+
+    testWidgets('switching theme into CLASSIC with a SwitchListTile mounted '
+        'does not crash on TextStyle inherit mismatch', (tester) async {
+      Widget app(ThemeData theme) => MaterialApp(
+        themeAnimationDuration: Duration.zero, // matches main.dart
+        theme: theme,
+        home: Scaffold(
+          body: SwitchListTile(
+            title: const Text('Reduce visual effects'),
+            subtitle: const Text('Disables backdrop blur & animations'),
+            value: true,
+            onChanged: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpWidget(app(brutalistTheme(Brightness.dark)));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(app(classicTheme(Brightness.dark)));
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('active tab shows an accent bottom indicator', (tester) async {
