@@ -8,6 +8,7 @@ import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/core/utils/workspace/workspace_bookmark.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
@@ -188,6 +189,9 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
         RepositoryProvider<WorkspaceSyncService>.value(
           value: di.sl<WorkspaceSyncService>(),
+        ),
+        ChangeNotifierProvider<ThemeReactionController>.value(
+          value: di.sl<ThemeReactionController>(),
         ),
         ChangeNotifierProvider<UpdateController>.value(
           value: di.sl<UpdateController>(),
