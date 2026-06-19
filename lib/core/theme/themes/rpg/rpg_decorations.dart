@@ -142,6 +142,7 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   late final AnimationController _controller;
   late final List<_Mote> _motes;
   late final ValueNotifier<double> _frameNotifier;
+  final ValueNotifier<Offset> _pointer = ValueNotifier<Offset>(Offset.zero);
 
   @override
   void initState() {
@@ -186,6 +187,7 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _frameNotifier.dispose();
+    _pointer.dispose();
     super.dispose();
   }
 
@@ -193,40 +195,52 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    return Stack(
-      children: [
-        // Radial vignette under everything.
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                radius: 1.2,
-                colors: [
-                  theme.scaffoldBackgroundColor,
-                  if (isDark)
-                    Colors.black.withValues(alpha: 0.6)
-                  else
-                    RpgPalette.goldDeep.withValues(alpha: 0.08),
-                ],
-              ),
-            ),
-          ),
-        ),
-        RepaintBoundary(child: widget.child),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: RepaintBoundary(
-              child: CustomPaint(
-                painter: _StarfieldPainter(
-                  tListenable: _frameNotifier,
-                  motes: _motes,
-                  isDark: isDark,
+    return MouseRegion(
+      onHover: (e) {
+        final size = context.size;
+        if (size == null) return;
+        // Normalized -1..1 from center; parallax keeps each mote shift small.
+        _pointer.value = Offset(
+          (e.localPosition.dx / size.width) * 2 - 1,
+          (e.localPosition.dy / size.height) * 2 - 1,
+        );
+      },
+      child: Stack(
+        children: [
+          // Radial vignette under everything.
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  radius: 1.2,
+                  colors: [
+                    theme.scaffoldBackgroundColor,
+                    if (isDark)
+                      Colors.black.withValues(alpha: 0.6)
+                    else
+                      RpgPalette.goldDeep.withValues(alpha: 0.08),
+                  ],
                 ),
               ),
             ),
           ),
-        ),
-      ],
+          RepaintBoundary(child: widget.child),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: _StarfieldPainter(
+                    tListenable: _frameNotifier,
+                    pointer: _pointer,
+                    motes: _motes,
+                    isDark: isDark,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -251,10 +265,13 @@ class _Mote {
 class _StarfieldPainter extends CustomPainter {
   _StarfieldPainter({
     required this.tListenable,
+    required this.pointer,
     required this.motes,
     required this.isDark,
-  }) : super(repaint: tListenable);
+  }) : super(repaint: Listenable.merge([tListenable, pointer]));
+
   final ValueListenable<double> tListenable;
+  final ValueListenable<Offset> pointer;
   final List<_Mote> motes;
   final bool isDark;
 
@@ -264,16 +281,37 @@ class _StarfieldPainter extends CustomPainter {
   final Paint _glowPaint = Paint()
     ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
   final Paint _corePaint = Paint();
+  final Paint _constellationPaint = Paint()..strokeWidth = 0.5;
+  final Paint _shootPaint = Paint()..strokeCap = StrokeCap.round;
 
   @override
   void paint(Canvas canvas, Size size) {
     final t = tListenable.value;
-    for (final m in motes) {
-      final dy = ((m.seedY + t * m.speed) % 1.0) * size.height;
-      final dx =
-          ((m.seedX + math.sin((t + m.twinkleOffset) * math.pi * 2) * 0.01) %
-              1.0) *
-          size.width;
+    final par = pointer.value;
+
+    // --- Build mote screen positions (parallax applied) ---
+    final positions = List<Offset>.unmodifiable(
+      motes.map((m) {
+        final dy = ((m.seedY + t * m.speed) % 1.0) * size.height;
+        final dx =
+            ((m.seedX +
+                    math.sin(
+                          (t + m.twinkleOffset) * math.pi * 2,
+                        ) *
+                        0.01) %
+                1.0) *
+            size.width;
+        // Bigger motes shift more → depth illusion.
+        final px = dx + par.dx * (m.size * 4);
+        final py = dy + par.dy * (m.size * 4);
+        return Offset(px, py);
+      }),
+    );
+
+    // --- Draw motes ---
+    for (var i = 0; i < motes.length; i++) {
+      final m = motes[i];
+      final pos = positions[i];
 
       // Twinkle alpha — pulse each mote on a different phase.
       final twinkle =
@@ -288,10 +326,78 @@ class _StarfieldPainter extends CustomPainter {
       final color = _colorFor(m.hue).withValues(alpha: alphaBase * twinkle);
 
       _glowPaint.color = color.withValues(alpha: color.a * 0.6);
-      canvas.drawCircle(Offset(dx, dy), m.size * 2, _glowPaint);
+      canvas.drawCircle(pos, m.size * 2, _glowPaint);
 
       _corePaint.color = color;
-      canvas.drawCircle(Offset(dx, dy), m.size, _corePaint);
+      canvas.drawCircle(pos, m.size, _corePaint);
+    }
+
+    // --- Constellation lines ---
+    // Compare each mote only to the next ~6 to bound O(n²) cost.
+    const maxNeighbours = 6;
+    const proximityThreshold = 90.0;
+    for (var i = 0; i < positions.length; i++) {
+      final a = positions[i];
+      final end = math.min(i + maxNeighbours + 1, positions.length);
+      for (var j = i + 1; j < end; j++) {
+        final b = positions[j];
+        final dist = (b - a).distance;
+        if (dist < proximityThreshold) {
+          // proximity 1 at dist=0, 0 at dist=proximityThreshold.
+          final proximity = 1.0 - dist / proximityThreshold;
+          _constellationPaint.color = RpgPalette.gold.withValues(
+            alpha: 0.06 * proximity,
+          );
+          canvas.drawLine(a, b, _constellationPaint);
+        }
+      }
+    }
+
+    // --- Shooting star ---
+    // Derive a periodic streak entirely from `t` — no extra state.
+    // One streak every ~0.33 s of the 60-second loop (at t speed ~3).
+    final shoot = (t * 3) % 1.0;
+    if (shoot < 0.12) {
+      // Stable diagonal path seeded by the integer cycle index.
+      final seed = (t * 3).floor();
+      final rng = math.Random(seed);
+      // Start point: random position in top-left quadrant area.
+      final startX = rng.nextDouble() * size.width * 0.7;
+      final startY = rng.nextDouble() * size.height * 0.4;
+      // Diagonal direction: lower-right, length ~20% of viewport diagonal.
+      final diag = math.sqrt(
+        size.width * size.width + size.height * size.height,
+      );
+      final length = diag * 0.20;
+      // Angle between 20°–40° from horizontal for a natural streak.
+      final angle = math.pi / 9 + rng.nextDouble() * math.pi / 9;
+      final endX = startX + math.cos(angle) * length;
+      final endY = startY + math.sin(angle) * length;
+
+      // Alpha peaks at mid-streak (shoot ≈ 0.06).
+      final progress = shoot / 0.12; // 0..1
+      final midAlpha = 1.0 - (progress - 0.5).abs() * 2.0; // triangle peak
+      _shootPaint
+        ..color = RpgPalette.gold.withValues(alpha: 0.8 * midAlpha)
+        ..strokeWidth = 1.5;
+      canvas.drawLine(
+        Offset(startX, startY),
+        Offset(endX, endY),
+        _shootPaint,
+      );
+
+      // Tapered tail: a softer wider line slightly behind.
+      _shootPaint
+        ..color = RpgPalette.gold.withValues(alpha: 0.25 * midAlpha)
+        ..strokeWidth = 3.0;
+      canvas.drawLine(
+        Offset(startX, startY),
+        Offset(
+          startX + math.cos(angle) * length * 0.5,
+          startY + math.sin(angle) * length * 0.5,
+        ),
+        _shootPaint,
+      );
     }
   }
 
