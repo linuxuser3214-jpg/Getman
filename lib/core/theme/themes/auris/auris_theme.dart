@@ -57,10 +57,17 @@ ThemeData aurisTheme(
   final decoration = AppDecoration(
     panelBox: aurisPanelBox,
     tabShape: aurisTabShape,
-    // Identity for now — Phase E2 replaces with the auris press animation.
-    wrapInteractive: ({required child, onTap, scaleDown}) => child,
-    // Identity for now — Phase E2 replaces with the scanline/glow ambient.
-    scaffoldBackground: aurisScaffoldBackground,
+    // Auris press: scale-down on tap-down; identity under reduceEffects.
+    wrapInteractive: ({required child, onTap, scaleDown}) => AurisPress(
+      onTap: onTap,
+      scaleDown: scaleDown,
+      animate: !reduceEffects,
+      child: child,
+    ),
+    // Animated scanlines + drifting hex ornaments; static under reduceEffects.
+    scaffoldBackground: reduceEffects
+        ? aurisStaticScaffoldBackground
+        : aurisScaffoldBackground,
   );
 
   return base.copyWith(
