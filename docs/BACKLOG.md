@@ -182,6 +182,48 @@
   alongside sound; web/unsupported no-op. Niche.
 - **Effort**: S–M.
 
+### F. Per-theme custom component widgets (`AppComponents` slots)
+
+> The **AURIS** theme introduced an 8th theme extension, `AppComponents`
+> (`lib/core/theme/extensions/app_components.dart`): per-theme widget builders
+> for `surface / methodBadge / statusBadge / metric / toggle / logView /
+> dataRow / select / pendingIndicator / statusBanner`. A shared
+> `defaultAppComponents()` reproduces the classic look, and AURIS overrides the
+> slots with the `auris` package's HUD widgets. The seam now exists for every
+> theme to express personality through *different widgets*, not just colors.
+
+#### VM-F1 — Give the other six themes bespoke component widgets
+- **Idea**: Brutalist/Arcane/Glass/Editorial/Dracula/Classic each override
+  selected `AppComponents` slots with their own widget treatments (e.g.
+  Brutalist hard-edged ink badges, Arcane runic panels, Glass frosted stat
+  tiles) instead of all sharing `defaultAppComponents()`.
+- **Seam**: add `<name>_components.dart` returning
+  `defaultAppComponents().copyWith(...)`; attach in the theme builder. No
+  widget edits — consumers already read `context.appComponents`.
+- **Effort**: M per theme (pick the 2–3 highest-personality slots first).
+
+#### VM-F2 — Wire the `select` slot (currently built but unused)
+- **Idea**: `AppDropdown<T>` + the `select` slot exist but no app surface routes
+  through them — the HTTP method selector (`RequestKindMethodSelector`, renders a
+  colored `MethodBadge` in its trigger) and `PanelSelector` (custom drag-target
+  overlay) were too bespoke to route faithfully. Build a select-slot-friendly
+  selector (or enrich the slot) so AURIS shows `AurisSelect` there.
+- **Effort**: M.
+
+#### VM-F3 — Source real AURIS audio + signature theme-switch entrance
+- **Idea**: `assets/sounds/auris/` currently holds placeholder cues (seeded from
+  Glass). Source real sci-fi-HUD `send/success/error` mp3s. Optionally give AURIS
+  a bespoke CRT-power-on `ThemeSwitchTransition` entrance.
+- **Effort**: S (audio) / S–M (entrance).
+
+#### VM-F4 — AURIS metric stat cards (currently a compact chip fallback)
+- **Idea**: the `metric` slot under AURIS falls back to a compact `AurisContainer`
+  chip because `AurisStatCard`'s large value overflows the inline metadata
+  `Wrap`. A dedicated, larger response-metadata layout could use the full
+  `AurisStatCard` (flag `kAurisMetricUsesStatCard` already left in
+  `auris_components.dart`).
+- **Effort**: S–M.
+
 ---
 
 ## 🔐 Auth & Security
