@@ -285,9 +285,16 @@ concern) — flash safety applies even at full effects.
 A theme is **not just colours, shapes, and motion** — since the AURIS work it can
 also swap in its own *widgets*. **When authoring (or upgrading) a theme, always
 try to give it original components that express its personality**, not just a
-recoloured default. AURIS is the proof: a sci-fi-HUD panel, a chamfered switch, a
+recoloured default. AURIS was the proof: a sci-fi-HUD panel, a chamfered switch, a
 live terminal-style log, and status "badges" read as a different *product*, not a
-re-skin.
+re-skin. As of VM-F1 **every theme except Classic ships a bespoke set** — study
+the one nearest your new theme's tone as a reference: `brutalist_components.dart`
+(ink-press, the cleanest hand-authored example), `rpg_components.dart` (runic
+panels + a faceted-gem `CustomPainter`), `glass_components.dart` (reuses the
+theme's real `frost`), `editorial_components.dart` (fully static / calm),
+`dracula_components.dart` (a ≤1.5 Hz blinking cursor — the flash-safe animated
+example), and `auris_components.dart` (composes an external kit). Classic stays on
+`defaultAppComponents()` by design (the calm native default).
 
 **The seam — `AppComponents`** (`lib/core/theme/extensions/app_components.dart`,
 read via `context.appComponents`): per-theme widget builders for the slottable
@@ -327,9 +334,10 @@ slot, so **no app-widget edits are ever needed** to change how these render.
   (AURIS spreads `...base.extensions.values` into `copyWith`), and that the
   override is attached *only* by your theme so other themes never construct it.
 
-> Concrete per-theme ideas (Brutalist ink-stamps, Arcane runic panels, Glass
-> frosted tiles, Editorial pull-quotes, Dracula console log, …) live in
-> [`BACKLOG.md`](BACKLOG.md) **VM-F1**.
+> The per-theme bespoke sets (Brutalist ink-stamps, Arcane runic panels, Glass
+> frosted tiles, Editorial article panels, Dracula console log, …) shipped under
+> [`BACKLOG.md`](BACKLOG.md) **VM-F1** — see each `<name>_components.dart` for the
+> concrete reference. The `select` slot is still inherited everywhere (VM-F2).
 
 ---
 

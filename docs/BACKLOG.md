@@ -192,44 +192,39 @@
 > slots with the `auris` package's HUD widgets. The seam now exists for every
 > theme to express personality through *different widgets*, not just colors.
 
-#### VM-F1 — Original components per theme (give every theme its own widget set, like AURIS)
-- **Idea**: AURIS proved the seam — a theme can express itself through *original
-  widgets*, not just colours/shapes. Do the same for the other six: design
-  bespoke components that fit **each theme's personality** and wire them through
-  the `AppComponents` slots (override only the high-personality slots; inherit
-  `defaultAppComponents()` for the rest). These can be brand-new custom widgets
-  authored in the theme's own dir (the way `auris_components.dart` composes the
-  `auris` kit) — not merely recoloured defaults. Highest-impact slots to start
-  with: `surface`, `methodBadge`/`statusBadge`, `logView`, `metric`, `toggle`.
-  Sketches (illustrative, not prescriptive):
-  - **BRUTALIST** — hard ink-stamp badges (thick border, hard offset shadow,
-    uppercase), slab panels with the signature hard shadow, a chunky toggle that
-    *clunks*, a monospace "dot-matrix"/ticker log.
-  - **ARCANE QUEST** — runic-bordered/illuminated panels, gem or sigil status
-    badges, a spellbook/scroll-style frame log, parchment data rows, an
-    enchanted lever toggle, stat "runestones" for metric.
-  - **LIQUID GLASS** — frosted stat tiles, translucent lozenge badges, a glass
-    switch with a liquid thumb, a blurred terminal pane (builds on its existing
-    frost).
-  - **EDITORIAL** — serif/footnote-style data rows, magazine pull-quote panels,
-    quiet capsule badges, a restrained byline-style log.
-  - **DRACULA** — neon-accent capsule badges, a dev-console terminal log, softly
-    rounded panels with subtle purple glow.
-  - **CLASSIC** — stays mostly on the defaults *by design* (calm/native, like its
-    motion); at most minor Postman-style refinements. Don't make it loud.
-- **Seam**: add `<name>_components.dart` exporting
-  `AppComponents <name>Components()` = `defaultAppComponents().copyWith(...)`,
-  plus the theme's own private widgets; attach it in `<name>_theme.dart` instead
-  of `defaultAppComponents()`. **No app-widget edits** — every consumer already
-  reads `context.appComponents`. Read `docs/THEME_AUTHORING.md` and use
-  `auris_components.dart` as the reference pattern (incl. the fidelity/overflow
-  testing under the theme).
-- **Tests**: per theme, a `<name>_components_test.dart` (each overridden slot
-  renders under that theme without throwing) + an under-theme render/overflow
-  guard for the panels + the metadata row (the AURIS work caught real overflow
-  this way).
-- **Effort**: M per theme — keep the calm/loud contrast intentional (don't turn
-  a calm theme loud just because the seam exists; see THEME_AUTHORING §2).
+#### VM-F1 — Original components per theme (give every theme its own widget set, like AURIS) — ✅ DONE (2026-06-20)
+- **Shipped**: every theme except Classic now has a bespoke `<name>Components()`
+  = `defaultAppComponents().copyWith(...)` in its own dir, wired through the
+  `AppComponents` slots (no app-widget edits). `select` inherited everywhere
+  (still VM-F2). Per-theme `<name>_components_test.dart` (per-slot smoke +
+  ResponseSection/RealtimePanel overflow guards). What landed:
+  - **BRUTALIST** (`brutalist_components.dart`) — ink-press: slab panels +
+    stuck-on header label, ink-stamp method/status badges, mono ticker-chip
+    metric, chunky snap switch, fanfold line-printer log, printed data rows,
+    block-press pending, stamped banner.
+  - **ARCANE QUEST** (`rpg_components.dart`) — spellbook: runic-framed parchment
+    panel (rune-corner CustomPaint), faceted gem status badge, rune-plate method
+    badge, runestone metric, enchanted lever, grimoire log, quest-ledger rows,
+    rotating summoning-ring pending, heraldic ribbon banner.
+  - **LIQUID GLASS** (`glass_components.dart`) — frosted HUD: frosted tiles (real
+    blur via `context.appDecoration.frost`), translucent lozenge badges, frosted
+    lozenge metric, liquid-glass switch, blurred terminal log, glass rows,
+    frosted ripple pending, frosted capsule banner.
+  - **EDITORIAL** (`editorial_components.dart`) — print magazine, fully static
+    (no animation): hairline article panels, small-caps typographic tags,
+    footnote metric, outlined switch, dispatch log, reference rows, galley-proof
+    pending, ruled note banner.
+  - **DRACULA** (`dracula_components.dart`) — neon dev-console: console panels
+    (static purple glow + `// comment` header), neon capsule badges, terminal
+    metric, console toggle, REPL log (→/←/⊕/⊗/✗), console kv rows, ≤1.5 Hz
+    blinking-cursor pending, `[OK]`/`[ERR]` status line.
+  - **CLASSIC** — unchanged, stays on `defaultAppComponents()` by design.
+- **Patterns enforced** (carried from AURIS): `surface` fills (in an `Expanded`),
+  `logView` sizes to bounded height, `metric` is a compact inline chip; animated
+  slots build the painter once + `CustomPainter(repaint:)` (no per-frame alloc),
+  degrade to static under `reduceEffects`; any repeating flash ≤ 3 Hz.
+- **Remaining**: `select` slot still inherited everywhere (VM-F2); a few accepted
+  Minors (see plan/ledger) — none blocking.
 
 #### VM-F2 — Wire the `select` slot (currently built but unused)
 - **Idea**: `AppDropdown<T>` + the `select` slot exist but no app surface routes
