@@ -27,11 +27,14 @@ ThemeData aurisTheme(
   bool isCompact = false,
   bool reduceEffects = false,
 }) {
-  final base = brightness == Brightness.dark
-      ? AurisTheme.dark(glowScale: reduceEffects ? 0.0 : 1.0)
-      : AurisTheme.light(glowScale: reduceEffects ? 0.0 : 1.0);
+  final base = _normalizeTextLerp(
+    brightness == Brightness.dark
+        ? AurisTheme.dark(glowScale: reduceEffects ? 0.0 : 1.0)
+        : AurisTheme.light(glowScale: reduceEffects ? 0.0 : 1.0),
+  );
 
   // AurisTheme attaches AurisScheme automatically — confirmed in C1.
+  // _normalizeTextLerp uses copyWith, which preserves base.extensions.
   final scheme = base.extension<AurisScheme>()!;
 
   final layout = isCompact ? AppLayout.compact : AppLayout.normal;
@@ -90,5 +93,54 @@ ThemeData aurisTheme(
       // AURIS component slots: each surface maps to its Auris* widget.
       aurisComponents(),
     ],
+  );
+}
+
+/// Aligns AURIS's `listTileTheme.leadingAndTrailingTextStyle` with the
+/// convention every other theme follows, so theme switches don't crash.
+///
+/// The app runs with `themeAnimationDuration: Duration.zero`, but a mounted
+/// [ListTile] still wraps each of its leading/title/subtitle/trailing slots in
+/// its OWN internal `AnimatedDefaultTextStyle` (hardcoded ~200ms, independent
+/// of the app's theme animation duration). On a theme switch each slot lerps
+/// the old resolved style to the new one — and `TextStyle.lerp` throws "Failed
+/// to interpolate TextStyles with different inherit values" if the two sides
+/// disagree on `inherit`. (`ThemeData.lerp` inside `AnimatedTheme` lerps the
+/// `listTileTheme` styles directly too, with the same constraint.)
+///
+/// The established convention (see every `<name>_theme.dart` listTileTheme,
+/// and the comment in `classic_theme`): **`titleTextStyle` and
+/// `subtitleTextStyle` are pinned `inherit: true`;
+/// `leadingAndTrailingTextStyle` is left unset**, so ListTile falls back to
+/// Material's localized `labelSmall`
+/// for that slot, which is `inherit: false`. AURIS inherits these from the
+/// external `auris` kit and already matches on title/subtitle (both
+/// `inherit: true`) — but the kit ALSO sets `leadingAndTrailingTextStyle`
+/// (ShareTechMono, `inherit: true`), the lone slot that diverges. Lerping
+/// AURIS's `inherit: true` leading/trailing style against another theme's
+/// `inherit: false` localized fallback is the crash that flooded the console
+/// and red-screened the Settings rows.
+///
+/// Fix: force ONLY that one slot to `inherit: false` (+ a baseline) so it lerps
+/// cleanly against the localized fallback in both directions, while keeping its
+/// ShareTechMono family/size/color. Title/subtitle are left exactly as the kit
+/// produces them (`inherit: true`) — flipping them would instead mismatch the
+/// other themes' pinned `inherit: true` title/subtitle. `textTheme` is likewise
+/// untouched: it feeds [AppTypography.base], lerped via a *separate* path
+/// (`AppTypography.lerp` → `TextTheme.lerp`) where every theme's base is
+/// `inherit: true`; normalizing it to `inherit: false` is exactly the
+/// regression a previous app-wide normalization introduced. See
+/// `auris_text_lerp_test`.
+ThemeData _normalizeTextLerp(ThemeData theme) {
+  final tile = theme.listTileTheme;
+  final lead = tile.leadingAndTrailingTextStyle;
+  if (lead == null) return theme;
+  return theme.copyWith(
+    listTileTheme: tile.copyWith(
+      leadingAndTrailingTextStyle: lead.copyWith(
+        inherit: false,
+        textBaseline: lead.textBaseline ?? TextBaseline.alphabetic,
+      ),
+    ),
   );
 }
