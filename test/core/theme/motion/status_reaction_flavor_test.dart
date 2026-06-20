@@ -69,4 +69,26 @@ void main() {
       );
     });
   });
+
+  group('flavorFor — transport failures', () {
+    ThemeReaction net(TransportFailureKind? t) => ThemeReaction(
+      kind: ThemeReactionKind.networkError,
+      transportFailure: t,
+    );
+    test('timeout transport → timeout flavor', () {
+      expect(
+        flavorFor(net(TransportFailureKind.timeout)),
+        StatusReactionFlavor.timeout,
+      );
+    });
+    test('badCertificate transport → badCertificate flavor', () {
+      expect(
+        flavorFor(net(TransportFailureKind.badCertificate)),
+        StatusReactionFlavor.badCertificate,
+      );
+    });
+    test('null transport → networkError flavor', () {
+      expect(flavorFor(net(null)), StatusReactionFlavor.networkError);
+    });
+  });
 }

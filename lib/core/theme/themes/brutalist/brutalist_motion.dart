@@ -38,6 +38,7 @@ StampSpec stampSpecFor(StatusReactionFlavor f) => switch (f) {
   StatusReactionFlavor.unauthorized ||
   StatusReactionFlavor.forbidden => const StampSpec(barrier: true),
   StatusReactionFlavor.rateLimited => const StampSpec(thuds: 3),
+  StatusReactionFlavor.badCertificate => const StampSpec(barrier: true),
   _ => const StampSpec(),
 };
 

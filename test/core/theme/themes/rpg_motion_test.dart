@@ -122,6 +122,7 @@ void main() {
     expect(rpgSpecFor(StatusReactionFlavor.notFound).style, RpgFx.scatter);
     expect(rpgSpecFor(StatusReactionFlavor.serverCrash).style, RpgFx.crack);
     expect(rpgSpecFor(StatusReactionFlavor.rateLimited).repeat, 3);
+    expect(rpgSpecFor(StatusReactionFlavor.badCertificate).style, RpgFx.ward);
   });
 
   testWidgets('A2: rpg overlay survives every mapped status code', (

@@ -19,6 +19,7 @@ enum StatusReactionFlavor {
   serviceUnavailable,
   serverError,
   networkError,
+  badCertificate,
   cancelled,
 }
 
@@ -29,7 +30,12 @@ StatusReactionFlavor flavorFor(ThemeReaction r) {
     case ThemeReactionKind.cancelled:
       return StatusReactionFlavor.cancelled;
     case ThemeReactionKind.networkError:
-      return StatusReactionFlavor.networkError;
+      return switch (r.transportFailure) {
+        TransportFailureKind.timeout => StatusReactionFlavor.timeout,
+        TransportFailureKind.badCertificate =>
+          StatusReactionFlavor.badCertificate,
+        null => StatusReactionFlavor.networkError,
+      };
     case ThemeReactionKind.sendStarted:
       return StatusReactionFlavor.ok;
     case ThemeReactionKind.success:

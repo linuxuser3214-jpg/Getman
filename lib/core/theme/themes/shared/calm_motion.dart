@@ -37,6 +37,8 @@ CalmSpec calmSpecFor(StatusReactionFlavor f, Color base, Color error) {
     case StatusReactionFlavor.serverError:
     case StatusReactionFlavor.networkError:
       return CalmSpec(color: error);
+    case StatusReactionFlavor.badCertificate:
+      return CalmSpec(color: error, blinks: 2);
     case StatusReactionFlavor.created:
     case StatusReactionFlavor.noContent:
     case StatusReactionFlavor.ok:

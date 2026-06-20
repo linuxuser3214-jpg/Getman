@@ -172,6 +172,10 @@ void main() {
       glassSpecFor(StatusReactionFlavor.serverCrash).style,
       GlassFx.crack,
     );
+    expect(
+      glassSpecFor(StatusReactionFlavor.badCertificate).style,
+      GlassFx.barrier,
+    );
   });
 
   testWidgets('A2: glass overlay survives every mapped status code', (

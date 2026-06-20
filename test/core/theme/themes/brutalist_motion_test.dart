@@ -122,6 +122,7 @@ void main() {
     expect(stampSpecFor(StatusReactionFlavor.unauthorized).barrier, isTrue);
     expect(stampSpecFor(StatusReactionFlavor.forbidden).barrier, isTrue);
     expect(stampSpecFor(StatusReactionFlavor.ok).thuds, 1);
+    expect(stampSpecFor(StatusReactionFlavor.badCertificate).barrier, isTrue);
   });
 
   testWidgets('A2: overlay survives every mapped status code', (tester) async {

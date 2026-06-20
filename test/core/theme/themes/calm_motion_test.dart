@@ -61,6 +61,10 @@ void main() {
       error,
     );
     expect(calmSpecFor(StatusReactionFlavor.ok, base, error).blinks, 1);
+    expect(
+      calmSpecFor(StatusReactionFlavor.badCertificate, base, error).color,
+      error,
+    );
   });
 
   testWidgets(

@@ -39,6 +39,7 @@ RpgSpec rpgSpecFor(StatusReactionFlavor f) => switch (f) {
   StatusReactionFlavor.clientError ||
   StatusReactionFlavor.networkError ||
   StatusReactionFlavor.serviceUnavailable => const RpgSpec(RpgFx.crack),
+  StatusReactionFlavor.badCertificate => const RpgSpec(RpgFx.ward),
   _ => const RpgSpec(RpgFx.sparkle),
 };
 

@@ -44,6 +44,7 @@ GlassSpec glassSpecFor(StatusReactionFlavor f) => switch (f) {
   StatusReactionFlavor.serverError ||
   StatusReactionFlavor.clientError ||
   StatusReactionFlavor.networkError => const GlassSpec(GlassFx.crack),
+  StatusReactionFlavor.badCertificate => const GlassSpec(GlassFx.barrier),
   _ => const GlassSpec(GlassFx.ripple),
 };
 
