@@ -71,21 +71,17 @@ class ArticlePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    final framed = DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-      ),
-      child: child,
+    final decoration = BoxDecoration(
+      color: theme.cardColor,
+      border: Border.all(color: theme.dividerColor, width: layout.borderThin),
     );
 
-    if (title == null) return framed;
+    if (title == null) {
+      return DecoratedBox(decoration: decoration, child: child);
+    }
 
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-      ),
+      decoration: decoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -556,31 +556,23 @@ class _BlinkingCursorState extends State<BlinkingCursor>
       ),
     );
 
+    final cursorText = Text(
+      '▋',
+      style: TextStyle(
+        fontFamily: context.appTypography.codeFontFamily,
+        fontSize: layout.fontSizeNormal,
+        color: accent,
+      ),
+    );
     final cursorBlock = _c == null
-        ? Text(
-            '▋',
-            style: TextStyle(
-              fontFamily: context.appTypography.codeFontFamily,
-              fontSize: layout.fontSizeNormal,
-              color: accent,
-            ),
-          )
+        ? cursorText
         : AnimatedBuilder(
             animation: _c!,
-            builder: (context, _) {
+            child: cursorText,
+            builder: (context, child) {
               // Toggle opacity 1↔0 once per period.
               final opacity = _c!.value < 0.5 ? 1.0 : 0.0;
-              return Opacity(
-                opacity: opacity,
-                child: Text(
-                  '▋',
-                  style: TextStyle(
-                    fontFamily: context.appTypography.codeFontFamily,
-                    fontSize: layout.fontSizeNormal,
-                    color: accent,
-                  ),
-                ),
-              );
+              return Opacity(opacity: opacity, child: child);
             },
           );
 
