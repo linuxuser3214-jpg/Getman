@@ -162,7 +162,9 @@ void main() {
   // Per-slot mapping tests.
   // -------------------------------------------------------------------------
 
-  testWidgets('surface (no title) → AurisContainer', (tester) async {
+  testWidgets('surface (no title) → AurisContainer (not AurisPanel)', (
+    tester,
+  ) async {
     await _pumpSlot(
       tester,
       dark,
@@ -172,6 +174,9 @@ void main() {
       ),
     );
     expect(tester.takeException(), isNull);
+    // Without a title, surface must produce an AurisContainer but NOT wrap it
+    // in AurisPanel (which would indicate the title path was taken).
+    expect(find.byType(AurisPanel), findsNothing);
     expect(find.byType(AurisContainer), findsWidgets);
     expect(find.text('BODY'), findsOneWidget);
   });
@@ -419,12 +424,15 @@ void main() {
     when(
       () => realtimeBloc.stream,
     ).thenAnswer((_) => const Stream<RealtimeState>.empty());
+    when(
+      () => tabsBloc.stream,
+    ).thenAnswer((_) => const Stream<TabsState>.empty());
 
     await tester.pumpWidget(
       MaterialApp(
         theme: dark,
         home: Scaffold(
-          body: RepositoryProvider<TabsBloc>.value(
+          body: BlocProvider<TabsBloc>.value(
             value: tabsBloc,
             child: BlocProvider<RealtimeBloc>.value(
               value: realtimeBloc,
@@ -476,6 +484,25 @@ void main() {
                     state: AppBannerState.info,
                     message: 'I',
                   ),
+                  SizedBox(
+                    height: 60,
+                    child: c.logView(
+                      context,
+                      lines: const [
+                        AppLogLine(text: 'ping', kind: AppLogLineKind.outgoing),
+                      ],
+                      title: 'LOG',
+                    ),
+                  ),
+                  c.select(
+                    context,
+                    AppSelectSpec(
+                      items: const [AppSelectItem(label: 'ONE')],
+                      selectedIndex: 0,
+                      onSelected: (_) {},
+                    ),
+                  ),
+                  SizedBox(height: 60, child: c.pendingIndicator(context)),
                 ],
               );
             },
