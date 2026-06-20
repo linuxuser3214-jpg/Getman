@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
 import 'package:getman/core/theme/extensions/app_palette.dart';
 import 'package:getman/core/theme/motion/latency_weight.dart';
+import 'package:getman/core/theme/motion/photosensitivity.dart';
 import 'package:getman/core/theme/motion/reaction_stage.dart';
 import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
@@ -87,7 +88,7 @@ class _CalmReactionOverlayState extends State<_CalmReactionOverlay>
     final error = Theme.of(context).colorScheme.error;
     final spec = calmSpecFor(flavorFor(r), base, error);
     _color = spec.color;
-    _blinks = spec.blinks;
+    _blinks = safeFlashCount(_c.duration!, spec.blinks);
     _weight = latencyWeight(r.durationMs);
     unawaited(_c.forward(from: 0));
   }

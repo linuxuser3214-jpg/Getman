@@ -103,6 +103,8 @@ theme's identity:
   the theme's voice (or accept the shared/quiet default). Off by default.
 - [ ] **`reduceVisualEffects`** — define the degraded form of every item above
   (see §5). This is not optional.
+- [ ] **Flash safety** — any repeating flash/blink respects
+  `kMaxSafeFlashesPerSecond` via the photosensitivity guard (§5b).
 
 Use the existing themes as a tonal map: **Glass** = elegant/fluid (ripple,
 crack-and-heal, liquid send), **Arcane** = game-y/magical (sparkle shower, runic
@@ -174,6 +176,25 @@ Pointer-reactive ambient (cursor parallax/sheen) must be gated so it neither
 subscribes nor repaints in the static path (see the `pointer: animate ? … : null`
 gating in `glass_decorations.dart`). Sound is independently gated by
 `enableThemeSounds` (separate from `reduceVisualEffects`).
+
+---
+
+## 5b. Photosensitivity (flash safety) — mandatory
+
+WCAG 2.3.1 (general flash threshold): nothing may flash more than **3 times per
+second**. This is independent of `reduceVisualEffects` (a motion/vestibular
+concern) — flash safety applies even at full effects.
+
+- Any **repeating** flash/blink/strobe MUST cap its rate via
+  `lib/core/theme/motion/photosensitivity.dart`: clamp the count with
+  `safeFlashCount(sweep, desired)` or gate the period at `kMinFlashPeriod`.
+  (See `shared/calm_motion.dart` `_onReaction` for the reference use.)
+- **Large / full-screen** flashes are the real hazard — they MUST route through
+  the guard *and* still degrade under `reduceVisualEffects`. Small-area
+  one-shot fades/sweeps/sparkles are not "flashes" and need no clamp, but never
+  let a count parameter scale them into a rapid full-screen strobe.
+- Audited at this writing: calm's pulse-bar blink is guarded; rpg/brutalist/
+  glass terminal effects are single-shot or small-area below the cap.
 
 ---
 

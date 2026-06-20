@@ -67,6 +67,37 @@ void main() {
     );
   });
 
+  testWidgets('calm overlay survives a bad-certificate reaction', (
+    tester,
+  ) async {
+    final motion = calmMotion(reduceEffects: false);
+    final controller = ThemeReactionController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: motion.reactionOverlay(
+              context,
+              controller: controller,
+              child: const Text('app'),
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.fire(
+      const ThemeReaction(
+        kind: ThemeReactionKind.networkError,
+        transportFailure: TransportFailureKind.badCertificate,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(find.text('app'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.takeException(), isNull);
+    controller.dispose();
+  });
+
   testWidgets(
     'A2: calm overlay survives every mapped status code',
     (tester) async {
