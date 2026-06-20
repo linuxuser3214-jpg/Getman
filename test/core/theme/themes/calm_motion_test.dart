@@ -65,6 +65,10 @@ void main() {
       calmSpecFor(StatusReactionFlavor.badCertificate, base, error).color,
       error,
     );
+    expect(
+      calmSpecFor(StatusReactionFlavor.badCertificate, base, error).blinks,
+      2,
+    );
   });
 
   testWidgets('calm overlay survives a bad-certificate reaction', (

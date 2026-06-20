@@ -71,9 +71,11 @@ class _CalmReactionOverlay extends StatefulWidget {
 
 class _CalmReactionOverlayState extends State<_CalmReactionOverlay>
     with SingleTickerProviderStateMixin {
+  static const Duration _kSweepDuration = Duration(milliseconds: 700);
+
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 700),
+    duration: _kSweepDuration,
   );
   Color? _color;
   int _blinks = 1;
@@ -88,7 +90,7 @@ class _CalmReactionOverlayState extends State<_CalmReactionOverlay>
     final error = Theme.of(context).colorScheme.error;
     final spec = calmSpecFor(flavorFor(r), base, error);
     _color = spec.color;
-    _blinks = safeFlashCount(_c.duration!, spec.blinks);
+    _blinks = safeFlashCount(_kSweepDuration, spec.blinks);
     _weight = latencyWeight(r.durationMs);
     unawaited(_c.forward(from: 0));
   }
