@@ -75,8 +75,8 @@ class _RealtimePanelState extends State<RealtimePanel> {
             child: context.appDecoration.frost(
               context,
               borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-              child: Container(
-                decoration: context.appDecoration.panelBox(context, offset: 0),
+              child: context.appComponents.surface(
+                context,
                 child: BlocBuilder<RealtimeBloc, RealtimeState>(
                   buildWhen: _framesChanged,
                   builder: (context, state) {

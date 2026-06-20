@@ -189,11 +189,8 @@ class ResponseSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(
                           context.appShape.panelRadius,
                         ),
-                        child: Container(
-                          decoration: context.appDecoration.panelBox(
-                            context,
-                            offset: 0,
-                          ),
+                        child: context.appComponents.surface(
+                          context,
                           child: TabBarView(
                             children: [
                               ResponseBodyView(
