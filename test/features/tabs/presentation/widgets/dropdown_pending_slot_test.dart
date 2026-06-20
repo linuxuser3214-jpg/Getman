@@ -1,5 +1,5 @@
-// Tests that the response-pending shimmer routes through the pendingIndicator
-// slot and fills the panel correctly (no RenderFlex overflow, Shimmer present).
+// Tests that the response-pending skeleton routes through the pendingIndicator
+// slot and fills the panel correctly (no RenderFlex overflow).
 //
 // RequestKindMethodSelector and PanelSelector are intentionally NOT routed
 // through AppDropdown/select — see B7 report for rationale.
@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_components.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
@@ -31,7 +32,6 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_section.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:re_editor/re_editor.dart';
-import 'package:shimmer/shimmer.dart';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -174,7 +174,8 @@ void main() {
   // -------------------------------------------------------------------------
 
   testWidgets(
-    'isSending tab renders Shimmer via pendingIndicator slot (no exception)',
+    'isSending tab renders pending skeleton via pendingIndicator slot '
+    '(no exception)',
     (tester) async {
       const tabId = 'tabPending';
       final completer = Completer<HttpResponseEntity>();
@@ -212,8 +213,9 @@ void main() {
 
       await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
 
-      // The pendingIndicator slot must render a Shimmer widget.
-      expect(find.byType(Shimmer), findsOneWidget);
+      // The brutalist pendingIndicator slot renders BrutalPressIndicator
+      // (ink-press skeleton), not a Shimmer.
+      expect(find.byType(BrutalPressIndicator), findsOneWidget);
       // No RenderFlex overflow or other exception.
       expect(tester.takeException(), isNull);
 
@@ -231,7 +233,7 @@ void main() {
   );
 
   testWidgets(
-    'isSending tab pending skeleton has Semantics label "Loading response"',
+    'isSending tab pending skeleton has Semantics liveRegion label',
     (tester) async {
       const tabId = 'tabPendingSem';
       final completer = Completer<HttpResponseEntity>();
@@ -267,10 +269,11 @@ void main() {
 
       await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
 
-      expect(find.byType(Shimmer), findsOneWidget);
+      // Brutalist theme: BrutalPressIndicator wraps the skeleton in Semantics.
+      expect(find.byType(BrutalPressIndicator), findsOneWidget);
       expect(
-        tester.getSemantics(find.byType(Shimmer)),
-        matchesSemantics(label: 'Loading response', isLiveRegion: true),
+        tester.getSemantics(find.byType(BrutalPressIndicator)),
+        matchesSemantics(label: 'PRINTING…', isLiveRegion: true),
       );
 
       completer.completeError(

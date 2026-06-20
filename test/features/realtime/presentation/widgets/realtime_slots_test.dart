@@ -64,7 +64,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('logView slot: IN and OUT labels + frame text appear', (
+  testWidgets('logView slot: direction glyphs + frame text appear', (
     tester,
   ) async {
     stubRealtime(
@@ -83,8 +83,9 @@ void main() {
 
     await pump(tester);
 
-    expect(find.text('IN'), findsOneWidget);
-    expect(find.text('OUT'), findsOneWidget);
+    // Brutalist logView uses glyph markers (▼ / ▲) rather than 'IN' / 'OUT'.
+    expect(find.text('▼'), findsOneWidget);
+    expect(find.text('▲'), findsOneWidget);
     expect(find.text('server says hello'), findsOneWidget);
     expect(find.text('client ping'), findsOneWidget);
     expect(tester.takeException(), isNull);

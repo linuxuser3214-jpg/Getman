@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_bounce.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_components.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_decorations.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_motion.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
@@ -287,7 +287,7 @@ ThemeData brutalistTheme(
       decoration,
       brutalistMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'HIT SEND TO GET A RESPONSE'),
-      defaultAppComponents(),
+      brutalistComponents(reduceEffects: reduceEffects),
     ],
   );
 }
