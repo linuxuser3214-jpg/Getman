@@ -489,9 +489,13 @@ class AurisHexOrnament extends StatelessWidget {
 ```dart
 // From auris.dart:
 class ChamferClipper   // clip to chamfered silhouette; ChamferClipper({required double cut})
-class AurisChamferBorder  // ShapeBorder with chamfer; AurisChamferBorder({required double cut, BorderSide side})
+class AurisChamferBorder  // ShapeBorder with chamfer; AurisChamferBorder({double cut = 0, BorderSide side = BorderSide.none})
+class AurisChamferInputBorder // InputBorder variant (also exported by auris.dart) for chamfered text fields
 class SlantClipper     // parallelogram clip (used by Switch + ProgressBar)
 class AurisSlantBorder // ShapeBorder with slant; AurisSlantBorder({required double slant, BorderSide side})
+
+// NOTE: the auris WIDGETS self-chamfer internally — C2/D1 generally do NOT construct
+// these borders directly; they're available if a Getman-side surface wants the look.
 ```
 
 ---
