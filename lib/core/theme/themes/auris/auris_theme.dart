@@ -8,6 +8,7 @@ import 'package:getman/core/theme/extensions/app_shape.dart';
 import 'package:getman/core/theme/extensions/app_typography.dart';
 import 'package:getman/core/theme/themes/auris/auris_components.dart';
 import 'package:getman/core/theme/themes/auris/auris_decorations.dart';
+import 'package:getman/core/theme/themes/auris/auris_motion.dart';
 import 'package:getman/core/theme/themes/auris/auris_palette.dart';
 
 /// Builds [ThemeData] for the AURIS theme.
@@ -76,8 +77,8 @@ ThemeData aurisTheme(
       shape,
       typography,
       decoration,
-      // Identity motion — Phase E1 replaces with aurisMotion(reduceEffects).
-      const AppMotion(),
+      // AURIS HUD motion (Phase E1).
+      aurisMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: '// NO SIGNAL'),
       // AURIS component slots: each surface maps to its Auris* widget.
       aurisComponents(),
