@@ -192,15 +192,44 @@
 > slots with the `auris` package's HUD widgets. The seam now exists for every
 > theme to express personality through *different widgets*, not just colors.
 
-#### VM-F1 — Give the other six themes bespoke component widgets
-- **Idea**: Brutalist/Arcane/Glass/Editorial/Dracula/Classic each override
-  selected `AppComponents` slots with their own widget treatments (e.g.
-  Brutalist hard-edged ink badges, Arcane runic panels, Glass frosted stat
-  tiles) instead of all sharing `defaultAppComponents()`.
-- **Seam**: add `<name>_components.dart` returning
-  `defaultAppComponents().copyWith(...)`; attach in the theme builder. No
-  widget edits — consumers already read `context.appComponents`.
-- **Effort**: M per theme (pick the 2–3 highest-personality slots first).
+#### VM-F1 — Original components per theme (give every theme its own widget set, like AURIS)
+- **Idea**: AURIS proved the seam — a theme can express itself through *original
+  widgets*, not just colours/shapes. Do the same for the other six: design
+  bespoke components that fit **each theme's personality** and wire them through
+  the `AppComponents` slots (override only the high-personality slots; inherit
+  `defaultAppComponents()` for the rest). These can be brand-new custom widgets
+  authored in the theme's own dir (the way `auris_components.dart` composes the
+  `auris` kit) — not merely recoloured defaults. Highest-impact slots to start
+  with: `surface`, `methodBadge`/`statusBadge`, `logView`, `metric`, `toggle`.
+  Sketches (illustrative, not prescriptive):
+  - **BRUTALIST** — hard ink-stamp badges (thick border, hard offset shadow,
+    uppercase), slab panels with the signature hard shadow, a chunky toggle that
+    *clunks*, a monospace "dot-matrix"/ticker log.
+  - **ARCANE QUEST** — runic-bordered/illuminated panels, gem or sigil status
+    badges, a spellbook/scroll-style frame log, parchment data rows, an
+    enchanted lever toggle, stat "runestones" for metric.
+  - **LIQUID GLASS** — frosted stat tiles, translucent lozenge badges, a glass
+    switch with a liquid thumb, a blurred terminal pane (builds on its existing
+    frost).
+  - **EDITORIAL** — serif/footnote-style data rows, magazine pull-quote panels,
+    quiet capsule badges, a restrained byline-style log.
+  - **DRACULA** — neon-accent capsule badges, a dev-console terminal log, softly
+    rounded panels with subtle purple glow.
+  - **CLASSIC** — stays mostly on the defaults *by design* (calm/native, like its
+    motion); at most minor Postman-style refinements. Don't make it loud.
+- **Seam**: add `<name>_components.dart` exporting
+  `AppComponents <name>Components()` = `defaultAppComponents().copyWith(...)`,
+  plus the theme's own private widgets; attach it in `<name>_theme.dart` instead
+  of `defaultAppComponents()`. **No app-widget edits** — every consumer already
+  reads `context.appComponents`. Read `docs/THEME_AUTHORING.md` and use
+  `auris_components.dart` as the reference pattern (incl. the fidelity/overflow
+  testing under the theme).
+- **Tests**: per theme, a `<name>_components_test.dart` (each overridden slot
+  renders under that theme without throwing) + an under-theme render/overflow
+  guard for the panels + the metadata row (the AURIS work caught real overflow
+  this way).
+- **Effort**: M per theme — keep the calm/loud contrast intentional (don't turn
+  a calm theme loud just because the seam exists; see THEME_AUTHORING §2).
 
 #### VM-F2 — Wire the `select` slot (currently built but unused)
 - **Idea**: `AppDropdown<T>` + the `select` slot exist but no app surface routes
