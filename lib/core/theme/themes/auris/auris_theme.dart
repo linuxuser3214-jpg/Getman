@@ -1,12 +1,12 @@
 import 'package:auris/auris.dart';
 import 'package:flutter/material.dart';
-import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 import 'package:getman/core/theme/extensions/app_copy.dart';
 import 'package:getman/core/theme/extensions/app_decoration.dart';
 import 'package:getman/core/theme/extensions/app_layout.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
 import 'package:getman/core/theme/extensions/app_shape.dart';
 import 'package:getman/core/theme/extensions/app_typography.dart';
+import 'package:getman/core/theme/themes/auris/auris_components.dart';
 import 'package:getman/core/theme/themes/auris/auris_decorations.dart';
 import 'package:getman/core/theme/themes/auris/auris_palette.dart';
 
@@ -18,7 +18,7 @@ import 'package:getman/core/theme/themes/auris/auris_palette.dart';
 /// `copyWith`, crucially **spreading `base.extensions.values`** first so
 /// `AurisScheme` — which every auris widget force-unwraps — is always present.
 ///
-/// Phase D1 replaces [defaultAppComponents] with `aurisComponents()`.
+/// Phase D1 wires the AURIS component slots via [aurisComponents].
 /// Phase E1 replaces the identity [AppMotion] with `aurisMotion(...)`.
 /// Phase E2 replaces [aurisScaffoldBackground] with the real ambient.
 ThemeData aurisTheme(
@@ -79,8 +79,8 @@ ThemeData aurisTheme(
       // Identity motion — Phase E1 replaces with aurisMotion(reduceEffects).
       const AppMotion(),
       const AppCopy(emptyResponse: '// NO SIGNAL'),
-      // Default component slots — Phase D1 replaces with aurisComponents().
-      defaultAppComponents(),
+      // AURIS component slots: each surface maps to its Auris* widget.
+      aurisComponents(),
     ],
   );
 }
