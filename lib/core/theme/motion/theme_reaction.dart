@@ -12,12 +12,26 @@ enum ThemeReactionKind {
   cancelled,
 }
 
+/// A transport-level (no HTTP status) failure, refined just enough for the
+/// theme layer to pick a distinct flavor. Pure Dart; the bloc maps
+/// NetworkFailureType → this so the motion spine never imports core/error.
+enum TransportFailureKind { timeout, badCertificate }
+
 class ThemeReaction extends Equatable {
-  const ThemeReaction({required this.kind, this.statusCode, this.durationMs});
+  const ThemeReaction({
+    required this.kind,
+    this.statusCode,
+    this.durationMs,
+    this.transportFailure,
+  });
 
   final ThemeReactionKind kind;
   final int? statusCode;
   final int? durationMs;
+
+  /// Set only on a [ThemeReactionKind.networkError] reaction, to distinguish
+  /// timeout / bad-cert / generic transport failures. Null otherwise.
+  final TransportFailureKind? transportFailure;
 
   /// Maps an HTTP status to a reaction kind. 200..399 success, 400..499
   /// clientError, 500..599 serverError, anything else (0, sub-200, 6xx) is
@@ -39,5 +53,5 @@ class ThemeReaction extends Equatable {
       kind == ThemeReactionKind.networkError;
 
   @override
-  List<Object?> get props => [kind, statusCode, durationMs];
+  List<Object?> get props => [kind, statusCode, durationMs, transportFailure];
 }

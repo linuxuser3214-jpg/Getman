@@ -46,4 +46,17 @@ void main() {
       ),
     );
   });
+
+  group('transportFailure field', () {
+    test('defaults to null and is part of equality', () {
+      const a = ThemeReaction(kind: ThemeReactionKind.networkError);
+      expect(a.transportFailure, isNull);
+      const b = ThemeReaction(
+        kind: ThemeReactionKind.networkError,
+        transportFailure: TransportFailureKind.timeout,
+      );
+      expect(a == b, isFalse);
+      expect(b.transportFailure, TransportFailureKind.timeout);
+    });
+  });
 }
