@@ -73,6 +73,12 @@ jobs:
       # updater compares against the tag, not whatever is in pubspec.yaml.
       - name: Build Windows
         shell: pwsh
+        # The audioplayers_windows plugin includes <experimental/coroutine>, which the
+        # runner's MSVC now rejects with a hard error (STL1011) unless this macro is set.
+        # cl.exe reads the CL env var and prepends it to every compile, so the define
+        # reaches the plugin's own .vcxproj without patching generated build files.
+        env:
+          CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
         run: |
           $ver = $env:VERSION -replace '^v',''
           flutter build windows --release --build-name="$ver" --build-number="${{ github.run_number }}"
@@ -101,7 +107,10 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config
+          # GStreamer dev packages are required by the audioplayers_linux plugin
+          # (sound effects) — its CMakeLists does pkg_check_modules(... gstreamer-1.0).
+          sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       - uses: subosito/flutter-action@v2
         with:
