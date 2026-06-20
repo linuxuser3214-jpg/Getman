@@ -126,26 +126,13 @@ class _DefaultStatusBadge extends StatelessWidget {
         border: Border.all(color: theme.dividerColor, width: layout.borderThin),
         borderRadius: BorderRadius.circular(context.appShape.panelRadius),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'STATUS: ',
-            style: TextStyle(
-              color: textColor,
-              fontSize: layout.fontSizeSmall,
-              fontWeight: context.appTypography.titleWeight,
-            ),
-          ),
-          Text(
-            '$statusCode',
-            style: TextStyle(
-              color: textColor,
-              fontWeight: context.appTypography.displayWeight,
-              fontSize: layout.fontSizeNormal,
-            ),
-          ),
-        ],
+      child: Text(
+        '$statusCode',
+        style: TextStyle(
+          color: textColor,
+          fontWeight: context.appTypography.displayWeight,
+          fontSize: layout.fontSizeNormal,
+        ),
       ),
     );
   }
@@ -409,14 +396,21 @@ class _DefaultDataRow extends StatelessWidget {
         style: TextStyle(
           fontWeight: context.appTypography.titleWeight,
           fontSize: layout.fontSizeNormal,
-          color: highlight ? theme.primaryColor : theme.primaryColor,
+          color: highlight
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurfaceVariant,
         ),
       ),
       subtitle: Text(
         value,
         style: TextStyle(
           fontSize: layout.fontSizeNormal,
-          color: theme.colorScheme.onSurface,
+          fontWeight: highlight
+              ? context.appTypography.titleWeight
+              : context.appTypography.bodyWeight,
+          color: highlight
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface,
         ),
       ),
     );
@@ -553,7 +547,7 @@ class _DefaultPendingIndicator extends StatelessWidget {
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: 8,
+              itemCount: 15,
               itemBuilder: (context, _) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Container(
