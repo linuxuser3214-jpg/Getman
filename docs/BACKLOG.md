@@ -267,6 +267,26 @@
 
 ---
 
+## 🛠️ Build, Packaging & Release
+
+### R1 — Bundle GStreamer into the Linux AppImage (runtime sound)
+- **Files**: `.github/workflows/release.yml` (the `Package AppImage` step);
+  `linux/packaging/AppRun`.
+- **Problem**: `audioplayers_linux` resolves GStreamer at **runtime** from the
+  host system. The v1.5.0 release fix added the GStreamer *dev* packages so the
+  build compiles, but the shipped `.AppImage` does not bundle the GStreamer
+  runtime libs/plugins — so sound effects only work on machines that already
+  have GStreamer installed (common on desktop Linux, not guaranteed).
+- **Fix**: Bundle the GStreamer runtime (`libgstreamer-1.0`, `gst-plugins-base`/
+  `-good`, the audio sink plugins) into the AppDir and point the loader at them
+  from `AppRun` (e.g. `linuxdeploy` + its GStreamer plugin, or copy the `.so`s
+  and set `GST_PLUGIN_SYSTEM_PATH` / `LD_LIBRARY_PATH`). Confirm the app degrades
+  gracefully (no crash, just silent) when GStreamer can't initialize.
+- **Effort**: M. **Verify**: run the built AppImage on a clean Linux box (no
+  system GStreamer installed) and confirm a send plays the themed sound.
+
+---
+
 # Working agreement (how to resume)
 1. **One concern per commit**, message `type(scope): summary`, end with
    `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
