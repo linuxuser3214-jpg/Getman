@@ -40,6 +40,14 @@
   THEME_AUTHORING §5b). `NetworkFailureType.connection` was split into
   `connectionTimeout`/`connectionError`. No wiki change (internal motion
   polish, no new user-facing control).
+- **M8 GraphQL body type shipped** (merged from `master`, `feat/graphql-body`):
+  a `graphql` `BodyType` (wire `'graphql'`, back-compat) with a dual-pane
+  QUERY + VARIABLES (JSON) editor; send posts `{query,variables}` as
+  `application/json` with `{{var}}` resolved in both panes; invalid variables
+  surface a status-0 error response. New `graphqlVariables` field on the request
+  config (entity + Hive model typeId 1 `@HiveField(15)`; query reuses `body`).
+  Round-trips through code-gen, Postman import/export, and the git workspace
+  mirror. Spec + plan under `docs/superpowers/`.
 
 ---
 
@@ -196,14 +204,6 @@
 ---
 
 ## 📦 Request & Body Types
-
-### M8 — GraphQL body type
-- **Files**: `body_type.dart:4`, `request_config_entity.dart`,
-  `request_serializer.dart`, `request_editor_tabs.dart`.
-- **Fix**: Add a `graphql` `BodyType` (new wire string for back-compat); store
-  query + variables JSON; serialize `{query,variables}` with `application/json`
-  at send; dual-pane editor.
-- **Effort**: M.
 
 ### M9 — Pre-request scripts (no-code)
 - **Files**: `lib/features/chaining/…` (post-response only today), send pipeline

@@ -92,7 +92,9 @@ bearer/basic/api-key, applied in `request_serializer.dart`), **code generation**
 (`code_gen_service.dart` — cURL / JS fetch / Node axios / Python requests / Go net/http / Java
 OkHttp; each a pure `_Effective` formatter, new targets appear in `code_export_dialog.dart`
 automatically since it iterates `CodeGenTarget.values`), **body types** (`body_type.dart` —
-none/raw/urlencoded/multipart/binary), and a **git-friendly workspace mirror**
+none/raw/urlencoded/multipart/binary/graphql; the `graphql` type stores the query in `body`
+plus a `graphqlVariables` JSON map, serialized as `{query,variables}` `application/json` at
+send via a dual-pane QUERY + VARIABLES editor), and a **git-friendly workspace mirror**
 (`collections/data/services/workspace_sync_service.dart`).
 
 Mandatory rules:
