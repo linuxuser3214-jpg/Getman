@@ -440,22 +440,20 @@ class _DefaultDataRow extends StatelessWidget {
     return ListTile(
       dense: true,
       title: Text(
-        label.toUpperCase(),
+        label,
         style: TextStyle(
           fontWeight: context.appTypography.titleWeight,
           fontSize: layout.fontSizeNormal,
-          color: highlight
-              ? theme.colorScheme.primary
-              : theme.colorScheme.onSurfaceVariant,
+          // Both highlight states use primaryColor — the views always show the
+          // key in primaryColor regardless of highlight state.
+          color: theme.primaryColor,
         ),
       ),
       subtitle: Text(
         value,
         style: TextStyle(
           fontSize: layout.fontSizeNormal,
-          fontWeight: highlight
-              ? context.appTypography.titleWeight
-              : context.appTypography.bodyWeight,
+          fontWeight: highlight ? context.appTypography.titleWeight : null,
           color: highlight
               ? theme.colorScheme.primary
               : theme.colorScheme.onSurface,
