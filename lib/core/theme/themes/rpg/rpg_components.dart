@@ -97,15 +97,20 @@ class RunicPanel extends StatelessWidget {
 }
 
 class _RunicBorderPainter extends CustomPainter {
-  const _RunicBorderPainter({required this.borderColor});
+  _RunicBorderPainter({required this.borderColor})
+    : _paint = Paint()
+        ..color = borderColor
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke;
+
   final Color borderColor;
+  final Paint _paint;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = borderColor
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
+    // Mutate the hoisted Paint's color (borderColor may differ between
+    // instances; a single painter is constructed per build, not per frame).
+    _paint.color = borderColor;
 
     const r = 6.0;
     const flourish = 8.0;
@@ -118,30 +123,30 @@ class _RunicBorderPainter extends CustomPainter {
       size.height,
       const Radius.circular(r),
     );
-    canvas.drawRRect(rect, paint);
+    canvas.drawRRect(rect, _paint);
 
     // Corner flourishes — small cross marks at each corner.
-    final corners = [
-      Offset.zero,
-      Offset(size.width, 0),
-      Offset(0, size.height),
-      Offset(size.width, size.height),
-    ];
-    for (final corner in corners) {
-      final dx = corner.dx == 0 ? flourish : -flourish;
-      final dy = corner.dy == 0 ? flourish : -flourish;
+    // Inline instead of allocating a List<Offset> per call.
+    void drawCorner(double cx, double cy) {
+      final dx = cx == 0 ? flourish : -flourish;
+      final dy = cy == 0 ? flourish : -flourish;
       canvas
         ..drawLine(
-          corner + Offset(dx / 2, 0),
-          corner + Offset(dx, 0),
-          paint,
+          Offset(cx + dx / 2, cy),
+          Offset(cx + dx, cy),
+          _paint,
         )
         ..drawLine(
-          corner + Offset(0, dy / 2),
-          corner + Offset(0, dy),
-          paint,
+          Offset(cx, cy + dy / 2),
+          Offset(cx, cy + dy),
+          _paint,
         );
     }
+
+    drawCorner(0, 0);
+    drawCorner(size.width, 0);
+    drawCorner(0, size.height);
+    drawCorner(size.width, size.height);
   }
 
   @override
@@ -305,7 +310,26 @@ class _GemShape extends ShapeBorder {
       ..color = borderColor
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
-    canvas.drawPath(getOuterPath(rect), paint);
+    // Build the stroke path directly to avoid the extra allocation that
+    // delegating to getOuterPath() would cause (getOuterPath allocates a new
+    // Path each call).  _GemShape.paint is not a hot path (it runs once per
+    // layout, not per frame), but the discipline is kept.
+    final cx = rect.center.dx;
+    final cut = rect.height * 0.18;
+    final path = Path()
+      ..moveTo(rect.left + cut, rect.top)
+      ..lineTo(rect.right - cut, rect.top)
+      ..lineTo(rect.right, rect.top + cut)
+      ..lineTo(rect.right, rect.bottom - cut)
+      ..lineTo(rect.right - cut, rect.bottom)
+      ..lineTo(rect.left + cut, rect.bottom)
+      ..lineTo(rect.left, rect.bottom - cut)
+      ..lineTo(rect.left, rect.top + cut)
+      ..close()
+      ..moveTo(rect.left + cut, rect.top)
+      ..lineTo(cx, rect.top + rect.height * 0.35)
+      ..lineTo(rect.right - cut, rect.top);
+    canvas.drawPath(path, paint);
   }
 
   @override
@@ -629,18 +653,23 @@ class _SummoningRingState extends State<SummoningRing>
     super.dispose();
   }
 
+  // Painter is constructed once per build (not per frame). When animating,
+  // it reads angle from the controller directly inside paint() and uses _c as
+  // its repaint notifier — no AnimatedBuilder rebuild needed.
+  late _SummoningRingPainter _painter;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Rebuild the painter when dependencies (e.g. theme brightness) change;
+    // at 60fps the animation itself does NOT trigger a build — only repaint.
+    _painter = _SummoningRingPainter(animation: _c);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-
-    final inner = _c == null
-        ? _buildRing(context, angle: 0)
-        : AnimatedBuilder(
-            animation: _c!,
-            builder: (context, _) =>
-                _buildRing(context, angle: _c!.value * 2 * math.pi),
-          );
 
     return Semantics(
       label: widget.label,
@@ -665,7 +694,7 @@ class _SummoningRingState extends State<SummoningRing>
                 child: SizedBox(
                   width: 96,
                   height: 96,
-                  child: inner,
+                  child: CustomPaint(painter: _painter),
                 ),
               ),
               const SizedBox(height: 12),
@@ -683,69 +712,79 @@ class _SummoningRingState extends State<SummoningRing>
       ),
     );
   }
-
-  Widget _buildRing(BuildContext context, {required double angle}) {
-    return CustomPaint(
-      painter: _SummoningRingPainter(angle: angle),
-    );
-  }
 }
 
+/// Allocation-free summoning ring painter.
+///
+/// - 2 [Paint] objects are built once at construction, not per frame.
+/// - 8 [TextPainter]s (one per rune glyph) are laid out once at construction.
+/// - When [animation] is non-null the controller drives repaint directly
+///   (via `super(repaint: animation)`); the angle is read from
+///   `animation.value` inside [paint]. No [AnimatedBuilder] wrapper needed.
+/// - When [animation] is null (static / reduceEffects mode) angle stays 0.
 class _SummoningRingPainter extends CustomPainter {
-  const _SummoningRingPainter({required this.angle});
-  final double angle;
+  _SummoningRingPainter({this.animation})
+    : _arcPaint = Paint()
+        ..color = RpgPalette.gold
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round,
+      _innerPaint = Paint()
+        ..color = RpgPalette.goldDeep.withValues(alpha: 0.4)
+        ..strokeWidth = 1
+        ..style = PaintingStyle.stroke,
+      _runePainters = _buildRunePainters(),
+      super(repaint: animation);
+
+  final AnimationController? animation;
+  final Paint _arcPaint;
+  final Paint _innerPaint;
+  // One pre-laid-out TextPainter per rune glyph — never reallocated in paint.
+  final List<TextPainter> _runePainters;
 
   static const _runes = ['ᚠ', 'ᚢ', 'ᚦ', 'ᚨ', 'ᚱ', 'ᚲ', 'ᚷ', 'ᚹ'];
 
+  static List<TextPainter> _buildRunePainters() {
+    const style = TextStyle(color: RpgPalette.gold, fontSize: 10);
+    return [
+      for (final r in _runes)
+        TextPainter(
+          text: TextSpan(text: r, style: style),
+          textDirection: TextDirection.ltr,
+        )..layout(),
+    ];
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
+    final angle = animation != null ? animation!.value * 2 * math.pi : 0.0;
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 4;
 
-    // Outer rotating border arc.
-    final arcPaint = Paint()
-      ..color = RpgPalette.gold
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    // Outer rotating border arc + inner static ring.
+    canvas
+      ..drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        angle,
+        math.pi * 1.6,
+        false,
+        _arcPaint,
+      )
+      ..drawCircle(center, radius * 0.65, _innerPaint);
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      angle,
-      math.pi * 1.6,
-      false,
-      arcPaint,
-    );
-
-    // Inner static ring.
-    final innerPaint = Paint()
-      ..color = RpgPalette.goldDeep.withValues(alpha: 0.4)
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-    canvas.drawCircle(center, radius * 0.65, innerPaint);
-
-    // Rune glyphs arranged in a circle.
-    final tp = TextPainter(textDirection: TextDirection.ltr);
+    // Rune glyphs arranged in a circle — reuse pre-built painters.
     final runeRadius = radius * 0.82;
-    for (var i = 0; i < _runes.length; i++) {
-      final theta = (i / _runes.length) * 2 * math.pi + angle * 0.4;
+    for (var i = 0; i < _runePainters.length; i++) {
+      final theta = (i / _runePainters.length) * 2 * math.pi + angle * 0.4;
       final x = center.dx + runeRadius * math.cos(theta);
       final y = center.dy + runeRadius * math.sin(theta);
-      tp
-        ..text = TextSpan(
-          text: _runes[i],
-          style: const TextStyle(
-            color: RpgPalette.gold,
-            fontSize: 10,
-          ),
-        )
-        ..layout()
-        ..paint(canvas, Offset(x - tp.width / 2, y - tp.height / 2));
+      final tp = _runePainters[i];
+      tp.paint(canvas, Offset(x - tp.width / 2, y - tp.height / 2));
     }
   }
 
   @override
-  bool shouldRepaint(_SummoningRingPainter old) => old.angle != angle;
+  bool shouldRepaint(_SummoningRingPainter old) => old.animation != animation;
 }
 
 // --- statusBanner: heraldic ribbon banner ----------------------------------
