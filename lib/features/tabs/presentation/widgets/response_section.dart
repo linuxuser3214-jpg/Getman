@@ -10,7 +10,6 @@ import 'package:getman/features/tabs/presentation/widgets/response/response_body
 import 'package:getman/features/tabs/presentation/widgets/response/response_cookies_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_headers_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_history_timeline.dart';
-import 'package:getman/features/tabs/presentation/widgets/response/response_metadata_item.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_tests_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
     show UnifiedRequestPanel;
@@ -153,25 +152,19 @@ class ResponseSection extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 8,
                   children: [
-                    ResponseMetadataItem(
-                      label: 'STATUS',
-                      value: response.statusCode.toString(),
-                      color: context.appPalette.statusAccent(
-                        response.statusCode,
-                      ),
-                      layout: layout,
+                    context.appComponents.statusBadge(
+                      context,
+                      statusCode: response.statusCode,
                     ),
-                    ResponseMetadataItem(
+                    context.appComponents.metric(
+                      context,
                       label: 'TIME',
                       value: '${response.durationMs} ms',
-                      color: theme.colorScheme.secondary,
-                      layout: layout,
                     ),
-                    ResponseMetadataItem(
+                    context.appComponents.metric(
+                      context,
                       label: 'SIZE',
                       value: formatBytes(responseSizeBytes(response)),
-                      color: theme.colorScheme.secondary,
-                      layout: layout,
                     ),
                     ResponseHistoryTimeline(
                       tabId: tabId,

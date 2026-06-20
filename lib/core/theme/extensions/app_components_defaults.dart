@@ -90,7 +90,9 @@ class _DefaultMethodBadge extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// statusBadge  — mirrors the STATUS chip in ResponseMetadataItem
+// statusBadge  — byte-faithful reproduction of the STATUS chip in
+// ResponseMetadataItem: 600ms color-fade keyed by statusCode, label 'STATUS',
+// border, panelRadius, and the same white-in-dark text logic.
 // ---------------------------------------------------------------------------
 
 Widget _defaultStatusBadge(
@@ -108,38 +110,70 @@ class _DefaultStatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    final color = context.appPalette.statusAccent(statusCode);
+    final baseColor = context.appPalette.statusAccent(statusCode);
     final isDark = theme.brightness == Brightness.dark;
-    final lightOn = context.appPalette.onColor(color);
-    // Deliberate contrast on a variable-colored badge — same logic as
-    // ResponseMetadataItem (CLAUDE.md §4.8 exception).
-    // ignore: avoid_hardcoded_brand_colors — a11y white on dark, CLAUDE.md §4.8
+    final lightOn = context.appPalette.onColor(baseColor);
+    // Deliberate contrast on a variable-colored status badge (CLAUDE.md §4.8
+    // exception): STATUS text is always white in dark mode; light mode keeps
+    // the higher-contrast on-color.
+    // ignore: avoid_hardcoded_brand_colors
     final textColor = isDark ? Colors.white : lightOn;
 
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: layout.isCompact ? 4 : 8,
+    return TweenAnimationBuilder<Color?>(
+      key: ValueKey(statusCode),
+      duration: const Duration(milliseconds: 600),
+      tween: ColorTween(
+        begin: baseColor.withValues(alpha: 1),
+        end: baseColor.withValues(alpha: 0.2),
       ),
-      decoration: BoxDecoration(
-        color: color,
-        border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-      ),
-      child: Text(
-        '$statusCode',
-        style: TextStyle(
-          color: textColor,
-          fontWeight: context.appTypography.displayWeight,
-          fontSize: layout.fontSizeNormal,
-        ),
+      builder: (context, animColor, child) {
+        return Container(
+          margin: EdgeInsets.only(right: layout.isCompact ? 8 : 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: layout.isCompact ? 4 : 8,
+          ),
+          decoration: BoxDecoration(
+            color: animColor,
+            border: Border.all(
+              color: theme.dividerColor,
+              width: layout.borderThin,
+            ),
+            borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+          ),
+          child: child,
+        );
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'STATUS: ',
+            style: TextStyle(
+              color: textColor,
+              fontSize: layout.fontSizeSmall,
+              fontWeight: context.appTypography.titleWeight,
+            ),
+          ),
+          Text(
+            '$statusCode',
+            style: TextStyle(
+              color: textColor,
+              fontWeight: context.appTypography.displayWeight,
+              fontSize: layout.fontSizeNormal,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// metric  — mirrors TIME/SIZE chips in ResponseMetadataItem
+// metric  — byte-faithful reproduction of TIME/SIZE chips in
+// ResponseMetadataItem: 600ms color-fade keyed by value, label text, border,
+// panelRadius, and the same white-in-dark text logic. delta is ignored by the
+// default (not rendered in the original ResponseMetadataItem).
 // ---------------------------------------------------------------------------
 
 Widget _defaultMetric(
@@ -168,25 +202,41 @@ class _DefaultMetric extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    final color = theme.colorScheme.secondary;
+    final baseColor = theme.colorScheme.secondary;
     final isDark = theme.brightness == Brightness.dark;
-    final lightOn = context.appPalette.onColor(color);
-    // ignore: avoid_hardcoded_brand_colors — deliberate contrast on a variable-
-    // colored metric chip; same exception documented in CLAUDE.md §4.8.
+    final lightOn = context.appPalette.onColor(baseColor);
+    // Deliberate contrast on a variable-colored metric chip (CLAUDE.md §4.8
+    // exception): TIME/SIZE text is always white in dark mode; light mode keeps
+    // the higher-contrast on-color.
+    // ignore: avoid_hardcoded_brand_colors
     final textColor = isDark ? Colors.white : lightOn;
     final displayValue = unit != null ? '$value $unit' : value;
-    final fullValue = delta != null ? '$displayValue  $delta' : displayValue;
 
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: layout.isCompact ? 4 : 8,
+    return TweenAnimationBuilder<Color?>(
+      key: ValueKey(displayValue),
+      duration: const Duration(milliseconds: 600),
+      tween: ColorTween(
+        begin: baseColor.withValues(alpha: 1),
+        end: baseColor.withValues(alpha: 0.2),
       ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-      ),
+      builder: (context, animColor, child) {
+        return Container(
+          margin: EdgeInsets.only(right: layout.isCompact ? 8 : 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: layout.isCompact ? 4 : 8,
+          ),
+          decoration: BoxDecoration(
+            color: animColor,
+            border: Border.all(
+              color: theme.dividerColor,
+              width: layout.borderThin,
+            ),
+            borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+          ),
+          child: child,
+        );
+      },
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -199,7 +249,7 @@ class _DefaultMetric extends StatelessWidget {
             ),
           ),
           Text(
-            fullValue,
+            displayValue,
             style: TextStyle(
               color: textColor,
               fontWeight: context.appTypography.displayWeight,
