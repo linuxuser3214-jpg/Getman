@@ -593,10 +593,9 @@ class _SettingsDialogState extends State<SettingsDialog>
     Key? switchKey,
   }) {
     final layout = context.appLayout;
-    return SwitchListTile(
-      key: switchKey,
+    return ListTile(
       contentPadding: EdgeInsets.symmetric(horizontal: layout.inputPadding),
-      secondary: icon == null ? null : Icon(icon, size: layout.iconSize),
+      leading: icon == null ? null : Icon(icon, size: layout.iconSize),
       title: Text(
         title,
         style: TextStyle(
@@ -607,8 +606,15 @@ class _SettingsDialogState extends State<SettingsDialog>
       subtitle: subtitle == null
           ? null
           : Text(subtitle, style: TextStyle(fontSize: layout.fontSizeSmall)),
-      value: value,
-      onChanged: onChanged,
+      trailing: KeyedSubtree(
+        key: switchKey,
+        child: context.appComponents.toggle(
+          context,
+          value: value,
+          onChanged: onChanged,
+        ),
+      ),
+      onTap: () => onChanged(!value),
     );
   }
 }
