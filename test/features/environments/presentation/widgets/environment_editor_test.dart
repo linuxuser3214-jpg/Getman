@@ -87,7 +87,7 @@ void main() {
     expect(nameField, findsOneWidget);
 
     await tester.enterText(nameField, 'Staging');
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     // putEnvironment should have been called (UpdateEnvironment persists).
     await untilCalled(() => repo.putEnvironment(any()));
@@ -113,14 +113,14 @@ void main() {
       expect(keyField, findsOneWidget);
 
       await tester.enterText(keyField, 'BASE_URL');
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       // Typing a non-empty key into the trailing row causes a new trailing row
       // to appear. Now set the value.
       final valField = find.byKey(const ValueKey('env_var_val_0'));
       expect(valField, findsOneWidget);
       await tester.enterText(valField, 'https://api.dev');
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       await untilCalled(() => repo.putEnvironment(any()));
 
@@ -152,7 +152,7 @@ void main() {
       expect(lockBtns, findsWidgets);
 
       await tester.tap(lockBtns.first);
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       await untilCalled(() => repo.putEnvironment(any()));
 
@@ -181,7 +181,7 @@ void main() {
       expect(deleteBtn, findsOneWidget);
 
       await tester.tap(deleteBtn);
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       await untilCalled(() => repo.putEnvironment(any()));
 

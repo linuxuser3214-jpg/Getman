@@ -164,7 +164,9 @@ void main() {
       await _pump(tester, envsBloc: envsBloc, settingsBloc: settingsBloc);
       await _openMenu(tester);
 
-      await tester.tap(find.text('No Environment'));
+      // "No Environment" renders both as the closed-selector label and as a
+      // menu item; tap the menu item (last in the tree, atop the overlay).
+      await tester.tap(find.text('No Environment').last);
       await tester.pumpAndSettle();
 
       await untilCalled(() => settingsUc(any()));
