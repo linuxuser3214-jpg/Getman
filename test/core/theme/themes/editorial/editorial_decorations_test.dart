@@ -83,17 +83,20 @@ void main() {
     testWidgets(
       'does not throw under reduceEffects=true',
       (tester) async {
+        BoxDecoration? deco;
         await tester.pumpWidget(
           MaterialApp(
             theme: editorialTheme(Brightness.light, reduceEffects: true),
             home: Builder(
               builder: (ctx) {
-                editorialPanelBox(ctx);
+                deco = editorialPanelBox(ctx);
                 return const SizedBox.shrink();
               },
             ),
           ),
         );
+        expect(deco, isNotNull);
+        expect(deco!.border, isNotNull);
         expect(tester.takeException(), isNull);
       },
     );
@@ -125,8 +128,7 @@ void main() {
                   hovered: false,
                   isFirst: false,
                 );
-                // Ensure layout is referenced (avoids unused-variable warning
-                // and validates the context is themed correctly).
+                // Validate the context is themed correctly.
                 expect(layout.borderThick, greaterThan(layout.borderThin));
                 return const SizedBox.shrink();
               },
@@ -283,11 +285,20 @@ void main() {
           home: Builder(
             builder: (ctx) => editorialScaffoldBackground(
               ctx,
-              child: const SizedBox.shrink(),
+              child: const SizedBox(
+                key: ValueKey('bg_child_dark'),
+                width: 200,
+                height: 200,
+              ),
             ),
           ),
         ),
       );
+      // The structural contract must hold in dark mode too.
+      expect(find.byKey(const ValueKey('bg_child_dark')), findsOneWidget);
+      expect(find.byType(Stack), findsAtLeastNWidgets(1));
+      expect(find.byType(IgnorePointer), findsAtLeastNWidgets(1));
+      expect(find.byType(CustomPaint), findsAtLeastNWidgets(1));
       expect(tester.takeException(), isNull);
     });
 
@@ -300,16 +311,24 @@ void main() {
           home: Builder(
             builder: (ctx) => editorialScaffoldBackground(
               ctx,
-              child: const SizedBox.shrink(),
+              child: const SizedBox(
+                key: ValueKey('bg_child_reduce'),
+                width: 200,
+                height: 200,
+              ),
             ),
           ),
         ),
       );
+      // Under reduceEffects the structural wrapping (Stack + overlay) must
+      // still render correctly — the child must be present.
+      expect(find.byKey(const ValueKey('bg_child_reduce')), findsOneWidget);
+      expect(find.byType(Stack), findsAtLeastNWidgets(1));
       expect(tester.takeException(), isNull);
     });
 
     testWidgets(
-      'via context.appDecoration.scaffoldBackground — does not throw',
+      'via context.appDecoration.scaffoldBackground — renders child in Stack',
       (tester) async {
         await tester.pumpWidget(
           MaterialApp(
@@ -317,11 +336,18 @@ void main() {
             home: Builder(
               builder: (ctx) => ctx.appDecoration.scaffoldBackground(
                 ctx,
-                child: const SizedBox.shrink(),
+                child: const SizedBox(
+                  key: ValueKey('bg_child_deco'),
+                  width: 200,
+                  height: 200,
+                ),
               ),
             ),
           ),
         );
+        // Verify the child is reachable and wrapped in a Stack.
+        expect(find.byKey(const ValueKey('bg_child_deco')), findsOneWidget);
+        expect(find.byType(Stack), findsAtLeastNWidgets(1));
         expect(tester.takeException(), isNull);
       },
     );

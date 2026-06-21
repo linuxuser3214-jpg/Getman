@@ -179,10 +179,13 @@ void main() {
       'survives mount + immediate dispose (no lifecycle crash)',
       (tester) async {
         await tester.pumpWidget(_host(animate: false));
+        // Confirm the widget is present before we unmount it.
+        expect(find.byType(ClassicPress), findsOneWidget);
         await tester.pumpWidget(const MaterialApp(home: Scaffold()));
         await tester.pump();
-        expect(tester.takeException(), isNull);
+        // After replacement, ClassicPress must be gone with no lifecycle error.
         expect(find.byType(ClassicPress), findsNothing);
+        expect(tester.takeException(), isNull);
       },
     );
   });

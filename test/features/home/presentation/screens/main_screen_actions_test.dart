@@ -1,11 +1,21 @@
-// Widget tests for the Actions registered by MainScreen.
+// Tests for the Action callback LOGIC registered by MainScreen.
 //
-// Rather than pumping the full MainScreen widget (which pulls in SideMenu,
-// TabContentStack, ChainingWriteBackListener and a large transitive tree),
-// this harness rebuilds each relevant Action callback in a thin Actions wrapper
-// with mock blocs in scope, then invokes the Intent and asserts the expected
-// BLoC event was dispatched. This mirrors the intent documented in §4.1 / §6 of
-// CLAUDE.md: "only [certain] intents live at MainScreen."
+// Pumping the real MainScreen is not feasible in widget tests: its transitive
+// tree requires GetIt-registered singletons (ThemeReactionController,
+// WorkspacePulseController, ThemeSoundService, TabDirtyChecker) plus
+// SideMenu / TabContentStack / ChainingWriteBackListener / ThemeReactionListener
+// that cannot be provided without running the full DI container, and the
+// theme's ambient ticker never settles so pumpAndSettle would hang.
+//
+// Instead, this harness rebuilds each relevant Action callback in a thin
+// Actions wrapper with mock blocs in scope — a faithful copy of the exact
+// callbacks in MainScreen._buildMainScreenActions — then invokes the Intent
+// and asserts the expected BLoC event was dispatched.
+//
+// NOTE: this tests the ACTION CALLBACK LOGIC (a verbatim copy), NOT the
+// MainScreen widget itself. The real MainScreen shortcut wiring (keyboard
+// chords → Intents → correct Actions tree) is covered end-to-end by
+// integration_test/flows/tab_shortcuts_test.dart.
 
 import 'dart:async';
 
@@ -471,11 +481,6 @@ void main() {
       testWidgets('calls focus on the URL focus registry for the active tab', (
         tester,
       ) async {
-        var focused = '';
-        final node = FocusNode();
-        addTearDown(node.dispose);
-        // Override focus() by pre-registering a node so we can observe the
-        // call. We spy via a UrlFocusRegistry subclass to track focus calls.
         final spyRegistry = _SpyFocusRegistry();
         await _pump(
           tester,
@@ -492,9 +497,6 @@ void main() {
         await tester.pump();
         // The registry's focus() must have been called with the active tab id.
         expect(spyRegistry.lastFocused, _kTab.tabId);
-        // Suppress unused-variable warning.
-        focused = spyRegistry.lastFocused ?? '';
-        expect(focused.isNotEmpty, isTrue);
       });
 
       testWidgets('is a no-op when there are no tabs', (tester) async {
