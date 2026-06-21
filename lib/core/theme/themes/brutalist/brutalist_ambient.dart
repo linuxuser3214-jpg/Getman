@@ -1,16 +1,21 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/motion/ambient_signals.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
 import 'package:provider/provider.dart';
 
-/// How long a click impulse stays alive before the widget prunes it. C1 (the
-/// ripple render) lands in Task 13; we age + drop entries now so the list never
-/// grows unbounded and the painter (later) only ever sees live impulses.
+/// How long a click impulse stays alive before the widget prunes it.
 const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
+
+/// @visibleForTesting impulse counter — updated by the `_BrutalistAmbientState`
+/// on each `_addImpulse` call; read by tests to assert click registration
+/// without accessing the private State class. Reset to 0 between tests.
+@visibleForTesting
+int debugBrutalistImpulseCount = 0;
 
 /// Full-effects Brutalist wallpaper: a slowly drifting risograph/halftone dot
 /// grid with a faint accent registration "ghost" offset. This is the C1/C2
@@ -162,6 +167,7 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
       AmbientImpulse(position: normalized, bornAtMs: nowMs),
     ];
     _impulses.value = next;
+    debugBrutalistImpulseCount = next.length;
     // Clicking is activity — keep the session pulse awake (no-op if null).
     _pulse?.touch();
   }
@@ -195,6 +201,7 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
                 // safety, but we don't want to subscribe to a dead controller).
                 hasPulse: _pulse != null,
                 signals: signals,
+                clock: widget.animate ? _clock : null,
               ),
             ),
           ),
@@ -206,6 +213,11 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
     if (!widget.animate) return stack;
     return Listener(
       onPointerDown: (e) {
+        // Desktop/web only — touch events don't produce ambient ripples.
+        if (e.kind != PointerDeviceKind.mouse &&
+            e.kind != PointerDeviceKind.stylus) {
+          return;
+        }
         final size = context.size;
         if (size == null || size.isEmpty) return;
         _addImpulse(
@@ -249,14 +261,18 @@ class _HalftonePainter extends CustomPainter {
     required this.isDark,
     required this.hasPulse,
     required this.signals,
+    this.clock,
   }) : super(repaint: _repaintFor(t, signals, hasPulse));
 
   final Animation<double> t;
   final bool isDark;
   final bool hasPulse;
 
-  /// Non-null only in animated mode (C1/C2 inputs). Read by Tasks 13/14.
+  /// Non-null only in animated mode (C1/C2 inputs).
   final AmbientSignals? signals;
+
+  /// Monotonic clock for impulse age computation; null in static mode.
+  final Stopwatch? clock;
 
   // Reused across dots/frames — only `.color` mutates per draw.
   final Paint _paint = Paint();
@@ -266,6 +282,9 @@ class _HalftonePainter extends CustomPainter {
   // overdraw of state).
   final Path _inkPath = Path();
   final Path _ghostPath = Path();
+
+  // Reused stroke paint for click ripples (C1). Not allocated in paint().
+  final Paint _ripplePaint = Paint()..style = PaintingStyle.stroke;
 
   static const int _kMaxCols = 40;
   static const int _kMaxRows = 28;
@@ -322,10 +341,32 @@ class _HalftonePainter extends CustomPainter {
     _inkPath.reset();
     _ghostPath.reset();
 
+    // C1 cursor force: pointer 0..1 → pixel coords. Dots near the cursor are
+    // pushed radially outward, creating a "parting" effect. Applied per-dot
+    // before adding to the path (no allocation — just adjust cx/cy locals).
+    final ptr = signals?.pointer.value;
+    final ptrPx = ptr != null
+        ? Offset(ptr.dx * size.width, ptr.dy * size.height)
+        : null;
+
     for (var c = 0; c < cols; c++) {
       for (var r = 0; r < rows; r++) {
-        final cx = c * _kCell + driftX;
-        final cy = r * _kCell + driftY;
+        var cx = c * _kCell + driftX;
+        var cy = r * _kCell + driftY;
+
+        // Cursor force: push the dot away from the pointer position.
+        if (ptrPx != null) {
+          final dx = cx - ptrPx.dx;
+          final dy = cy - ptrPx.dy;
+          final dist = math.sqrt(dx * dx + dy * dy);
+          const forceRadius = 80.0;
+          if (dist < forceRadius && dist > 0) {
+            final push = (1 - dist / forceRadius) * 28.0;
+            cx += dx / dist * push;
+            cy += dy / dist * push;
+          }
+        }
+
         // Radius swells on a diagonal wave so dots pulse in soft bands.
         final phase = (c + r) * 0.45 + v * math.pi * 2;
         final swell = 0.5 + 0.5 * math.sin(phase);
@@ -363,13 +404,40 @@ class _HalftonePainter extends CustomPainter {
       _inkPath,
       _paint..color = ink.withValues(alpha: isDark ? 0.06 : 0.05),
     );
+
+    // C1 click ripple: an expanding ink-splat ring per impulse. Age drives both
+    // radius and alpha (peaks at mid-life via sin curve) — no per-frame alloc.
+    final nowMs = clock?.elapsedMilliseconds ?? 0;
+    const kRippleLifetimeMs = 1400;
+    final rippleColor = isDark
+        ? BrutalistPalette.textDark
+        : BrutalistPalette.primary;
+    for (final imp in signals?.impulses.value ?? const <AmbientImpulse>[]) {
+      final ageMs = nowMs - imp.bornAtMs;
+      if (ageMs < 0 || ageMs > kRippleLifetimeMs) continue;
+      final age01 = ageMs / kRippleLifetimeMs;
+      final rippleRadius = size.shortestSide * 0.18 * age01;
+      final alpha = 0.28 * math.sin(age01 * math.pi);
+      if (alpha <= 0 || rippleRadius <= 0) continue;
+      final center = Offset(
+        imp.position.dx * size.width,
+        imp.position.dy * size.height,
+      );
+      _ripplePaint
+        ..shader = null
+        ..blendMode = BlendMode.srcOver
+        ..color = rippleColor.withValues(alpha: alpha)
+        ..strokeWidth = 2.0;
+      canvas.drawCircle(center, rippleRadius, _ripplePaint);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _HalftonePainter old) =>
       old.isDark != isDark ||
       old.hasPulse != hasPulse ||
-      old.signals != signals;
+      old.signals != signals ||
+      old.clock != clock;
 }
 
 // C0-continuous oscillation in -1..1 (cheap, no trig for the drift).

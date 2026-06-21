@@ -2,15 +2,20 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:auris/auris.dart' show AurisScheme;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/motion/ambient_signals.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:provider/provider.dart';
 
-/// How long a click impulse stays alive before the widget prunes it. C1 (the
-/// HUD ping render) lands in Task 13; we age + drop entries now so the list
-/// never grows unbounded and the painter (later) only ever sees live impulses.
+/// How long a click impulse stays alive before the widget prunes it.
 const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
+
+/// @visibleForTesting impulse counter — updated by the `_AurisAmbientState` on
+/// each `_addImpulse` call; read by tests to assert click registration without
+/// accessing the private State class. Reset to 0 between tests.
+@visibleForTesting
+int debugAurisImpulseCount = 0;
 
 /// Full-effects AURIS wallpaper: a scanning sci-fi HUD grid (faint gridlines)
 /// with a slow radar sweep arc and drifting telemetry ticks. This is the C1/C2
@@ -163,6 +168,7 @@ class _AurisAmbientState extends State<_AurisAmbient>
       AmbientImpulse(position: normalized, bornAtMs: nowMs),
     ];
     _impulses.value = next;
+    debugAurisImpulseCount = next.length;
     // Clicking is activity — keep the session pulse awake (no-op if null).
     _pulse?.touch();
   }
@@ -203,6 +209,7 @@ class _AurisAmbientState extends State<_AurisAmbient>
                 // safety, but we don't want to subscribe to a dead controller).
                 hasPulse: _pulse != null,
                 signals: signals,
+                clock: widget.animate ? _clock : null,
               ),
             ),
           ),
@@ -214,6 +221,11 @@ class _AurisAmbientState extends State<_AurisAmbient>
     if (!widget.animate) return stack;
     return Listener(
       onPointerDown: (e) {
+        // Desktop/web only — touch events don't produce ambient ripples.
+        if (e.kind != PointerDeviceKind.mouse &&
+            e.kind != PointerDeviceKind.stylus) {
+          return;
+        }
         final size = context.size;
         if (size == null || size.isEmpty) return;
         _addImpulse(
@@ -329,14 +341,18 @@ class _AurisHudPainter extends CustomPainter {
     required this.palette,
     required this.hasPulse,
     required this.signals,
+    this.clock,
   }) : super(repaint: _repaintFor(t, signals, hasPulse));
 
   final Animation<double> t;
   final _AurisHudPalette palette;
   final bool hasPulse;
 
-  /// Non-null only in animated mode (C1/C2 inputs). Read by Tasks 13/14.
+  /// Non-null only in animated mode (C1/C2 inputs).
   final AmbientSignals? signals;
+
+  /// Monotonic clock for impulse age computation; null in static mode.
+  final Stopwatch? clock;
 
   // Reused across frames — `.color`/`.shader`/`.strokeWidth` mutate per draw.
   final Paint _fillPaint = Paint();
@@ -351,6 +367,8 @@ class _AurisHudPainter extends CustomPainter {
   final Paint _spokePaint = Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.5;
+  // Reused stroke paint for click ping ripples (C1).
+  final Paint _ripplePaint = Paint()..style = PaintingStyle.stroke;
 
   // Gridline Path cache — built once, reused across frames; rebuilt only when
   // Size changes. NEVER rebuilt per frame (the drift is applied via a canvas
@@ -486,8 +504,17 @@ class _AurisHudPainter extends CustomPainter {
     for (final seed in _kTickSeeds) {
       final phase = v + seed.$3;
       final bob = _wave(phase) * 0.02;
-      final cx = (seed.$1 + bob) * size.width;
-      final cy = (seed.$2 - bob) * size.height;
+      // C1 cursor force: ticks lean slightly toward pointer (adds HUD-tracking
+      // feel without jarring displacement).
+      final ptr = signals?.pointer.value;
+      var cx = (seed.$1 + bob) * size.width;
+      var cy = (seed.$2 - bob) * size.height;
+      if (ptr != null) {
+        final targetX = ptr.dx * size.width;
+        final targetY = ptr.dy * size.height;
+        cx += (targetX - cx) * 0.04;
+        cy += (targetY - cy) * 0.04;
+      }
       // Slow fade cycle (0..1..0) — no hard on/off, so not a flash.
       final fade = 0.35 + 0.35 * (0.5 + 0.5 * math.sin(phase * math.pi * 2));
       _tickPaint
@@ -499,13 +526,72 @@ class _AurisHudPainter extends CustomPainter {
         ..drawLine(Offset(cx - arm, cy), Offset(cx + arm, cy), _tickPaint)
         ..drawLine(Offset(cx, cy - arm), Offset(cx, cy + arm), _tickPaint);
     }
+
+    // C1 cursor reticle: a small targeting crosshair at the pointer position
+    // so the HUD visually "tracks" the cursor. Only in animated mode.
+    final ptr = signals?.pointer.value;
+    if (ptr != null) {
+      final cx = ptr.dx * size.width;
+      final cy = ptr.dy * size.height;
+      _tickPaint
+        ..color = palette.sweep.withValues(alpha: spokeAlpha * 0.6)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1;
+      const reticleArm = 6.0;
+      const reticleGap = 3.0;
+      // Broken crosshair (gap in centre) — classic HUD targeting reticle.
+      canvas
+        ..drawLine(
+          Offset(cx - reticleArm, cy),
+          Offset(cx - reticleGap, cy),
+          _tickPaint,
+        )
+        ..drawLine(
+          Offset(cx + reticleGap, cy),
+          Offset(cx + reticleArm, cy),
+          _tickPaint,
+        )
+        ..drawLine(
+          Offset(cx, cy - reticleArm),
+          Offset(cx, cy - reticleGap),
+          _tickPaint,
+        )
+        ..drawLine(
+          Offset(cx, cy + reticleGap),
+          Offset(cx, cy + reticleArm),
+          _tickPaint,
+        );
+    }
+
+    // C1 click ping: expanding target-lock ring per impulse.
+    final nowMs = clock?.elapsedMilliseconds ?? 0;
+    const kRippleLifetimeMs = 1400;
+    for (final imp in signals?.impulses.value ?? const <AmbientImpulse>[]) {
+      final ageMs = nowMs - imp.bornAtMs;
+      if (ageMs < 0 || ageMs > kRippleLifetimeMs) continue;
+      final age01 = ageMs / kRippleLifetimeMs;
+      final rippleRadius = size.shortestSide * 0.20 * age01;
+      final alpha = (has ? 0.30 : 0.18) * math.sin(age01 * math.pi);
+      if (alpha <= 0 || rippleRadius <= 0) continue;
+      final center = Offset(
+        imp.position.dx * size.width,
+        imp.position.dy * size.height,
+      );
+      _ripplePaint
+        ..shader = null
+        ..blendMode = BlendMode.plus
+        ..color = palette.sweep.withValues(alpha: alpha)
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(center, rippleRadius, _ripplePaint);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _AurisHudPainter old) =>
       old.palette != palette ||
       old.hasPulse != hasPulse ||
-      old.signals != signals;
+      old.signals != signals ||
+      old.clock != clock;
 }
 
 // C0-continuous oscillation in -1..1 (cheap; no trig for the drift).
