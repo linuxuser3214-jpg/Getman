@@ -175,7 +175,17 @@ class _RequestViewState extends State<RequestView> {
               child: Focus(
                 autofocus: true,
                 child: Padding(
-                  padding: EdgeInsets.all(layout.pagePadding),
+                  // On the desktop split-pane layout, align the content's left
+                  // edge with the open-request tab strip above it (which sits
+                  // flush against the side-menu divider) by dropping the left
+                  // page padding. The drawer layout (tablet/phone) keeps full
+                  // padding so content isn't flush against the screen edge.
+                  padding: EdgeInsets.fromLTRB(
+                    context.useDrawerNav ? layout.pagePadding : 0,
+                    layout.pagePadding,
+                    layout.pagePadding,
+                    layout.pagePadding,
+                  ),
                   child: Column(
                     children: [
                       UrlBar(
