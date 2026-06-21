@@ -102,21 +102,29 @@ Future<void> bootGetman(
   });
 
   final settings = await di.init(storageDirectoryOverride: tempDir.path);
+  await disableStartupUpdateCheck();
 
-  // Disable the startup auto-update check for E2E. Otherwise the real GitHub
-  // `releases/latest` check finds a newer published version than the test
-  // bundle's and opens the UpdateDialog on boot — its modal barrier absorbs
-  // every hit-test, so `url_field` (and everything else) is in the tree but
-  // not hit-testable and all interaction flows time out. A fresh E2E profile
-  // seeds from an empty box, so the setting defaults to `true`; flip it on the
-  // SettingsBloc (the gate reads it from there) before the gate mounts. This
-  // also keeps the suite hermetic (no network call to GitHub).
+  await $.pumpWidgetAndSettle(MyApp(initialSettings: settings));
+  await resizeWindow($, windowSize);
+}
+
+/// Disables the startup auto-update check on the freshly-booted SettingsBloc.
+///
+/// Otherwise the real GitHub `releases/latest` check finds a newer published
+/// version than the test bundle's and opens the UpdateDialog on boot — its
+/// modal barrier absorbs every hit-test, so `url_field` (and everything else)
+/// is in the tree but **not hit-testable** and all interaction flows time
+/// out. A fresh E2E profile seeds from an empty box, so the setting defaults
+/// to `true`; flip it on the SettingsBloc (the gate reads it from there)
+/// before `pumpWidget` mounts the gate. Also keeps the suite hermetic.
+///
+/// [bootGetman] calls this for you. Flows that boot the app **manually** (e.g.
+/// restart-persistence flows that call `di.init` + pump `MyApp` themselves)
+/// must call it after each `di.init`, before pumping `MyApp`.
+Future<void> disableStartupUpdateCheck() async {
   final settingsBloc = di.sl<SettingsBloc>()
     ..add(const UpdateCheckForUpdatesOnStartup(enabled: false));
   await settingsBloc.stream.firstWhere(
     (s) => !s.settings.checkForUpdatesOnStartup,
   );
-
-  await $.pumpWidgetAndSettle(MyApp(initialSettings: settings));
-  await resizeWindow($, windowSize);
 }
