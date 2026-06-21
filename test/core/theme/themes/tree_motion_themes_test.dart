@@ -272,26 +272,31 @@ void main() {
   // treeDropHighlight(active:false).
   // ---------------------------------------------------------------------------
 
+  // Counts the combined number of DecoratedBox + CustomPaint widgets in the
+  // tree — both are used by the loud-theme drop-highlight overlays (glass/rpg/
+  // brutalist add a DecoratedBox; auris adds a CustomPaint HUD bracket).
+  int overlayLayerCount(WidgetTester tester) =>
+      tester.widgetList<DecoratedBox>(find.byType(DecoratedBox)).length +
+      tester.widgetList<CustomPaint>(find.byType(CustomPaint)).length;
+
   Future<void> assertDropHighlightActiveDiffers(
     WidgetTester tester, {
     required Widget Function(BuildContext, {required bool active}) makeWidget,
     required ThemeData theme,
   }) async {
-    // inactive
+    // Identity baseline: bare child under the same theme (no motion hook).
+    // Captures Scaffold + MaterialApp chrome contributions to the count.
     await tester.pumpWidget(
       MaterialApp(
         theme: theme,
-        home: Scaffold(
-          body: Builder(builder: (ctx) => makeWidget(ctx, active: false)),
-        ),
+        home: const Scaffold(body: _kChild),
       ),
     );
     await tester.pump(const Duration(milliseconds: 50));
-    final inactiveCount = tester
-        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
-        .length;
+    final identityCount = overlayLayerCount(tester);
 
-    // active
+    // active: true — animation controller initialised to 1.0, overlay is
+    // visible immediately (no need to wait for a forward() animation).
     await tester.pumpWidget(
       MaterialApp(
         theme: theme,
@@ -301,16 +306,19 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 50));
-    final activeCount = tester
-        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
-        .length;
+    final activeCount = overlayLayerCount(tester);
 
+    // The active overlay MUST add at least one decoration/painter layer on top
+    // of what the bare Scaffold provides.  greaterThan (not greaterThanOrEqual)
+    // is the genuine RED→GREEN gate: an identity hook that returns child
+    // unchanged gives activeCount == identityCount → test FAILS as required.
     expect(
       activeCount,
-      greaterThanOrEqualTo(inactiveCount),
+      greaterThan(identityCount),
       reason:
-          'active drop highlight should have at least as many '
-          'layers as inactive',
+          'active drop highlight must add at least one DecoratedBox or '
+          'CustomPaint layer beyond the identity baseline; '
+          'identity=$identityCount active=$activeCount',
     );
 
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
@@ -318,7 +326,7 @@ void main() {
     expect(tester.takeException(), isNull);
   }
 
-  testWidgets('glass treeDropHighlight active>=inactive layers', (t) async {
+  testWidgets('glass treeDropHighlight active>identity layers', (t) async {
     await assertDropHighlightActiveDiffers(
       t,
       makeWidget: (ctx, {required active}) => glassMotion(
@@ -328,7 +336,7 @@ void main() {
     );
   });
 
-  testWidgets('rpg treeDropHighlight active>=inactive layers', (t) async {
+  testWidgets('rpg treeDropHighlight active>identity layers', (t) async {
     await assertDropHighlightActiveDiffers(
       t,
       makeWidget: (ctx, {required active}) => rpgMotion(
@@ -338,7 +346,7 @@ void main() {
     );
   });
 
-  testWidgets('brutalist treeDropHighlight active>=inactive layers', (t) async {
+  testWidgets('brutalist treeDropHighlight active>identity layers', (t) async {
     await assertDropHighlightActiveDiffers(
       t,
       makeWidget: (ctx, {required active}) => brutalistMotion(
@@ -348,7 +356,7 @@ void main() {
     );
   });
 
-  testWidgets('auris treeDropHighlight active>=inactive layers', (t) async {
+  testWidgets('auris treeDropHighlight active>identity layers', (t) async {
     await assertDropHighlightActiveDiffers(
       t,
       makeWidget: (ctx, {required active}) => aurisMotion(
