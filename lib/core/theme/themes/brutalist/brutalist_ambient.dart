@@ -92,13 +92,15 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Null-safe pulse lookup: Provider.of throws when no provider is
-    // registered, so swallow that and leave _pulse null. The standalone smoke
-    // test pumps WITHOUT a WorkspacePulseController provider — MUST NOT throw.
-    if (!widget.animate) {
-      _pulse = null;
-      return;
-    }
+    // Resolve pulse unconditionally so a false→true animate flip (via
+    // didUpdateWidget) picks up the real provider. didChangeDependencies does
+    // NOT re-fire on prop changes — gating on widget.animate would silently
+    // miss the re-enable round-trip (C2 regression fix).
+    //
+    // Null-safe: Provider.of throws when no provider is absent; swallow and
+    // leave _pulse null. Standalone tests (no provider) MUST NOT throw.
+    // The static path (!widget.animate) never reads _pulse, so unconditional
+    // caching is harmless.
     try {
       _pulse = Provider.of<WorkspacePulseController>(context, listen: false);
     } on ProviderNotFoundException {
