@@ -56,7 +56,114 @@ AppMotion rpgMotion({required bool reduceEffects}) {
         _RpgSendAffordance(isSending: isSending, child: child),
     inFlightFrame: (context, {required child, required isSending}) =>
         _RpgInFlightFrame(isSending: isSending, child: child),
+    contentTransition: (context, {required child, required transitionKey}) =>
+        _RpgContentTransition(transitionKey: transitionKey, child: child),
   );
+}
+
+/// Scroll-unfurl content transition: a golden shimmer band sweeps top-to-bottom
+/// as if unfurling a parchment scroll (~400 ms).
+class _RpgContentTransition extends StatefulWidget {
+  const _RpgContentTransition({
+    required this.transitionKey,
+    required this.child,
+  });
+
+  final String transitionKey;
+  final Widget child;
+
+  @override
+  State<_RpgContentTransition> createState() => _RpgContentTransitionState();
+}
+
+class _RpgContentTransitionState extends State<_RpgContentTransition>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 400),
+  );
+
+  @override
+  void didUpdateWidget(_RpgContentTransition old) {
+    super.didUpdateWidget(old);
+    if (old.transitionKey != widget.transitionKey) {
+      unawaited(_c.forward(from: 0));
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child, // hoisted — entire tab content NOT rebuilt per frame
+      builder: (ctx, child) {
+        if (_c.value == 0 || _c.value == 1) return child!;
+        return Stack(
+          children: [
+            child!,
+            Positioned.fill(
+              key: const ValueKey<String>('content_transition_overlay'),
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _RpgScrollUnfurlPainter(t: _c.value),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Parchment-scroll unfurl: a golden shimmer band sweeps downward, trailing
+/// sparkle motes. Reuses Paint objects; no per-frame allocation.
+class _RpgScrollUnfurlPainter extends CustomPainter {
+  _RpgScrollUnfurlPainter({required this.t});
+  final double t;
+
+  // Hoisted Paint objects — reused across frames.
+  final Paint _bandPaint = Paint();
+  final Paint _motePaint = Paint();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Sweep band: travels top→bottom over full duration.
+    final sweepY = Curves.easeInOut.transform(t) * size.height;
+    final bandH = size.height * 0.35;
+    final fade = (t < 0.6 ? 1.0 : (1.0 - (t - 0.6) / 0.4)).clamp(0.0, 1.0);
+
+    final bandRect = Rect.fromLTWH(0, sweepY - bandH, size.width, bandH);
+    _bandPaint.shader = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        const Color(0x00000000),
+        RpgPalette.gold.withValues(alpha: 0.18 * fade),
+        RpgPalette.gold.withValues(alpha: 0.08 * fade),
+      ],
+    ).createShader(bandRect);
+    canvas.drawRect(bandRect, _bandPaint);
+
+    // Sparkle motes along the leading edge.
+    final rng = math.Random(t.hashCode); // stable per t-bucket
+    for (var i = 0; i < 12; i++) {
+      final x = (i / 12 + rng.nextDouble() * 0.08) * size.width;
+      final y = sweepY - rng.nextDouble() * bandH * 0.5;
+      final a = fade * (0.5 + 0.5 * rng.nextDouble());
+      _motePaint.color = RpgPalette.gold.withValues(alpha: a);
+      canvas.drawCircle(Offset(x, y), 1.5 + rng.nextDouble() * 1.5, _motePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RpgScrollUnfurlPainter old) => old.t != t;
 }
 
 /// Runic circuit-trace frame: an animated dash-offset stroke that travels the

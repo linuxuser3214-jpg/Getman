@@ -29,7 +29,139 @@ AppMotion aurisMotion({required bool reduceEffects}) {
         _AurisSendAffordance(isSending: isSending, child: child),
     inFlightFrame: (context, {required child, required isSending}) =>
         _AurisInFlightFrame(isSending: isSending, child: child),
+    contentTransition: (context, {required child, required transitionKey}) =>
+        _AurisContentTransition(transitionKey: transitionKey, child: child),
   );
+}
+
+/// HUD-wipe content transition: a vertical scan-line wipes left→right
+/// like a radar sweep updating its display (~350 ms). Falls back to identity
+/// when AurisScheme is absent.
+class _AurisContentTransition extends StatefulWidget {
+  const _AurisContentTransition({
+    required this.transitionKey,
+    required this.child,
+  });
+
+  final String transitionKey;
+  final Widget child;
+
+  @override
+  State<_AurisContentTransition> createState() =>
+      _AurisContentTransitionState();
+}
+
+class _AurisContentTransitionState extends State<_AurisContentTransition>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 350),
+  );
+
+  @override
+  void didUpdateWidget(_AurisContentTransition old) {
+    super.didUpdateWidget(old);
+    if (old.transitionKey != widget.transitionKey) {
+      unawaited(_c.forward(from: 0));
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).extension<AurisScheme>();
+    // Fallback to primaryColor when AurisScheme is absent (tests / other themes)
+    // rather than bailing to identity — the transition must still play.
+    final primary = Theme.of(context).primaryColor;
+    final scanColor = scheme?.primaryActive ?? primary;
+    final trailColor = scheme?.primaryDim ?? primary;
+
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child, // hoisted — entire tab content NOT rebuilt per frame
+      builder: (ctx, child) {
+        if (_c.value == 0 || _c.value == 1) return child!;
+        return Stack(
+          children: [
+            child!,
+            Positioned.fill(
+              key: const ValueKey<String>('content_transition_overlay'),
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _AurisHudWipePainter(
+                    t: _c.value,
+                    scanColor: scanColor,
+                    trailColor: trailColor,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Radar-wipe: a bright vertical scan-line sweeps left→right; a dim trail
+/// fades behind it. Reuses Paint objects; no per-frame allocation.
+class _AurisHudWipePainter extends CustomPainter {
+  _AurisHudWipePainter({
+    required this.t,
+    required this.scanColor,
+    required this.trailColor,
+  });
+  final double t;
+  final Color scanColor;
+  final Color trailColor;
+
+  // Hoisted Paint objects — reused across frames, shader/color mutated.
+  final Paint _trailPaint = Paint();
+  final Paint _linePaint = Paint()..style = PaintingStyle.stroke;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Leading position of the scan line.
+    final x = Curves.easeInOut.transform(t) * size.width;
+    final fade = (1.0 - t).clamp(0.0, 1.0);
+
+    // Dim trail to the left of the scan line.
+    if (x > 0) {
+      _trailPaint.shader = LinearGradient(
+        colors: [
+          trailColor.withValues(alpha: 0.18 * fade),
+          trailColor.withValues(alpha: 0.04 * fade),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, x, size.height));
+      canvas.drawRect(Rect.fromLTWH(0, 0, x, size.height), _trailPaint);
+    }
+
+    // Bright vertical scan line.
+    _linePaint
+      ..strokeWidth = 2.0
+      ..color = scanColor.withValues(alpha: 0.85 * fade);
+    canvas.drawLine(Offset(x, 0), Offset(x, size.height), _linePaint);
+
+    // Glow halo around the scan line.
+    if (x + 16 <= size.width) {
+      _trailPaint.shader = LinearGradient(
+        colors: [
+          scanColor.withValues(alpha: 0.35 * fade),
+          const Color(0x00000000),
+        ],
+      ).createShader(Rect.fromLTWH(x, 0, 16, size.height));
+      canvas.drawRect(Rect.fromLTWH(x, 0, 16, size.height), _trailPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AurisHudWipePainter old) =>
+      old.t != t || old.scanColor != scanColor || old.trailColor != trailColor;
 }
 
 /// HUD scanline sweep around the frame while [isSending].
