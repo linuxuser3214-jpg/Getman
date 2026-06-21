@@ -636,6 +636,10 @@ class _MarchingBarPainter extends CustomPainter {
   /// Drives the march: 0→1 as the build controller advances.
   final double phase;
 
+  // Reused across frames — only `.color` is mutated in paint() (no per-frame
+  // Paint allocation on the hot in-flight path).
+  final Paint _paint = Paint();
+
   @override
   void paint(Canvas canvas, Size size) {
     const h = 4.0;
@@ -643,7 +647,7 @@ class _MarchingBarPainter extends CustomPainter {
     const dashPitch = dash * 2; // gap == dash width
     final y = size.height - h;
     final w = size.width * (0.15 + 0.85 * tension);
-    final paint = Paint()..color = color;
+    _paint.color = color;
 
     // Clip so dashes never paint outside the bar bounds.
     canvas
@@ -654,7 +658,7 @@ class _MarchingBarPainter extends CustomPainter {
     final offset = (phase * dashPitch) % dashPitch;
     // Start one pitch before 0 so a partial dash can march in from the left.
     for (var x = -dashPitch + offset; x < w; x += dashPitch) {
-      canvas.drawRect(Rect.fromLTWH(x, y, dash, h), paint);
+      canvas.drawRect(Rect.fromLTWH(x, y, dash, h), _paint);
     }
 
     canvas.restore();
