@@ -192,8 +192,8 @@ for full effects and a static one for `reduceEffects` (see `rpg_decorations.dart
 > work (Tasks B1–C2), Brutalist and AURIS joined Arcane Quest and Liquid Glass
 > with a live `scaffoldBackground`. If you add a new loud theme, authoring an
 > ambient is **expected, not optional**. Brutalist's ambient is a halftone-dot
-> field (`brutalist_decorations.dart`); AURIS's is the HUD-grid wallpaper
-> (`auris_decorations.dart`). Both degrade to a static variant under
+> field (`brutalist_ambient.dart`); AURIS's is the HUD-grid wallpaper
+> (`auris_ambient.dart`). Both degrade to a static variant under
 > `reduceEffects`. The `AmbientSignals` bundle (C1/C2) is passed into the
 > animated variant so the background reacts to pointer movement, click ripples,
 > and session rhythm; the static variant receives `null` and subscribes to

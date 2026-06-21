@@ -7,8 +7,7 @@
 //
 // The full bloc harness (TabsBloc + SettingsBloc + CollectionsBloc +
 // HistoryBloc) is borrowed from the per-theme component tests; if those tests
-// pass, this
-// harness works.  The four themes exercised are the LOUD ones:
+// pass, this harness works.  The four themes exercised are the LOUD ones:
 // kGlassThemeId, kRpgThemeId, kBrutalistThemeId, kAurisThemeId — the calm
 // themes (Classic/Editorial/Dracula) use the same minimal AppMotion and are
 // already covered by the per-theme component overflow guards in
@@ -85,6 +84,14 @@ HttpRequestTabEntity _respondedTab(String tabId) => HttpRequestTabEntity(
     headers: {'content-type': 'application/json'},
     durationMs: 42,
   ),
+);
+
+/// Tab that is mid-send (isSending: true) — exercises the inFlightFrame overlay
+/// and any in-flight motion hooks under each loud theme.
+HttpRequestTabEntity _inFlightTab(String tabId) => HttpRequestTabEntity(
+  tabId: tabId,
+  config: HttpRequestConfigEntity(id: tabId),
+  isSending: true,
 );
 
 Future<TabsBloc> _loadedBloc(
@@ -199,6 +206,82 @@ void main() {
         expect(tester.takeException(), isNull);
         // Status code visible (metadata row rendered correctly).
         expect(find.textContaining('200'), findsWidgets);
+      },
+    );
+  }
+
+  // In-flight variants — exercises the inFlightFrame overlay that loud themes
+  // render while isSending is true.  Uses a bounded pump (NOT pumpAndSettle)
+  // because the frame animates continuously.
+  for (final themeId in [
+    kGlassThemeId,
+    kRpgThemeId,
+    kBrutalistThemeId,
+    kAurisThemeId,
+  ]) {
+    testWidgets(
+      'ResponseSection (in-flight) renders without overflow under $themeId '
+      '(inFlightFrame overlay active, 1400×900 desktop)',
+      (tester) async {
+        tester.view.physicalSize = const Size(1400, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+
+        final tabId = '${themeId}_inflight';
+        final repository = _MockTabsRepository();
+        final sendUseCase = _MockSendRequestUseCase();
+        when(() => repository.saveTabs(any())).thenAnswer((_) async {});
+        when(() => repository.putTab(any())).thenAnswer((_) async {});
+        when(() => repository.putPanel(any())).thenAnswer((_) async {});
+        when(
+          () => repository.savePanelMeta(any(), any()),
+        ).thenAnswer((_) async {});
+
+        final bloc = await _loadedBloc(
+          repository,
+          sendUseCase,
+          _inFlightTab(tabId),
+        );
+        addTearDown(bloc.close);
+        final controller = CodeLineEditingController();
+        addTearDown(controller.dispose);
+
+        final theme = appThemes[themeId]!.builder(Brightness.dark);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: MultiBlocProvider(
+                providers: [
+                  BlocProvider.value(value: bloc),
+                  BlocProvider<SettingsBloc>(
+                    create: (_) => _settingsBloc(),
+                  ),
+                  BlocProvider<CollectionsBloc>(
+                    create: (_) => _FakeCollectionsBloc(),
+                  ),
+                  BlocProvider<HistoryBloc>(
+                    create: (_) => _FakeHistoryBloc(),
+                  ),
+                ],
+                child: ResponseSection(
+                  tabId: tabId,
+                  responseController: controller,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        // Bounded pump — the inFlightFrame overlay animates continuously so
+        // pumpAndSettle would hang.  Two ticks are enough to lay out the frame
+        // border and verify no RenderFlex overflow.
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // No RenderFlex overflow, no build/paint exception.
+        expect(tester.takeException(), isNull);
       },
     );
   }
