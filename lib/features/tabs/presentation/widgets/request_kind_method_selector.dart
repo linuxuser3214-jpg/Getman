@@ -87,7 +87,12 @@ class RequestKindMethodSelector extends StatelessWidget {
                       .map(
                         (m) => SizedBox(
                           width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
-                          child: Center(child: MethodBadge(method: m)),
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: MethodBadge(method: m),
+                            ),
+                          ),
                         ),
                       )
                       .toList();

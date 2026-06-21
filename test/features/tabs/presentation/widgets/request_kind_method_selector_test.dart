@@ -47,7 +47,12 @@ Future<TabsBloc> _loadedBloc(
   return bloc;
 }
 
-Future<void> _pump(WidgetTester tester, TabsBloc bloc, String tabId) async {
+Future<void> _pump(
+  WidgetTester tester,
+  TabsBloc bloc,
+  String tabId, {
+  bool isNarrow = false,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: brutalistTheme(Brightness.light),
@@ -63,7 +68,10 @@ Future<void> _pump(WidgetTester tester, TabsBloc bloc, String tabId) async {
                 builder: (context, state) {
                   final tab = state.tabs.byId(tabId);
                   if (tab == null) return const SizedBox.shrink();
-                  return RequestKindMethodSelector(tab: tab, isNarrow: false);
+                  return RequestKindMethodSelector(
+                    tab: tab,
+                    isNarrow: isNarrow,
+                  );
                 },
               ),
             ),
@@ -184,4 +192,25 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'no overflow when isNarrow=true and selected method is DELETE (wide badge)',
+    (tester) async {
+      // DELETE is the widest badge and was the overflow vector in the
+      // selected-face before FittedBox was added to selectedItemBuilder.
+      // isNarrow=true uses a 64 px SizedBox — the narrowest constrained width.
+      const tab = HttpRequestTabEntity(
+        tabId: 't5',
+        config: HttpRequestConfigEntity(id: 't5', method: 'DELETE'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 't5', isNarrow: true);
+
+      expect(tester.takeException(), isNull);
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 }
