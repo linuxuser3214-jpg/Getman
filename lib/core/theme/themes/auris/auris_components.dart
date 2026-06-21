@@ -15,6 +15,7 @@ import 'dart:async';
 
 import 'package:auris/auris_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 
@@ -185,19 +186,46 @@ Widget _aurisMethodBadge(
   return AurisBadge(method, variant: _methodVariant(method));
 }
 
-AurisBadgeVariant _statusVariant(int statusCode) {
-  if (statusCode >= 200 && statusCode < 300) return AurisBadgeVariant.success;
-  if (statusCode >= 300 && statusCode < 400) return AurisBadgeVariant.gold;
-  if (statusCode >= 400 && statusCode < 500) return AurisBadgeVariant.amber;
-  if (statusCode >= 500 && statusCode < 600) return AurisBadgeVariant.danger;
-  return AurisBadgeVariant.amber;
-}
-
+// The status chip sits inline in the response metadata `Wrap` next to the
+// TIME / SIZE [_aurisMetric] chips. A plain [AurisBadge] is noticeably smaller
+// than those chips (8/3 padding, 11px) which read as undersized beside them, so
+// we render a status-tinted chip with the SAME geometry as the metric chip
+// (12/6 padding, 11px label + 13px mono value) — only the color is semantic.
 Widget _aurisStatusBadge(
   BuildContext context, {
   required int statusCode,
 }) {
-  return AurisBadge('$statusCode', variant: _statusVariant(statusCode));
+  final scheme = Theme.of(context).extension<AurisScheme>()!;
+  final color = context.appPalette.statusColor(statusCode);
+  return AurisContainer(
+    fill: color.withValues(alpha: 0.14),
+    borderColor: color.withValues(alpha: 0.6),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          'STATUS ',
+          style: TextStyle(
+            fontFamily: AurisTokens.fontBody,
+            fontFamilyFallback: AurisTokens.fontBodyFallback,
+            fontSize: 11,
+            letterSpacing: AurisTokens.trackingLabel,
+            color: scheme.textMid,
+          ),
+        ),
+        Text(
+          '$statusCode',
+          style: TextStyle(
+            fontFamily: AurisTokens.fontMono,
+            fontFamilyFallback: AurisTokens.fontMonoFallback,
+            fontSize: 13,
+            color: color,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------

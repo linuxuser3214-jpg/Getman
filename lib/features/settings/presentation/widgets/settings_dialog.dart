@@ -128,6 +128,12 @@ class _SettingsDialogState extends State<SettingsDialog>
               labels: _tabLabels,
               isScrollable: true,
               tabKeyPrefix: 'settingstab',
+              // The tab strip is already framed by a divider above and below; a
+              // tab top border would double up against the upper divider.
+              topIndicatorBorder: false,
+              // Center the tabs with equal space on both sides instead of the
+              // scrollable default's leading offset (which pushes them right).
+              tabAlignment: TabAlignment.center,
             ),
             tabDivider,
             SizedBox(height: layout.tabSpacing),

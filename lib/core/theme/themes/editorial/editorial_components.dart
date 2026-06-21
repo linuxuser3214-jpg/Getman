@@ -76,11 +76,15 @@ class ArticlePanel extends StatelessWidget {
       border: Border.all(color: theme.dividerColor, width: layout.borderThin),
     );
 
+    // Container (not DecoratedBox) so the hairline frame insets its child by
+    // the border width (BoxDecoration.padding == border.dimensions). Otherwise
+    // an opaque child — e.g. the code editor's surface fill — paints over the
+    // border, leaving the editor unframed below the (transparent) toolbar.
     if (title == null) {
-      return DecoratedBox(decoration: decoration, child: child);
+      return Container(decoration: decoration, child: child);
     }
 
-    return DecoratedBox(
+    return Container(
       decoration: decoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

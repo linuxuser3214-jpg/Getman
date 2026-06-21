@@ -138,13 +138,18 @@ BoxDecoration glassTabShape(
 /// BrandedTabBar selected-tab indicator for glass — the same glass lozenge,
 /// top-rounded only so the active PARAMS/HEADERS/BODY segment lifts off the
 /// translucent panel as a tab (flush bottom) instead of a floating blue bar.
-Decoration glassBrandedTabIndicator(BuildContext context) =>
-    glassSelectedTabBox(
-      context,
-      borderRadius: BorderRadius.vertical(
-        top: Radius.circular(context.appShape.buttonRadius),
-      ),
-    );
+// topBorder is accepted for API parity with the indicator hook but not used:
+// the glass lozenge is a rounded, top-cornered pill (no flat top edge to drop),
+// so it reads cleanly inside the Settings tab strip's dividers either way.
+Decoration glassBrandedTabIndicator(
+  BuildContext context, {
+  bool topBorder = true,
+}) => glassSelectedTabBox(
+  context,
+  borderRadius: BorderRadius.vertical(
+    top: Radius.circular(context.appShape.buttonRadius),
+  ),
+);
 
 /// Full-effects wallpaper: animated drifting mesh gradient.
 Widget glassScaffoldBackground(BuildContext context, {required Widget child}) =>

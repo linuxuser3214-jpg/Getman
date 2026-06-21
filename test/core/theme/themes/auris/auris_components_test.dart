@@ -205,14 +205,20 @@ void main() {
     expect(find.byType(AurisBadge), findsOneWidget);
   });
 
-  testWidgets('statusBadge → AurisBadge', (tester) async {
+  testWidgets('statusBadge → status-tinted AurisContainer chip', (
+    tester,
+  ) async {
     await _pumpSlot(
       tester,
       dark,
       (context) => context.appComponents.statusBadge(context, statusCode: 200),
     );
     expect(tester.takeException(), isNull);
-    expect(find.byType(AurisBadge), findsOneWidget);
+    // Sized to match the TIME/SIZE metric chips (AurisContainer), not the small
+    // AurisBadge tag — see _aurisStatusBadge.
+    expect(find.byType(AurisContainer), findsWidgets);
+    expect(find.textContaining('STATUS'), findsOneWidget);
+    expect(find.text('200'), findsOneWidget);
   });
 
   testWidgets('metric → an auris widget (Card or fallback Badge/Container)', (

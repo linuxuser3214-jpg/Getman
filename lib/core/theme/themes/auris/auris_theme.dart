@@ -60,6 +60,9 @@ ThemeData aurisTheme(
   final decoration = AppDecoration(
     panelBox: aurisPanelBox,
     tabShape: aurisTabShape,
+    // Light-filled selected tab so the (dark) onPrimary label reads — AURIS's
+    // primaryColor defaults dark, which the shared default indicator can't fix.
+    brandedTabIndicator: aurisBrandedTabIndicator,
     // Auris press: scale-down on tap-down; identity under reduceEffects.
     wrapInteractive: ({required child, onTap, scaleDown}) => AurisPress(
       onTap: onTap,

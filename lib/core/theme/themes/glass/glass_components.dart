@@ -164,7 +164,13 @@ class GlassLozenge extends StatelessWidget {
           : EdgeInsets.zero,
       padding: EdgeInsets.symmetric(
         horizontal: layout.badgePaddingHorizontal + 4,
-        vertical: layout.badgePaddingVertical,
+        // The labeled (status) lozenge sits inline beside the taller TIME /
+        // SIZE FrostedLozengeMetric chips (vertical padding 4); match their
+        // height so it doesn't read as undersized next to them. The bare method
+        // badge keeps the tighter default padding.
+        vertical: label != null
+            ? layout.badgePaddingVertical + 2
+            : layout.badgePaddingVertical,
       ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),

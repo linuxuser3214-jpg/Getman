@@ -91,6 +91,43 @@ BoxDecoration aurisTabShape(
   );
 }
 
+/// `BrandedTabBar` selected-tab indicator for AURIS.
+///
+/// AURIS composes the external `auris` kit, which never sets
+/// `ThemeData.primaryColor`; in dark mode it therefore defaults to a dark
+/// surface. The shared default indicator would paint that dark fill under the
+/// (dark) `onPrimary` label, leaving the selected tab's text unreadable
+/// (dark-on-dark — the reported bug on Settings / request-response /
+/// collections tabs). We give the selected tab a light fill in dark mode
+/// ([AurisScheme.textBright]) so the dark label reads as crisp light text, and
+/// keep the gold fill in light mode (where the default already worked).
+///
+/// [topBorder] is dropped by the Settings tab strip (see
+/// `BrandedTabBar.topIndicatorBorder`), which frames its tabs with dividers.
+BoxDecoration aurisBrandedTabIndicator(
+  BuildContext context, {
+  bool topBorder = true,
+}) {
+  final theme = Theme.of(context);
+  final layout = context.appLayout;
+  final scheme = theme.extension<AurisScheme>();
+  final isDark = theme.brightness == Brightness.dark;
+  final fill = scheme == null
+      ? theme.primaryColor
+      : (isDark ? scheme.textBright : scheme.primaryActive);
+  final borderColor = scheme?.borderBright ?? theme.dividerColor;
+  return BoxDecoration(
+    color: fill,
+    border: Border(
+      top: topBorder
+          ? BorderSide(color: borderColor, width: layout.borderThick)
+          : BorderSide.none,
+      left: BorderSide(color: borderColor, width: layout.borderThick),
+      right: BorderSide(color: borderColor, width: layout.borderThick),
+    ),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Scaffold background — animated ambient + static variant
 // ---------------------------------------------------------------------------

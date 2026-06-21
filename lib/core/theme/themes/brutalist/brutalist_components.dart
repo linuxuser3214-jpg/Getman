@@ -70,7 +70,12 @@ class BrutalSlab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final slab = DecoratedBox(
+    // Container (not DecoratedBox) so the panel border insets its child by the
+    // border width (BoxDecoration.padding == border.dimensions). Without that
+    // inset an opaque child — e.g. the code editor's surface fill — paints over
+    // the border, leaving the editor unframed while the (transparent) toolbar
+    // above still shows it. Matches how the default/classic surface behaves.
+    final slab = Container(
       decoration: context.appDecoration.panelBox(context, offset: 0),
       child: child,
     );

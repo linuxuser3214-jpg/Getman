@@ -286,7 +286,6 @@ class _GemShape extends ShapeBorder {
 
   @override
   Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
-    final cx = rect.center.dx;
     final cut = rect.height * 0.18;
     return Path()
       ..moveTo(rect.left + cut, rect.top)
@@ -297,11 +296,7 @@ class _GemShape extends ShapeBorder {
       ..lineTo(rect.left + cut, rect.bottom)
       ..lineTo(rect.left, rect.bottom - cut)
       ..lineTo(rect.left, rect.top + cut)
-      ..close()
-      // Facet highlight line.
-      ..moveTo(rect.left + cut, rect.top)
-      ..lineTo(cx, rect.top + rect.height * 0.35)
-      ..lineTo(rect.right - cut, rect.top);
+      ..close();
   }
 
   @override
@@ -314,7 +309,6 @@ class _GemShape extends ShapeBorder {
     // delegating to getOuterPath() would cause (getOuterPath allocates a new
     // Path each call).  _GemShape.paint is not a hot path (it runs once per
     // layout, not per frame), but the discipline is kept.
-    final cx = rect.center.dx;
     final cut = rect.height * 0.18;
     final path = Path()
       ..moveTo(rect.left + cut, rect.top)
@@ -325,10 +319,7 @@ class _GemShape extends ShapeBorder {
       ..lineTo(rect.left + cut, rect.bottom)
       ..lineTo(rect.left, rect.bottom - cut)
       ..lineTo(rect.left, rect.top + cut)
-      ..close()
-      ..moveTo(rect.left + cut, rect.top)
-      ..lineTo(cx, rect.top + rect.height * 0.35)
-      ..lineTo(rect.right - cut, rect.top);
+      ..close();
     canvas.drawPath(path, paint);
   }
 
