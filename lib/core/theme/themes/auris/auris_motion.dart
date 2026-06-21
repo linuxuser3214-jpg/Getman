@@ -26,7 +26,170 @@ AppMotion aurisMotion({required bool reduceEffects}) {
         _AurisReactionOverlay(controller: controller, child: child),
     sendAffordance: (context, {required child, required isSending}) =>
         _AurisSendAffordance(isSending: isSending, child: child),
+    inFlightFrame: (context, {required child, required isSending}) =>
+        _AurisInFlightFrame(isSending: isSending, child: child),
   );
+}
+
+/// HUD scanline sweep around the frame while [isSending].
+/// A bright line travels the four edges continuously. Period ~2.0 s — not a
+/// strobe. Colors sourced from [AurisScheme].
+class _AurisInFlightFrame extends StatefulWidget {
+  const _AurisInFlightFrame({required this.isSending, required this.child});
+  final bool isSending;
+  final Widget child;
+
+  @override
+  State<_AurisInFlightFrame> createState() => _AurisInFlightFrameState();
+}
+
+class _AurisInFlightFrameState extends State<_AurisInFlightFrame>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000), // orbit period
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isSending) unawaited(_c.repeat());
+  }
+
+  @override
+  void didUpdateWidget(_AurisInFlightFrame old) {
+    super.didUpdateWidget(old);
+    // Edge-detect on old.isSending (THEME_AUTHORING §3 restart guard).
+    if (widget.isSending && !old.isSending) {
+      unawaited(_c.repeat());
+    } else if (!widget.isSending && old.isSending) {
+      _c
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isSending) return widget.child;
+    final scheme = Theme.of(context).extension<AurisScheme>();
+    final scanColor = scheme?.primaryActive ?? Colors.amber;
+    final dimColor = scheme?.primaryDim ?? Colors.amber.withValues(alpha: 0.4);
+    // Child hoisted out of per-frame rebuilds.
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (context, child) => Stack(
+        children: [
+          child!,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _AurisFrameScanPainter(
+                  phase: _c.value,
+                  scanColor: scanColor,
+                  dimColor: dimColor,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Draws a bright scanline that travels the four edges of the frame.
+/// The line advances via [phase] (0→1 = one full orbit).  A dim ghost border
+/// is always present to reinforce the HUD "targeting" feel.
+class _AurisFrameScanPainter extends CustomPainter {
+  _AurisFrameScanPainter({
+    required this.phase,
+    required this.scanColor,
+    required this.dimColor,
+  });
+  final double phase;
+  final Color scanColor;
+  final Color dimColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Always-on dim border.
+    final dimPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..color = dimColor.withValues(alpha: 0.25);
+    canvas.drawRect(
+      Rect.fromLTWH(0.5, 0.5, size.width - 1, size.height - 1),
+      dimPaint,
+    );
+
+    // Scanline: a short bright segment travelling the perimeter.
+    final perimeter = 2 * (size.width + size.height);
+    const segLen = 60.0; // length of the bright scan segment
+
+    // Position of the leading edge along the perimeter.
+    final lead = phase * perimeter;
+
+    // Build the perimeter path (clockwise from top-left).
+    final perimPath = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+
+    final metrics = perimPath.computeMetrics().toList();
+    if (metrics.isEmpty) return;
+    final m = metrics.first;
+
+    // Extract the segment with a tail glow (slightly longer, dimmer).
+    final tailStart = (lead - segLen * 1.5).clamp(0.0, m.length);
+    final tailEnd = lead.clamp(0.0, m.length);
+    final headStart = (lead - segLen).clamp(0.0, m.length);
+
+    if (tailEnd > tailStart) {
+      final tailPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = scanColor.withValues(alpha: 0.25);
+      canvas.drawPath(m.extractPath(tailStart, tailEnd), tailPaint);
+    }
+
+    if (tailEnd > headStart) {
+      final headPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..color = scanColor.withValues(alpha: 0.8);
+      canvas.drawPath(m.extractPath(headStart, tailEnd), headPaint);
+    }
+
+    // Handle wrap-around (when lead is near the end of perimeter).
+    final overflow = lead - m.length;
+    if (overflow > 0) {
+      final wrapEnd = overflow.clamp(0.0, m.length);
+      final wrapHeadStart = (overflow - segLen).clamp(0.0, m.length);
+      if (wrapEnd > 0) {
+        final headPaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5
+          ..color = scanColor.withValues(alpha: 0.8);
+        canvas.drawPath(m.extractPath(wrapHeadStart, wrapEnd), headPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AurisFrameScanPainter old) =>
+      old.phase != phase ||
+      old.scanColor != scanColor ||
+      old.dimColor != dimColor;
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:getman/core/theme/extensions/app_motion.dart';
+import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/motion/latency_weight.dart';
 import 'package:getman/core/theme/motion/reaction_stage.dart';
 import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
@@ -58,7 +58,89 @@ AppMotion glassMotion({required bool reduceEffects}) {
         _GlassReactionOverlay(controller: controller, child: child),
     sendAffordance: (context, {required child, required isSending}) =>
         _GlassSendAffordance(isSending: isSending, child: child),
+    inFlightFrame: (context, {required child, required isSending}) =>
+        _GlassInFlightFrame(isSending: isSending, child: child),
   );
+}
+
+/// Frost-breathe frame: a soft animated border glow that pulses in opacity
+/// while [isSending].  The glow period is ~1.6 s — well under 3 Hz; not a
+/// strobe.
+class _GlassInFlightFrame extends StatefulWidget {
+  const _GlassInFlightFrame({required this.isSending, required this.child});
+  final bool isSending;
+  final Widget child;
+
+  @override
+  State<_GlassInFlightFrame> createState() => _GlassInFlightFrameState();
+}
+
+class _GlassInFlightFrameState extends State<_GlassInFlightFrame>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    // 1.6 s breathe — well under 3 Hz
+    duration: const Duration(milliseconds: 1600),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isSending) unawaited(_c.repeat(reverse: true));
+  }
+
+  @override
+  void didUpdateWidget(_GlassInFlightFrame old) {
+    super.didUpdateWidget(old);
+    // Edge-detect on old.isSending (THEME_AUTHORING §3 restart guard).
+    if (widget.isSending && !old.isSending) {
+      unawaited(_c.repeat(reverse: true));
+    } else if (!widget.isSending && old.isSending) {
+      _c
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isSending) return widget.child;
+    final accent = Theme.of(context).primaryColor;
+    // Child hoisted out of per-frame rebuilds.
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (context, child) {
+        final glow = 0.15 + 0.35 * _c.value;
+        return Stack(
+          children: [
+            child!,
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(
+                      context.appShape.panelRadius,
+                    ),
+                    border: Border.all(
+                      color: accent.withValues(alpha: glow),
+                      width: context.appLayout.borderThin * 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _GlassReactionOverlay extends StatefulWidget {

@@ -53,7 +53,125 @@ AppMotion rpgMotion({required bool reduceEffects}) {
         _RpgReactionOverlay(controller: controller, child: child),
     sendAffordance: (context, {required child, required isSending}) =>
         _RpgSendAffordance(isSending: isSending, child: child),
+    inFlightFrame: (context, {required child, required isSending}) =>
+        _RpgInFlightFrame(isSending: isSending, child: child),
   );
+}
+
+/// Runic circuit-trace frame: an animated dash-offset stroke that travels the
+/// border while [isSending].  Period ~2.4 s — continuous motion, not a strobe.
+class _RpgInFlightFrame extends StatefulWidget {
+  const _RpgInFlightFrame({required this.isSending, required this.child});
+  final bool isSending;
+  final Widget child;
+
+  @override
+  State<_RpgInFlightFrame> createState() => _RpgInFlightFrameState();
+}
+
+class _RpgInFlightFrameState extends State<_RpgInFlightFrame>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400), // circuit trace period
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isSending) unawaited(_c.repeat());
+  }
+
+  @override
+  void didUpdateWidget(_RpgInFlightFrame old) {
+    super.didUpdateWidget(old);
+    // Edge-detect on old.isSending (THEME_AUTHORING §3 restart guard).
+    if (widget.isSending && !old.isSending) {
+      unawaited(_c.repeat());
+    } else if (!widget.isSending && old.isSending) {
+      _c
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isSending) return widget.child;
+    // Child hoisted out of per-frame rebuilds.
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (context, child) => Stack(
+        children: [
+          child!,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _RpgCircuitTracePainter(phase: _c.value),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Draws a dashed border whose dash-offset advances with [phase] (0→1 loop),
+/// producing the "circuit trace travelling the frame" effect.
+class _RpgCircuitTracePainter extends CustomPainter {
+  _RpgCircuitTracePainter({required this.phase});
+  final double phase;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Two concentric rectangles: outer gold trace, inner arcane dim.
+    const dashLen = 12.0;
+    const gapLen = 8.0;
+    const pitch = dashLen + gapLen;
+    final perimeter = 2 * (size.width + size.height);
+
+    // Advance offset so the dash pattern travels counter-clockwise.
+    final offset = phase * perimeter;
+
+    void drawTracedRect(double inset, Color color, double strokeWidth) {
+      final rect = Rect.fromLTWH(
+        inset,
+        inset,
+        size.width - inset * 2,
+        size.height - inset * 2,
+      );
+      final path = Path()..addRect(rect);
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..color = color;
+      // Use path metrics to clip to dash pattern with animated offset.
+      final metrics = path.computeMetrics().toList();
+      for (final m in metrics) {
+        var pos = offset % pitch;
+        while (pos < m.length) {
+          final end = (pos + dashLen).clamp(0.0, m.length);
+          canvas.drawPath(m.extractPath(pos, end), paint);
+          pos += pitch;
+        }
+      }
+    }
+
+    drawTracedRect(1.5, RpgPalette.gold.withValues(alpha: 0.7), 1.8);
+    drawTracedRect(4, RpgPalette.arcane.withValues(alpha: 0.35), 1);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RpgCircuitTracePainter old) =>
+      old.phase != phase;
 }
 
 class _RpgReactionOverlay extends StatefulWidget {
