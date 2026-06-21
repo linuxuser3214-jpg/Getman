@@ -229,10 +229,14 @@ void main() {
       // splitRatio=0.0 is BELOW the [0.1, 0.9] range. Without the clamp in
       // _ratioToFlex, the request pane would get flex=0 and occupy zero width.
       // The clamp floors it to 0.1 (flex=100), keeping both panes non-zero.
-      // Note: pumping at an extreme narrow ratio can trigger pre-existing
-      // overflow in inner rows (e.g., the tab-strip at ~80 px wide) that are
-      // unrelated to the clamp; we drain those and assert only what matters:
-      // both top-level panes have positive width.
+      // Use a wide surface so the clamped 10% pane (~300 px) is wide enough for
+      // the inner tab strip: the clamp is what we test, so the pump stays
+      // overflow-clean and we assert strictly (no draining).
+      tester.view.physicalSize = const Size(3000, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await _pump(
         tester,
         tabsBloc: tabsBloc,
@@ -240,11 +244,7 @@ void main() {
         settings: _settingsBloc(splitRatio: 0),
       );
 
-      // Drain any layout-overflow exceptions emitted by inner widgets that are
-      // simply too wide for a 10 %-of-window pane. These are pre-existing and
-      // distinct from the clamp concern (the clamp prevents the pane reaching
-      // zero, it does not guarantee inner widgets fit in a very narrow pane).
-      tester.takeException();
+      expect(tester.takeException(), isNull);
 
       // The essential assertion: both panes must be laid out with positive
       // width, proving the clamp converted flex=0 → flex=100.
@@ -262,7 +262,7 @@ void main() {
       );
 
       await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-      tester.takeException(); // drain teardown timer cancellation noise
+      expect(tester.takeException(), isNull);
       await tester.pump(const Duration(seconds: 11));
     },
   );
@@ -283,8 +283,13 @@ void main() {
       // _ratioToFlex, the response pane would get flex=_ratioToFlex(1-1.0)=0
       // and occupy zero width. The clamp caps it to 0.9 so the response pane
       // retains flex=100 (10% of total) and remains visible.
-      // Note: the response pane at ~10% width may trigger pre-existing
-      // overflow in inner widgets; we drain those and assert only pane widths.
+      // Wide surface so the clamped 10% response pane is wide enough for its
+      // inner widgets — the clamp is what we test, so we assert strictly.
+      tester.view.physicalSize = const Size(3000, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await _pump(
         tester,
         tabsBloc: tabsBloc,
@@ -292,10 +297,7 @@ void main() {
         settings: _settingsBloc(splitRatio: 1),
       );
 
-      // Drain any layout-overflow exceptions from inner widgets that are too
-      // wide for a 10 %-of-window pane — these are pre-existing and unrelated
-      // to the clamp logic.
-      tester.takeException();
+      expect(tester.takeException(), isNull);
 
       // The essential assertion: both panes must be laid out with positive
       // width, proving the clamp converted flex=0 → flex=100.
@@ -313,7 +315,7 @@ void main() {
       );
 
       await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-      tester.takeException(); // drain teardown timer cancellation noise
+      expect(tester.takeException(), isNull);
       await tester.pump(const Duration(seconds: 11));
     },
   );
