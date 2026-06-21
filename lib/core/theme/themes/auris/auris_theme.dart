@@ -6,6 +6,7 @@ import 'package:getman/core/theme/extensions/app_layout.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
 import 'package:getman/core/theme/extensions/app_shape.dart';
 import 'package:getman/core/theme/extensions/app_typography.dart';
+import 'package:getman/core/theme/themes/auris/auris_ambient.dart';
 import 'package:getman/core/theme/themes/auris/auris_components.dart';
 import 'package:getman/core/theme/themes/auris/auris_decorations.dart';
 import 'package:getman/core/theme/themes/auris/auris_motion.dart';
@@ -21,7 +22,8 @@ import 'package:getman/core/theme/themes/auris/auris_palette.dart';
 ///
 /// Phase D1 wires the AURIS component slots via [aurisComponents].
 /// Phase E1 replaces the identity [AppMotion] with `aurisMotion(...)`.
-/// Phase E2 replaces [aurisScaffoldBackground] with the real ambient.
+/// Task 12 wires the real animated ambient (the C1/C2 base, plumbing
+/// AmbientSignals) via `auris_ambient.dart`.
 ThemeData aurisTheme(
   Brightness brightness, {
   bool isCompact = false,
@@ -70,10 +72,11 @@ ThemeData aurisTheme(
       animate: !reduceEffects,
       child: child,
     ),
-    // Animated scanlines + drifting hex ornaments; static under reduceEffects.
+    // Animated scanning HUD grid + radar sweep + telemetry ticks; static grid
+    // frame under reduceEffects. Plumbs AmbientSignals (C1/C2 base, Task 12).
     scaffoldBackground: reduceEffects
         ? aurisStaticScaffoldBackground
-        : aurisScaffoldBackground,
+        : aurisScaffoldBackgroundAnimated,
   );
 
   return base.copyWith(
